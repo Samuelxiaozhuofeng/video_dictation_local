@@ -1,0 +1,32 @@
+1
+00:00:00,000 --> 00:00:03,000
+¡Hola! ¿Cómo estás?
+
+2
+00:00:03,500 --> 00:00:06,000
+Estoy bien, gracias. ¿Y tú?
+
+3
+00:00:06,500 --> 00:00:10,000
+El niño está en España.
+
+4
+00:00:10,500 --> 00:00:14,000
+¿Dónde está la señorita Martínez?
+
+5
+00:00:14,500 --> 00:00:18,000
+Mañana voy a la montaña.
+
+6
+00:00:18,500 --> 00:00:22,000
+José y María están en Bogotá.
+
+7
+00:00:22,500 --> 00:00:26,000
+¿Cuántos años tienes? Tengo veintiún años.
+
+8
+00:00:26,500 --> 00:00:30,000
+La música clásica es muy hermosa.
+

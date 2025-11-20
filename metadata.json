@@ -1,0 +1,5 @@
+{
+  "name": "视频APP",
+  "description": "A video-based language learning tool allowing users to practice listening and typing using their own MP4 videos and subtitles.",
+  "requestFramePermissions": []
+}
