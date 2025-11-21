@@ -20,6 +20,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   const [aiModel, setAiModel] = useState('gemini-2.5-flash');
   const [aiTemperature, setAiTemperature] = useState(0.7);
   const [aiPrompt, setAiPrompt] = useState(AI.DEFAULT_PROMPT);
+  const [aiApiKey, setAiApiKey] = useState('');
 
   // Practice Configuration State
   const [sectionLength, setSectionLength] = useState(0);
@@ -51,6 +52,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     setAiModel(savedAI.model);
     setAiTemperature(savedAI.temperature);
     setAiPrompt(savedAI.promptTemplate || AI.DEFAULT_PROMPT);
+    setAiApiKey(savedAI.apiKey || '');
 
     // Load Practice Config
     const savedPractice = Storage.getPracticeConfig();
@@ -113,7 +115,8 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     const aiConfig: AIConfig = {
         model: aiModel,
         temperature: aiTemperature,
-        promptTemplate: aiPrompt
+        promptTemplate: aiPrompt,
+        apiKey: aiApiKey
     };
     AI.saveAIConfig(aiConfig);
 
@@ -201,7 +204,36 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 <Sparkles className="w-5 h-5 text-brand-400" />
                 AI Configuration
              </h2>
-             
+
+             {/* API Key Input */}
+             <div className="mb-6 pb-6 border-b border-slate-800">
+                <label className="block text-sm text-slate-400 mb-2">
+                   Gemini API Key
+                   <span className="text-red-400 ml-1">*</span>
+                </label>
+                <input
+                   type="password"
+                   value={aiApiKey}
+                   onChange={(e) => setAiApiKey(e.target.value)}
+                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-brand-500 outline-none font-mono text-sm"
+                   placeholder="Enter your Gemini API Key..."
+                />
+                <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                   <p className="text-xs text-blue-300 mb-2">
+                      <strong>How to get your API Key:</strong>
+                   </p>
+                   <ol className="text-xs text-blue-200 space-y-1 ml-4 list-decimal">
+                      <li>Visit <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline hover:text-white">Google AI Studio</a></li>
+                      <li>Sign in with your Google account</li>
+                      <li>Click "Create API Key"</li>
+                      <li>Copy and paste it here</li>
+                   </ol>
+                   <p className="text-xs text-blue-300 mt-2">
+                      🔒 Your API Key is stored locally in your browser and never sent to our servers.
+                   </p>
+                </div>
+             </div>
+
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                    <label className="block text-sm text-slate-400 mb-2">Model</label>

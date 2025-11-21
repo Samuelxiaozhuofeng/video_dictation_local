@@ -5,11 +5,15 @@ const STORAGE_KEY_AI = 'linguaclip_ai_config';
 
 export const DEFAULT_PROMPT = `Define the word "{word}" as it is used in this sentence: "{context}". Provide a brief definition and its part of speech.`;
 
-const getClient = () => {
-    if (!process.env.API_KEY) {
-        console.warn("API_KEY is missing from environment variables.");
+const getClient = (userApiKey?: string) => {
+    // Priority: 1. User's API Key, 2. Environment variable
+    const apiKey = userApiKey || process.env.API_KEY || '';
+
+    if (!apiKey) {
+        throw new Error("No API Key provided. Please enter your Gemini API Key in Settings.");
     }
-    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+    return new GoogleGenAI({ apiKey });
 };
 
 export const getAIConfig = (): AIConfig => {
@@ -18,17 +22,23 @@ export const getAIConfig = (): AIConfig => {
         const config = stored ? JSON.parse(stored) : {
             model: 'gemini-2.5-flash',
             temperature: 0.7,
-            promptTemplate: DEFAULT_PROMPT
+            promptTemplate: DEFAULT_PROMPT,
+            apiKey: ''
         };
-        
+
         // Backwards compatibility: ensure promptTemplate exists
         if (!config.promptTemplate) {
             config.promptTemplate = DEFAULT_PROMPT;
         }
-        
+
+        // Backwards compatibility: ensure apiKey exists
+        if (!config.apiKey) {
+            config.apiKey = '';
+        }
+
         return config;
     } catch (e) {
-        return { model: 'gemini-2.5-flash', temperature: 0.7, promptTemplate: DEFAULT_PROMPT };
+        return { model: 'gemini-2.5-flash', temperature: 0.7, promptTemplate: DEFAULT_PROMPT, apiKey: '' };
     }
 };
 
@@ -44,9 +54,9 @@ export interface WordDefinition {
 
 export const getWordDefinition = async (word: string, context: string): Promise<WordDefinition> => {
     try {
-        const ai = getClient();
         const config = getAIConfig();
-        
+        const ai = getClient(config.apiKey);
+
         const promptTemplate = config.promptTemplate || DEFAULT_PROMPT;
         const prompt = promptTemplate
             .replace('{word}', word)
@@ -76,6 +86,16 @@ export const getWordDefinition = async (word: string, context: string): Promise<
         throw new Error("No response text from AI");
     } catch (error) {
         console.error("AI Definition Error:", error);
+
+        // Check if it's an API key error
+        if (error instanceof Error && error.message.includes("API Key")) {
+            return {
+                word: word,
+                definition: "Please enter your Gemini API Key in Settings to use AI features.",
+                partOfSpeech: "Error"
+            };
+        }
+
         // Fallback
         return {
             word: word,

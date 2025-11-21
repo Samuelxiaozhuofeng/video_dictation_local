@@ -58,6 +58,7 @@ export interface AIConfig {
   model: string;
   temperature: number;
   promptTemplate?: string;
+  apiKey?: string; // User's own Gemini API Key
 }
 
 export const APP_DATA_FIELDS = [
