@@ -1,90 +1,46 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { 
-  Upload, 
-  Play, 
-  Pause, 
-  SkipBack, 
-  SkipForward, 
-  Volume2, 
-  VolumeX, 
-  FileVideo,
-  FileText,
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  VolumeX,
   RotateCcw,
-  AlertCircle,
   Bookmark,
   X,
   Trash2,
   PlayCircle,
-  Library,
   Settings as SettingsIcon,
   PlusCircle,
   Check,
   Mic,
   ChevronLeft,
-  ChevronRight,
-  List,
-  Maximize2
+  ChevronRight
 } from 'lucide-react';
-import { AppState, PracticeMode, Subtitle, VideoSection } from './types';
+import { AppState, PracticeMode, Subtitle, VideoSection, VideoRecord } from './types';
 import { parseSRT } from './utils/srtParser';
 import * as Storage from './utils/storage';
 import * as Anki from './utils/anki';
+import * as VideoStorage from './utils/videoStorage';
 import InputFeedback from './components/InputFeedback';
 import SavedLibrary from './components/SavedLibrary';
 import Settings from './components/Settings';
-
-// --- Helper Component: File Upload ---
-const FileDropZone = ({ 
-    accept, 
-    label, 
-    icon: Icon, 
-    onFileSelect, 
-    selectedFile 
-}: { 
-    accept: string, 
-    label: string, 
-    icon: any, 
-    onFileSelect: (f: File) => void,
-    selectedFile: File | null
-}) => {
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        if (e.dataTransfer.files?.[0]) onFileSelect(e.dataTransfer.files[0]);
-    };
-
-    return (
-        <div 
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={handleDrop}
-            className={`relative border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center transition-all cursor-pointer group
-                ${selectedFile 
-                    ? 'border-brand-500 bg-brand-500/10' 
-                    : 'border-slate-700 bg-slate-800/50 hover:border-brand-400 hover:bg-slate-800'
-                }`}
-        >
-            <input 
-                type="file" 
-                accept={accept} 
-                className="absolute inset-0 opacity-0 cursor-pointer" 
-                onChange={(e) => e.target.files?.[0] && onFileSelect(e.target.files[0])}
-            />
-            <div className={`p-4 rounded-full mb-3 transition-colors ${selectedFile ? 'bg-brand-500 text-white' : 'bg-slate-700 text-slate-400 group-hover:bg-slate-600'}`}>
-                <Icon className="w-8 h-8" />
-            </div>
-            <p className="text-lg font-medium text-slate-200">{selectedFile ? selectedFile.name : label}</p>
-            <p className="text-sm text-slate-500 mt-1">{selectedFile ? 'Click or drag to replace' : 'Click to browse or drag file here'}</p>
-        </div>
-    );
-};
+import VideoLibrary from './components/VideoLibrary';
+import UploadSection from './components/UploadSection';
 
 export default function App() {
   // --- State ---
   const [appState, setAppState] = useState<AppState>(AppState.UPLOAD);
-  
+
   // Resources
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [subtitleFile, setSubtitleFile] = useState<File | null>(null);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
+
+  // Video History
+  const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
+  const [uploadTab, setUploadTab] = useState<'library' | 'upload'>('library');
   
   // Subtitles & Sections
   const [fullSubtitles, setFullSubtitles] = useState<Subtitle[]>([]);
@@ -117,7 +73,7 @@ export default function App() {
 
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
-  const requestRef = useRef<number>();
+  const requestRef = useRef<number | undefined>(undefined);
 
   // --- Effects & Logic ---
 
@@ -128,6 +84,13 @@ export default function App() {
       setAnkiConfig(Anki.getAnkiConfig());
     }
   }, [appState]);
+
+  // Auto-save progress when subtitle index changes
+  useEffect(() => {
+    if (currentVideoId && appState === AppState.PRACTICE && currentSubtitleIndex > 0) {
+      VideoStorage.updateProgress(currentVideoId, currentSubtitleIndex, currentSectionIndex);
+    }
+  }, [currentSubtitleIndex, currentSectionIndex, currentVideoId, appState]);
 
   // Video Loop for pausing at end of subtitle
   const checkVideoTime = useCallback(() => {
@@ -240,16 +203,19 @@ export default function App() {
 
   // --- Handlers ---
 
-  const handleStartPractice = async () => {
-    if (videoFile && subtitleFile) {
+  const handleStartPractice = async (vFile?: File, sFile?: File, startIndex?: number, startSectionIndex?: number, videoId?: string) => {
+    const vf = vFile || videoFile;
+    const sf = sFile || subtitleFile;
+
+    if (vf && sf) {
       try {
-        const subText = await subtitleFile.text();
+        const subText = await sf.text();
         const parsed = parseSRT(subText);
         if (parsed.length === 0) {
             alert("No subtitles found in file. Please check the format.");
             return;
         }
-        
+
         const storedLines = Storage.getSavedLines();
         const previouslySavedIds = new Set<number>();
         parsed.forEach(sub => {
@@ -261,18 +227,18 @@ export default function App() {
         // 1. Setup Sections
         const computedSections: VideoSection[] = [];
         const pConfig = Storage.getPracticeConfig();
-        
+
         if (pConfig.sectionLength > 0) {
             const sectionDuration = pConfig.sectionLength * 60;
             const lastTime = parsed[parsed.length - 1].endTime;
-            
+
             let currentTime = 0;
             let secId = 1;
-            
+
             while (currentTime < lastTime) {
                 const endTime = currentTime + sectionDuration;
                 const sectionSubs = parsed.filter(s => s.startTime >= currentTime && s.startTime < endTime);
-                
+
                 // Only add section if it has content or it's the first one
                 if (sectionSubs.length > 0 || secId === 1) {
                     computedSections.push({
@@ -280,11 +246,11 @@ export default function App() {
                         label: `Section ${secId}`,
                         startTime: currentTime,
                         endTime: endTime,
-                        subtitleIndices: [], 
+                        subtitleIndices: [],
                         subtitles: sectionSubs
                     });
                 }
-                
+
                 currentTime = endTime;
                 secId++;
             }
@@ -300,16 +266,37 @@ export default function App() {
             });
         }
 
+        // Save video record to history if this is a new upload
+        let recordId = videoId;
+        if (!videoId) {
+          try {
+            const record = await VideoStorage.createVideoRecord(
+              vf,
+              sf,
+              subText,
+              parsed.length
+            );
+            recordId = record.id;
+          } catch (error) {
+            console.error('Failed to save video record:', error);
+          }
+        }
+
+        setCurrentVideoId(recordId || null);
         setFullSubtitles(parsed);
         setSections(computedSections);
-        setCurrentSectionIndex(0);
-        setSubtitles(computedSections[0].subtitles);
+
+        const initialSectionIndex = startSectionIndex ?? 0;
+        const initialSubtitleIndex = startIndex ?? 0;
+
+        setCurrentSectionIndex(initialSectionIndex);
+        setSubtitles(computedSections[initialSectionIndex].subtitles);
         setSavedIds(previouslySavedIds);
-        setVideoSrc(URL.createObjectURL(videoFile));
+        setVideoSrc(URL.createObjectURL(vf));
         setAppState(AppState.PRACTICE);
-        setCurrentSubtitleIndex(0);
+        setCurrentSubtitleIndex(initialSubtitleIndex);
         setMode(PracticeMode.LISTENING);
-        
+
       } catch (e) {
         alert("Error parsing subtitle file.");
         console.error(e);
@@ -319,6 +306,62 @@ export default function App() {
 
   const handleInputComplete = (wasCorrect: boolean) => {
      setMode(PracticeMode.FEEDBACK);
+  };
+
+  // Handle continuing practice from video library
+  const handleContinueFromLibrary = async (record: VideoRecord) => {
+    try {
+      // Try to get video file from stored handle (File System Access API)
+      let videoFileFromHandle = await VideoStorage.getVideoFileFromRecord(record);
+
+      // If file handle not available, prompt user to select the video file
+      if (!videoFileFromHandle) {
+        const confirmed = confirm(
+          `Please select the video file: "${record.videoFileName}"\n\n` +
+          `Your progress and subtitles are saved, you just need to select the video file again.`
+        );
+
+        if (!confirmed) return;
+
+        // Prompt user to select video file
+        try {
+          const [fileHandle] = await (window as any).showOpenFilePicker({
+            types: [{
+              description: 'Video files',
+              accept: { 'video/*': ['.mp4', '.webm', '.mkv', '.avi'] }
+            }],
+            multiple: false
+          });
+
+          videoFileFromHandle = await fileHandle.getFile();
+
+          // Save the new file handle for future use
+          await VideoStorage.saveVideoFileHandle(record.id, fileHandle);
+        } catch (err) {
+          console.error('User cancelled file selection:', err);
+          return;
+        }
+      }
+
+      // Create subtitle file from stored text
+      const subtitleFileFromRecord = VideoStorage.getSubtitleFileFromRecord(record);
+
+      // Set files for display
+      setVideoFile(videoFileFromHandle);
+      setSubtitleFile(subtitleFileFromRecord);
+
+      // Start practice with saved progress
+      await handleStartPractice(
+        videoFileFromHandle,
+        subtitleFileFromRecord,
+        record.currentSubtitleIndex,
+        record.currentSectionIndex,
+        record.id
+      );
+    } catch (error) {
+      console.error('Failed to continue from library:', error);
+      alert('Failed to load video. Please try again.');
+    }
   };
 
   const handleContinue = () => {
@@ -643,69 +686,77 @@ export default function App() {
 
   if (appState === AppState.UPLOAD) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      <div className="min-h-screen bg-slate-900 flex flex-col p-6 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 opacity-20 pointer-events-none">
             <div className="absolute -top-24 -left-24 w-96 h-96 bg-brand-500 rounded-full blur-3xl"></div>
             <div className="absolute top-1/2 right-0 w-64 h-64 bg-purple-500 rounded-full blur-3xl"></div>
         </div>
 
-        <div className="absolute top-6 right-6 z-20 flex gap-3">
-           <button 
-             onClick={() => setAppState(AppState.SETTINGS)}
-             className="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 transition-colors shadow-lg"
-             title="Settings"
-           >
-              <SettingsIcon className="w-5 h-5" />
-           </button>
-           <button 
-             onClick={() => setAppState(AppState.LIBRARY)}
-             className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 transition-colors shadow-lg"
-           >
-              <Bookmark className="w-4 h-4 text-brand-400" />
-              <span>My Collection</span>
-           </button>
+        {/* Header */}
+        <div className="relative z-10 w-full max-w-6xl mx-auto mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-white tracking-tight mb-2">LinguaClip Practice</h1>
+              <p className="text-slate-400 text-lg">Master language listening by typing what you hear from your favorite videos.</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setAppState(AppState.SETTINGS)}
+                className="p-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 transition-colors shadow-lg"
+                title="Settings"
+              >
+                <SettingsIcon className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setAppState(AppState.LIBRARY)}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 transition-colors shadow-lg"
+              >
+                <Bookmark className="w-4 h-4 text-brand-400" />
+                <span>My Collection</span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="relative z-10 w-full max-w-2xl bg-slate-900/80 backdrop-blur-xl border border-slate-700 p-10 rounded-3xl shadow-2xl">
-          <div className="text-center mb-10">
-            <h1 className="text-4xl font-bold text-white tracking-tight mb-3">LinguaClip Practice</h1>
-            <p className="text-slate-400 text-lg">Master language listening by typing what you hear from your favorite videos.</p>
-          </div>
-
-          <div className="space-y-6">
-            <FileDropZone 
-                accept="video/mp4" 
-                label="Upload Video (.mp4)" 
-                icon={FileVideo} 
-                selectedFile={videoFile}
-                onFileSelect={setVideoFile}
-            />
-            <FileDropZone 
-                accept=".srt,.txt" 
-                label="Upload Subtitles (.srt)" 
-                icon={FileText} 
-                selectedFile={subtitleFile}
-                onFileSelect={setSubtitleFile}
-            />
-          </div>
-
-          <div className="mt-10">
-            <button 
-                onClick={handleStartPractice}
-                disabled={!videoFile || !subtitleFile}
-                className="w-full py-4 bg-brand-600 hover:bg-brand-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-900/20 hover:shadow-brand-500/20"
+        {/* Tab Navigation */}
+        <div className="relative z-10 w-full max-w-6xl mx-auto mb-6">
+          <div className="flex gap-2 border-b border-slate-700">
+            <button
+              onClick={() => setUploadTab('library')}
+              className={`px-6 py-3 font-medium transition-all relative ${
+                uploadTab === 'library'
+                  ? 'text-brand-400'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
             >
-                Start Practice Session
-                <Play className="w-5 h-5 fill-current" />
+              📚 My Videos
+              {uploadTab === 'library' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-400"></div>
+              )}
             </button>
-            
-            {(!videoFile || !subtitleFile) && (
-                <div className="flex items-center justify-center gap-2 mt-4 text-slate-500 text-sm">
-                    <AlertCircle className="w-4 h-4" />
-                    <span>Both video and subtitle files are required to start.</span>
-                </div>
-            )}
+            <button
+              onClick={() => setUploadTab('upload')}
+              className={`px-6 py-3 font-medium transition-all relative ${
+                uploadTab === 'upload'
+                  ? 'text-brand-400'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              ➕ Upload New
+              {uploadTab === 'upload' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-400"></div>
+              )}
+            </button>
           </div>
+        </div>
+
+        {/* Tab Content */}
+        <div className="relative z-10 w-full max-w-6xl mx-auto flex-1 overflow-auto pb-6">
+          {uploadTab === 'library' ? (
+            <VideoLibrary onContinuePractice={handleContinueFromLibrary} />
+          ) : (
+            <UploadSection onStartPractice={(vf, sf) => handleStartPractice(vf, sf)} />
+          )}
         </div>
       </div>
     );

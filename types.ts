@@ -70,3 +70,33 @@ export const APP_DATA_FIELDS = [
   { key: 'definition', label: 'Word Definition (AI)' },
   { key: 'context', label: 'Context (Sentence)' },
 ];
+
+// Video History and Progress Types
+export interface VideoRecord {
+  id: string;                           // UUID
+  displayName: string;                  // Display name (from file name)
+  videoFileName: string;                // Original video file name
+  subtitleFileName: string;             // Original subtitle file name
+
+  // File access (for File System Access API)
+  videoFileHandle?: any;                // FileSystemFileHandle (stored separately in IndexedDB)
+  subtitleText: string;                 // Subtitle content (stored in IndexedDB)
+
+  // Progress information
+  currentSubtitleIndex: number;         // Current subtitle index
+  currentSectionIndex: number;          // Current section index
+  totalSubtitles: number;               // Total number of subtitles
+  completionRate: number;               // Completion percentage (0-100)
+
+  // Metadata
+  dateAdded: number;                    // Timestamp when added
+  lastPracticed: number;                // Timestamp of last practice
+  totalPracticeTime: number;            // Total practice time in seconds
+}
+
+export interface PracticeProgress {
+  videoId: string;
+  currentSubtitleIndex: number;
+  currentSectionIndex: number;
+  lastUpdated: number;
+}
