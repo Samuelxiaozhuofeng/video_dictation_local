@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Play,
   Pause,
@@ -18,18 +18,18 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
-import { AppState, PracticeMode, Subtitle, VideoSection, VideoRecord } from './types';
-import { parseSRT } from './utils/srtParser';
+import { AppState, PracticeMode, VideoRecord } from './types';
 import * as Storage from './utils/storage';
-import * as Anki from './utils/anki';
 import InputFeedback from './components/InputFeedback';
 import SavedLibrary from './components/SavedLibrary';
 import Settings from './components/Settings';
 import VideoLibrary from './components/VideoLibrary';
 import UploadSection from './components/UploadSection';
-import { useVideoPlayer } from './hooks/useVideoPlayer';
 import { useVideoHistory } from './hooks/useVideoHistory';
 import { usePracticeSession } from './hooks/usePracticeSession';
+import { useAnkiIntegration } from './hooks/useAnkiIntegration';
+import { useSavedLines } from './hooks/useSavedLines';
+import { useVideoController } from './hooks/useVideoController';
 
 export default function App() {
   // --- State ---
@@ -38,7 +38,6 @@ export default function App() {
   // Resources
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [subtitleFile, setSubtitleFile] = useState<File | null>(null);
-  const [videoSrc, setVideoSrc] = useState<string | null>(null);
 
   // Video History Hook
   const {
@@ -62,9 +61,7 @@ export default function App() {
     mode,
     showSectionComplete,
     shouldAutoAdvance,
-    setFullSubtitles,
     setSubtitles,
-    setSections,
     setCurrentSectionIndex,
     setCurrentSubtitleIndex,
     setMode,
@@ -72,28 +69,38 @@ export default function App() {
     setShouldAutoAdvance,
     switchSection,
     handleContinue: practiceHandleContinue,
-    handleNextSection
+    handleNextSection,
+    initializePractice
   } = usePracticeSession({
     videoId: currentVideoId,
     appState
   });
 
-  // Saved Lines State
-  const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
-  const [showSavedList, setShowSavedList] = useState(false);
-
-  // Anki State
-  const [ankiConfig, setAnkiConfig] = useState(Anki.getAnkiConfig());
-  const [ankiStatus, setAnkiStatus] = useState<'idle' | 'recording' | 'adding' | 'success' | 'error'>('idle');
-
   // Config
   const [practiceConfig, setPracticeConfig] = useState(Storage.getPracticeConfig());
 
-  // Refs
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  // Video Player Hook
+  // Saved Lines Hook
   const {
+    savedIds,
+    showSavedList,
+    savedItems,
+    setShowSavedList,
+    toggleSave: savedLinesToggleSave,
+    deleteSavedItem: savedLinesDeleteSavedItem,
+    isCurrentSaved: savedLinesIsCurrentSaved,
+    loadSavedIds,
+    setSavedIds
+  } = useSavedLines({
+    videoId: currentVideoId,
+    fullSubtitles,
+    videoFileName: videoFile?.name || null
+  });
+
+  // Video Controller Hook (integrates videoRef, videoSrc, and useVideoPlayer)
+  const {
+    videoRef,
+    videoSrc,
+    setVideoSrc,
     isPlaying,
     volume,
     playbackSpeed,
@@ -105,8 +112,7 @@ export default function App() {
     togglePlay,
     handleProgressSeek: videoPlayerHandleProgressSeek,
     handleReplayCurrent
-  } = useVideoPlayer({
-    videoRef,
+  } = useVideoController({
     subtitles,
     currentSubtitleIndex,
     mode,
@@ -129,15 +135,29 @@ export default function App() {
     onShouldAutoAdvanceChange: setShouldAutoAdvance
   });
 
+  // Anki Integration Hook
+  const {
+    ankiConfig,
+    ankiStatus,
+    setAnkiConfig,
+    setAnkiStatus,
+    handleAddToAnki: ankiHandleAddToAnki,
+    handleWordToAnki: ankiHandleWordToAnki,
+    reloadConfig: reloadAnkiConfig
+  } = useAnkiIntegration({
+    videoRef,
+    videoFileName: videoFile?.name || null
+  });
+
   // --- Effects & Logic ---
 
   // Load configs
   useEffect(() => {
     setPracticeConfig(Storage.getPracticeConfig());
     if (appState !== AppState.SETTINGS) {
-      setAnkiConfig(Anki.getAnkiConfig());
+      reloadAnkiConfig();
     }
-  }, [appState]);
+  }, [appState, reloadAnkiConfig]);
 
   // Auto-save progress when subtitle index changes
   useEffect(() => {
@@ -155,61 +175,17 @@ export default function App() {
     if (vf && sf) {
       try {
         const subText = await sf.text();
-        const parsed = parseSRT(subText);
-        if (parsed.length === 0) {
-            alert("No subtitles found in file. Please check the format.");
-            return;
+
+        // Use the hook's initializePractice method
+        const result = initializePractice(subText, startIndex, startSectionIndex);
+
+        if (!result) {
+          alert("No subtitles found in file. Please check the format.");
+          return;
         }
 
-        const storedLines = Storage.getSavedLines();
-        const previouslySavedIds = new Set<number>();
-        parsed.forEach(sub => {
-           if (storedLines.some(l => l.text === sub.text)) {
-               previouslySavedIds.add(sub.id);
-           }
-        });
-
-        // 1. Setup Sections
-        const computedSections: VideoSection[] = [];
-        const pConfig = Storage.getPracticeConfig();
-
-        if (pConfig.sectionLength > 0) {
-            const sectionDuration = pConfig.sectionLength * 60;
-            const lastTime = parsed[parsed.length - 1].endTime;
-
-            let currentTime = 0;
-            let secId = 1;
-
-            while (currentTime < lastTime) {
-                const endTime = currentTime + sectionDuration;
-                const sectionSubs = parsed.filter(s => s.startTime >= currentTime && s.startTime < endTime);
-
-                // Only add section if it has content or it's the first one
-                if (sectionSubs.length > 0 || secId === 1) {
-                    computedSections.push({
-                        id: secId,
-                        label: `Section ${secId}`,
-                        startTime: currentTime,
-                        endTime: endTime,
-                        subtitleIndices: [],
-                        subtitles: sectionSubs
-                    });
-                }
-
-                currentTime = endTime;
-                secId++;
-            }
-        } else {
-            // Single Section
-            computedSections.push({
-                id: 1,
-                label: "Full Video",
-                startTime: 0,
-                endTime: parsed[parsed.length - 1].endTime + 10,
-                subtitleIndices: [],
-                subtitles: parsed
-            });
-        }
+        const { parsed } = result;
+        const previouslySavedIds = loadSavedIds(parsed);
 
         // Save video record to history if this is a new upload
         let recordId = videoId;
@@ -228,19 +204,9 @@ export default function App() {
         }
 
         setCurrentVideoId(recordId || null);
-        setFullSubtitles(parsed);
-        setSections(computedSections);
-
-        const initialSectionIndex = startSectionIndex ?? 0;
-        const initialSubtitleIndex = startIndex ?? 0;
-
-        setCurrentSectionIndex(initialSectionIndex);
-        setSubtitles(computedSections[initialSectionIndex].subtitles);
         setSavedIds(previouslySavedIds);
         setVideoSrc(URL.createObjectURL(vf));
         setAppState(AppState.PRACTICE);
-        setCurrentSubtitleIndex(initialSubtitleIndex);
-        setMode(PracticeMode.LISTENING);
 
       } catch (e) {
         alert("Error parsing subtitle file.");
@@ -372,187 +338,25 @@ export default function App() {
   const toggleSaveCurrent = () => {
       const currentSub = subtitles[currentSubtitleIndex];
       if (!currentSub) return;
-      
-      const isSaved = savedIds.has(currentSub.id);
-      
-      if (isSaved) {
-          setSavedIds(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(currentSub.id);
-              return newSet;
-          });
-          Storage.removeLineFromStorage(currentSub.text);
-      } else {
-          setSavedIds(prev => {
-              const newSet = new Set(prev);
-              newSet.add(currentSub.id);
-              return newSet;
-          });
-          Storage.saveLineToStorage(currentSub, videoFile?.name || 'Unknown Video');
-      }
+      savedLinesToggleSave(currentSub);
   };
 
-  // --- Anki Integration ---
-
-  const captureAudioClip = async (start: number, end: number): Promise<string | null> => {
-    const video = videoRef.current;
-    if (!video) return null;
-
-    // Check for browser support
-    const stream: MediaStream | null = (video as any).captureStream ? (video as any).captureStream() : 
-                                       (video as any).mozCaptureStream ? (video as any).mozCaptureStream() : null;
-    
-    if (!stream) return null;
-
-    const audioTrack = stream.getAudioTracks()[0];
-    if (!audioTrack) return null;
-
-    const recorder = new MediaRecorder(new MediaStream([audioTrack]), { mimeType: 'audio/webm' });
-    const chunks: BlobPart[] = [];
-    const originalTime = video.currentTime;
-    const wasPlaying = !video.paused;
-
-    return new Promise((resolve) => {
-        recorder.ondataavailable = e => { 
-            if (e.data.size > 0) chunks.push(e.data); 
-        };
-
-        recorder.onstop = () => {
-            const blob = new Blob(chunks, { type: 'audio/webm' });
-            const reader = new FileReader();
-            reader.readAsDataURL(blob);
-            reader.onloadend = () => {
-                const result = reader.result as string;
-                const base64 = result.includes(',') ? result.split(',')[1] : result;
-                
-                // Restore state
-                video.currentTime = originalTime;
-                if (!wasPlaying) video.pause();
-                
-                resolve(base64);
-            }
-        };
-
-        // Start recording sequence
-        video.currentTime = start;
-        recorder.start();
-        video.play().catch(e => console.error("Record playback failed", e));
-
-        const duration = (end - start) * 1000;
-        
-        // Stop slightly after duration to ensure we catch the end
-        setTimeout(() => {
-            if (recorder.state !== 'inactive') {
-                recorder.stop();
-                video.pause();
-            }
-        }, duration + 50); // 50ms buffer
-    });
-  };
-
-  const captureMedia = async (currentSub: Subtitle) => {
-      let screenshotBase64 = undefined;
-      let audioBase64 = undefined;
-
-      if (!ankiConfig) return { screenshotBase64, audioBase64 };
-
-      const mappingValues = Object.values(ankiConfig.fieldMapping);
-      const needsScreenshot = mappingValues.includes('screenshot');
-      const needsAudio = mappingValues.includes('audio');
-
-      // 1. Capture Screenshot
-      if (videoRef.current && needsScreenshot) {
-          try {
-              const canvas = document.createElement('canvas');
-              canvas.width = videoRef.current.videoWidth;
-              canvas.height = videoRef.current.videoHeight;
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                  ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-                  screenshotBase64 = canvas.toDataURL('image/jpeg', 0.8);
-              }
-          } catch (e) {
-              console.error("Screenshot capture failed", e);
-          }
-      }
-
-      // 2. Capture Audio
-      if (needsAudio && videoRef.current) {
-          try {
-              const result = await captureAudioClip(currentSub.startTime, currentSub.endTime);
-              if (result) audioBase64 = result;
-          } catch (e) {
-              console.error("Audio capture failed", e);
-          }
-      }
-
-      return { screenshotBase64, audioBase64 };
-  };
+  // --- Anki Integration (using Hook) ---
 
   const handleAddToAnki = async () => {
-    if (!ankiConfig) {
-      alert("Please configure Anki settings first.");
-      return;
-    }
-    if (ankiStatus !== 'idle') return;
-
     const currentSub = subtitles[currentSubtitleIndex];
     if (!currentSub) return;
-
-    const needsAudio = Object.values(ankiConfig.fieldMapping).includes('audio');
-    if (needsAudio) setAnkiStatus('recording');
-    else setAnkiStatus('adding');
-
-    const { screenshotBase64, audioBase64 } = await captureMedia(currentSub);
-
-    setAnkiStatus('adding');
-    try {
-        await Anki.addNote(ankiConfig, {
-            sentence: currentSub.text,
-            videoName: videoFile?.name || 'Unknown',
-            timestamp: Storage.formatTimeCode(currentSub.startTime),
-            screenshotBase64,
-            audioBase64
-        });
-        setAnkiStatus('success');
-        setTimeout(() => setAnkiStatus('idle'), 2000);
-    } catch (e: any) {
-        console.error(e);
-        setAnkiStatus('error');
-        alert("Failed to add to Anki: " + e.message);
-        setTimeout(() => setAnkiStatus('idle'), 3000);
-    }
+    await ankiHandleAddToAnki(currentSub);
   };
 
   const handleWordToAnki = async (word: string, definition: string) => {
-      if (!ankiConfig || !subtitles[currentSubtitleIndex]) return;
-      
-      const currentSub = subtitles[currentSubtitleIndex];
-      
-      const { screenshotBase64, audioBase64 } = await captureMedia(currentSub);
-      
-      await Anki.addNote(ankiConfig, {
-          sentence: currentSub.text,
-          videoName: videoFile?.name || 'Unknown',
-          timestamp: Storage.formatTimeCode(currentSub.startTime),
-          screenshotBase64,
-          audioBase64,
-          word,
-          definition
-      });
+    const currentSub = subtitles[currentSubtitleIndex];
+    if (!currentSub) return;
+    await ankiHandleWordToAnki(word, definition, currentSub);
   };
 
   const deleteSavedItem = (id: number, e: React.MouseEvent) => {
-      e.stopPropagation();
-      const sub = fullSubtitles.find(s => s.id === id);
-      if (sub) {
-          setSavedIds(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(id);
-            return newSet;
-          });
-          Storage.removeLineFromStorage(sub.text);
-      }
+      savedLinesDeleteSavedItem(id, e);
   };
 
   const jumpToSaved = (id: number) => {
@@ -666,8 +470,7 @@ export default function App() {
 
   // PRACTICE MODE
   const currentSub = subtitles[currentSubtitleIndex];
-  const isCurrentSaved = currentSub && savedIds.has(currentSub.id);
-  const savedItems = fullSubtitles.filter(s => savedIds.has(s.id));
+  const isCurrentSaved = savedLinesIsCurrentSaved(currentSub);
 
   return (
     <div className="h-screen w-screen bg-black text-slate-200 overflow-hidden relative flex flex-col">
