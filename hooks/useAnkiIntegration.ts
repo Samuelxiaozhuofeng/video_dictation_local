@@ -34,15 +34,32 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
     setAnkiConfig(Anki.getAnkiConfig());
   }, []);
 
-  // Capture audio clip from video
+  // Capture audio clip from video with padding
   const captureAudioClip = useCallback(async (start: number, end: number): Promise<string | null> => {
     const video = videoRef.current;
     if (!video) return null;
 
+    // Get audio padding configuration
+    const paddingConfig = Storage.getAudioPaddingConfig();
+    const startPaddingSec = paddingConfig.startPadding / 1000;
+    const endPaddingSec = paddingConfig.endPadding / 1000;
+
+    // Apply padding
+    const paddedStart = start - startPaddingSec;
+    const paddedEnd = end + endPaddingSec;
+
+    // Boundary checks
+    if (paddedStart < 0) {
+      throw new Error(`Audio padding error: Start time (${paddedStart.toFixed(2)}s) is before video start. Please reduce start padding.`);
+    }
+    if (paddedEnd > video.duration) {
+      throw new Error(`Audio padding error: End time (${paddedEnd.toFixed(2)}s) exceeds video duration (${video.duration.toFixed(2)}s). Please reduce end padding.`);
+    }
+
     // Check for browser support
-    const stream: MediaStream | null = (video as any).captureStream ? (video as any).captureStream() : 
+    const stream: MediaStream | null = (video as any).captureStream ? (video as any).captureStream() :
                                        (video as any).mozCaptureStream ? (video as any).mozCaptureStream() : null;
-    
+
     if (!stream) return null;
 
     const audioTrack = stream.getAudioTracks()[0];
@@ -53,9 +70,9 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
     const originalTime = video.currentTime;
     const wasPlaying = !video.paused;
 
-    return new Promise((resolve) => {
-        recorder.ondataavailable = e => { 
-            if (e.data.size > 0) chunks.push(e.data); 
+    return new Promise((resolve, reject) => {
+        recorder.ondataavailable = e => {
+            if (e.data.size > 0) chunks.push(e.data);
         };
 
         recorder.onstop = () => {
@@ -65,22 +82,25 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
             reader.onloadend = () => {
                 const result = reader.result as string;
                 const base64 = result.includes(',') ? result.split(',')[1] : result;
-                
+
                 // Restore state
                 video.currentTime = originalTime;
                 if (!wasPlaying) video.pause();
-                
+
                 resolve(base64);
             }
         };
 
-        // Start recording sequence
-        video.currentTime = start;
+        // Start recording sequence with padded times
+        video.currentTime = paddedStart;
         recorder.start();
-        video.play().catch(e => console.error("Record playback failed", e));
+        video.play().catch(e => {
+            console.error("Record playback failed", e);
+            reject(e);
+        });
 
-        const duration = (end - start) * 1000;
-        
+        const duration = (paddedEnd - paddedStart) * 1000;
+
         // Stop slightly after duration to ensure we catch the end
         setTimeout(() => {
             if (recorder.state !== 'inactive') {

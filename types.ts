@@ -61,6 +61,12 @@ export interface AIConfig {
   apiKey?: string; // User's own Gemini API Key
 }
 
+// Audio Padding Configuration
+export interface AudioPaddingConfig {
+  startPadding: number; // in milliseconds
+  endPadding: number;   // in milliseconds
+}
+
 export const APP_DATA_FIELDS = [
   { key: 'sentence', label: 'Sentence (Subtitle)' },
   { key: 'videoName', label: 'Video Name' },

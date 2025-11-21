@@ -1,7 +1,8 @@
-import { SavedLine, Subtitle, PracticeConfig } from '../types';
+import { SavedLine, Subtitle, PracticeConfig, AudioPaddingConfig } from '../types';
 
 const STORAGE_KEY = 'linguaclip_saved_lines';
 const STORAGE_KEY_PRACTICE = 'linguaclip_practice_config';
+const STORAGE_KEY_AUDIO_PADDING = 'linguaclip_audio_padding';
 
 // Helper to format seconds to MM:SS
 export const formatTimeCode = (seconds: number): string => {
@@ -67,4 +68,20 @@ export const getPracticeConfig = (): PracticeConfig => {
 
 export const savePracticeConfig = (config: PracticeConfig) => {
   localStorage.setItem(STORAGE_KEY_PRACTICE, JSON.stringify(config));
+};
+
+// --- Audio Padding Config Storage ---
+
+export const getAudioPaddingConfig = (): AudioPaddingConfig => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_AUDIO_PADDING);
+    // Default: 100ms start, 200ms end
+    return stored ? JSON.parse(stored) : { startPadding: 100, endPadding: 200 };
+  } catch (e) {
+    return { startPadding: 100, endPadding: 200 };
+  }
+};
+
+export const saveAudioPaddingConfig = (config: AudioPaddingConfig) => {
+  localStorage.setItem(STORAGE_KEY_AUDIO_PADDING, JSON.stringify(config));
 };

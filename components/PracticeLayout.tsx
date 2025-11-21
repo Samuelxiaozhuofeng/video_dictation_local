@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Play, Pause, SkipBack, SkipForward, Volume2, VolumeX,
   RotateCcw, Bookmark, X, Trash2, PlayCircle, PlusCircle,
-  Check, Mic, ChevronLeft, ChevronRight
+  Check, Mic, ChevronLeft, ChevronRight, Settings
 } from 'lucide-react';
-import { PracticeMode, Subtitle, VideoSection, AnkiConfig } from '../types';
+import { PracticeMode, Subtitle, VideoSection, AnkiConfig, AudioPaddingConfig } from '../types';
 import * as Storage from '../utils/storage';
 import InputFeedback from './InputFeedback';
 
@@ -73,6 +73,23 @@ export default function PracticeLayout(props: PracticeLayoutProps) {
   } = props;
 
   const currentSub = subtitles[currentSubtitleIndex];
+
+  // Audio Padding State
+  const [showPaddingControl, setShowPaddingControl] = useState(false);
+  const [audioPadding, setAudioPadding] = useState<AudioPaddingConfig>({ startPadding: 100, endPadding: 200 });
+
+  // Load audio padding config on mount
+  useEffect(() => {
+    const config = Storage.getAudioPaddingConfig();
+    setAudioPadding(config);
+  }, []);
+
+  // Save audio padding config when changed
+  const handlePaddingChange = (field: 'startPadding' | 'endPadding', value: number) => {
+    const newConfig = { ...audioPadding, [field]: value };
+    setAudioPadding(newConfig);
+    Storage.saveAudioPaddingConfig(newConfig);
+  };
 
   return (
     <div className="h-screen w-screen bg-black text-slate-200 overflow-hidden relative flex flex-col">
@@ -261,7 +278,7 @@ export default function PracticeLayout(props: PracticeLayoutProps) {
                         </button>
                     </div>
 
-                    <div className="flex items-center gap-2 w-24 justify-end">
+                    <div className="flex items-center gap-2 w-24 justify-end relative">
                         {/* Anki Button Mini */}
                         {ankiConfig && (
                              <button
@@ -277,6 +294,16 @@ export default function PracticeLayout(props: PracticeLayoutProps) {
                                 <PlusCircle size={18} />
                             </button>
                         )}
+
+                        {/* Audio Padding Control Button */}
+                        <button
+                            onClick={() => setShowPaddingControl(!showPaddingControl)}
+                            className="text-slate-400 hover:text-white transition-all mr-2"
+                            title="Audio Padding Settings"
+                        >
+                            <Settings size={16} />
+                        </button>
+
                         <select
                             value={playbackSpeed}
                             onChange={(e) => onSetPlaybackSpeed(parseFloat(e.target.value))}
@@ -288,6 +315,59 @@ export default function PracticeLayout(props: PracticeLayoutProps) {
                             <option value="1.25">1.25x</option>
                             <option value="1.5">1.5x</option>
                         </select>
+
+                        {/* Audio Padding Control Panel */}
+                        {showPaddingControl && (
+                            <div className="absolute bottom-full right-0 mb-2 bg-slate-900/95 backdrop-blur border border-white/20 rounded-lg p-3 shadow-2xl w-64 z-50">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-xs font-semibold text-white">Audio Padding</h3>
+                                    <button
+                                        onClick={() => setShowPaddingControl(false)}
+                                        className="text-slate-400 hover:text-white"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {/* Start Padding */}
+                                    <div>
+                                        <label className="text-xs text-slate-400 mb-1 block">
+                                            Start: {audioPadding.startPadding}ms
+                                        </label>
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="1000"
+                                            step="50"
+                                            value={audioPadding.startPadding}
+                                            onChange={(e) => handlePaddingChange('startPadding', parseInt(e.target.value))}
+                                            className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-500"
+                                        />
+                                    </div>
+
+                                    {/* End Padding */}
+                                    <div>
+                                        <label className="text-xs text-slate-400 mb-1 block">
+                                            End: {audioPadding.endPadding}ms
+                                        </label>
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="1000"
+                                            step="50"
+                                            value={audioPadding.endPadding}
+                                            onChange={(e) => handlePaddingChange('endPadding', parseInt(e.target.value))}
+                                            className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-500"
+                                        />
+                                    </div>
+                                </div>
+
+                                <p className="text-xs text-slate-500 mt-3 leading-relaxed">
+                                    Adds extra time when recording audio for Anki cards.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

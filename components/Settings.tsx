@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Save, RefreshCw, Link, CheckCircle, AlertCircle, Settings as SettingsIcon, Sparkles, MessageSquare, Scissors } from 'lucide-react';
-import { AppState, AnkiConfig, AIConfig, APP_DATA_FIELDS, PracticeConfig } from '../types';
+import { ArrowLeft, Save, RefreshCw, Link, CheckCircle, AlertCircle, Settings as SettingsIcon, Sparkles, MessageSquare, Scissors, Volume2 } from 'lucide-react';
+import { AppState, AnkiConfig, AIConfig, APP_DATA_FIELDS, PracticeConfig, AudioPaddingConfig } from '../types';
 import * as Anki from '../utils/anki';
 import * as AI from '../utils/ai';
 import * as Storage from '../utils/storage';
@@ -24,6 +24,9 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
 
   // Practice Configuration State
   const [sectionLength, setSectionLength] = useState(0);
+
+  // Audio Padding Configuration State
+  const [audioPadding, setAudioPadding] = useState<AudioPaddingConfig>({ startPadding: 100, endPadding: 200 });
 
   // Data from Anki
   const [decks, setDecks] = useState<string[]>([]);
@@ -57,6 +60,10 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     // Load Practice Config
     const savedPractice = Storage.getPracticeConfig();
     setSectionLength(savedPractice.sectionLength);
+
+    // Load Audio Padding Config
+    const savedAudioPadding = Storage.getAudioPaddingConfig();
+    setAudioPadding(savedAudioPadding);
   }, []);
 
   // When model changes, fetch its fields
@@ -125,6 +132,9 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         sectionLength
     };
     Storage.savePracticeConfig(practiceConfig);
+
+    // Save Audio Padding
+    Storage.saveAudioPaddingConfig(audioPadding);
 
     onBack();
   };
@@ -195,6 +205,67 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                          ? "The entire video will be played as one continuous session."
                          : `The video will be automatically divided into ${sectionLength}-minute sections to reduce practice fatigue.`}
                  </p>
+             </div>
+        </section>
+
+        {/* Audio Padding Configuration Section */}
+        <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
+             <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+                <Volume2 className="w-5 h-5 text-brand-400" />
+                Audio Recording Padding
+             </h2>
+
+             <div className="space-y-6">
+                 {/* Start Padding */}
+                 <div>
+                     <label className="block text-sm text-slate-400 mb-3">
+                         Start Padding: <span className="text-white font-semibold">{audioPadding.startPadding}ms</span>
+                     </label>
+                     <input
+                         type="range"
+                         min="0"
+                         max="1000"
+                         step="50"
+                         value={audioPadding.startPadding}
+                         onChange={(e) => setAudioPadding({ ...audioPadding, startPadding: parseInt(e.target.value) })}
+                         className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-500"
+                     />
+                     <div className="flex justify-between text-xs text-slate-500 mt-1">
+                         <span>0ms</span>
+                         <span>1000ms</span>
+                     </div>
+                 </div>
+
+                 {/* End Padding */}
+                 <div>
+                     <label className="block text-sm text-slate-400 mb-3">
+                         End Padding: <span className="text-white font-semibold">{audioPadding.endPadding}ms</span>
+                     </label>
+                     <input
+                         type="range"
+                         min="0"
+                         max="1000"
+                         step="50"
+                         value={audioPadding.endPadding}
+                         onChange={(e) => setAudioPadding({ ...audioPadding, endPadding: parseInt(e.target.value) })}
+                         className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-500"
+                     />
+                     <div className="flex justify-between text-xs text-slate-500 mt-1">
+                         <span>0ms</span>
+                         <span>1000ms</span>
+                     </div>
+                 </div>
+
+                 <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                     <p className="text-xs text-slate-400 leading-relaxed">
+                         <strong className="text-slate-300">What is this?</strong><br/>
+                         When adding audio clips to Anki, padding adds extra time before and after the subtitle timing to ensure complete audio capture.
+                         This prevents cutting off the beginning or end of words.
+                     </p>
+                     <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                         <strong className="text-slate-300">Recommended:</strong> Start 100ms, End 200ms
+                     </p>
+                 </div>
              </div>
         </section>
 
