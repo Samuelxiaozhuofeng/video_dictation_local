@@ -74,6 +74,38 @@ export const isInputCorrect = (input: string, target: string): boolean => {
 };
 
 /**
+ * Check if input matches target with flexible first letter case
+ * First letter can be different case, but rest must match exactly
+ * @param input - User input word
+ * @param target - Target word
+ * @returns true if words match with flexible first letter case
+ */
+export const isInputCorrectFlexibleCase = (input: string, target: string): boolean => {
+  const trimmedInput = input.trim();
+  const trimmedTarget = target.trim();
+
+  if (trimmedInput.length !== trimmedTarget.length) {
+    return false;
+  }
+
+  if (trimmedInput.length === 0) {
+    return false;
+  }
+
+  // Compare first letter (case-insensitive)
+  if (trimmedInput[0].toLowerCase() !== trimmedTarget[0].toLowerCase()) {
+    return false;
+  }
+
+  // Compare rest of the word (case-sensitive)
+  if (trimmedInput.length > 1) {
+    return trimmedInput.slice(1) === trimmedTarget.slice(1);
+  }
+
+  return true;
+};
+
+/**
  * Reconstruct full text from tokens and user inputs
  * @param tokens - All tokens (words, punctuation, spaces)
  * @param wordInputs - User inputs for word tokens only
@@ -93,14 +125,68 @@ export const reconstructText = (tokens: Token[], wordInputs: string[]): string =
  */
 export const areAllWordsCorrect = (tokens: Token[], wordInputs: string[]): boolean => {
   const wordTokens = getWordTokens(tokens);
-  
+
   if (wordInputs.length !== wordTokens.length) {
     return false;
   }
-  
+
   return wordTokens.every((token, index) => {
     const input = wordInputs[index];
     return input && isInputCorrect(input, token.value);
   });
+};
+
+/**
+ * Check if all words are correctly filled with flexible case matching
+ * First letter case-insensitive, rest case-sensitive
+ */
+export const areAllWordsCorrectFlexibleCase = (tokens: Token[], wordInputs: string[]): boolean => {
+  const wordTokens = getWordTokens(tokens);
+
+  if (wordInputs.length !== wordTokens.length) {
+    return false;
+  }
+
+  return wordTokens.every((token, index) => {
+    const input = wordInputs[index];
+    return input && isInputCorrectFlexibleCase(input, token.value);
+  });
+};
+
+/**
+ * Word comparison result for detailed feedback
+ */
+export interface WordComparisonResult {
+  targetWord: string;
+  inputWord: string;
+  isCorrect: boolean;
+  tokenIndex: number; // Index in the full token array
+}
+
+/**
+ * Compare user inputs with target words and return detailed results
+ * Uses flexible case matching (first letter case-insensitive, rest case-sensitive)
+ * @param tokens - All tokens (words, punctuation, spaces)
+ * @param wordInputs - User inputs for word tokens only
+ * @returns Array of comparison results for each word
+ */
+export const compareWords = (tokens: Token[], wordInputs: string[]): WordComparisonResult[] => {
+  const wordTokens = getWordTokens(tokens);
+  const results: WordComparisonResult[] = [];
+
+  for (let i = 0; i < wordTokens.length; i++) {
+    const targetWord = wordTokens[i].value;
+    const inputWord = wordInputs[i] || '';
+    const isCorrect = inputWord && isInputCorrectFlexibleCase(inputWord, targetWord);
+
+    results.push({
+      targetWord,
+      inputWord,
+      isCorrect,
+      tokenIndex: wordTokens[i].index
+    });
+  }
+
+  return results;
 };
 

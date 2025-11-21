@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Send, RefreshCw, ArrowRight, Sparkles, Loader2, PlusCircle, Check, X } from 'lucide-react';
 import { PracticeMode } from '../types';
 import * as AI from '../utils/ai';
-import { tokenizeText, getWordTokens, isInputCorrect, areAllWordsCorrect, Token, TokenType } from '../utils/textTokenizer';
+import { tokenizeText, getWordTokens, isInputCorrect, areAllWordsCorrect, Token, TokenType, compareWords, reconstructText, isInputCorrectFlexibleCase, areAllWordsCorrectFlexibleCase } from '../utils/textTokenizer';
 
 interface InputFeedbackProps {
   targetText: string;
@@ -52,8 +52,9 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
     setWordInputs(newInputs);
 
     // Auto-advance: if current word is correct, move to next input
+    // Use flexible case matching (first letter case-insensitive, rest case-sensitive)
     const currentWordToken = wordTokens[index];
-    if (currentWordToken && isInputCorrect(value, currentWordToken.value)) {
+    if (currentWordToken && isInputCorrectFlexibleCase(value, currentWordToken.value)) {
       // Word is correct, move to next
       if (index < wordTokens.length - 1) {
         // Move to next input field
@@ -62,7 +63,7 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
         }, 100);
       } else {
         // This was the last word, check if all are correct
-        if (areAllWordsCorrect(tokens, newInputs)) {
+        if (areAllWordsCorrectFlexibleCase(tokens, newInputs)) {
           // All correct! Auto-submit and replay
           setTimeout(() => {
             handleAutoComplete();
@@ -139,9 +140,10 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (mode === PracticeMode.INPUT) {
-       const fullInput = wordInputs.join(' ').trim();
-       if (fullInput.length > 0) {
-          onComplete(fullInput.toLowerCase() === targetText.trim().toLowerCase());
+       // Check if all words are correct using flexible case matching
+       const allCorrect = areAllWordsCorrectFlexibleCase(tokens, wordInputs);
+       if (wordInputs.some(w => w.trim().length > 0)) {
+          onComplete(allCorrect);
        }
     }
   };
@@ -201,9 +203,11 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
   };
 
   const renderDetailedFeedback = () => {
-    const fullInput = wordInputs.join(' ');
-    const inputArray: string[] = Array.from(fullInput);
-    const targetArray: string[] = Array.from(targetText);
+    // Compare words using the new comparison logic
+    const comparisonResults = compareWords(tokens, wordInputs);
+
+    // Reconstruct full text with punctuation for display
+    const fullUserInput = reconstructText(tokens, wordInputs);
 
     return (
       <div className="w-full max-w-3xl mx-auto relative">
@@ -213,21 +217,45 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
              <div className="mb-3">
                  {renderTokenizedText(targetText)}
              </div>
-             
-             {/* Diff View (Compact) */}
-             <div className="flex flex-wrap justify-center items-center gap-0.5 text-sm font-mono border-t border-white/10 pt-3 opacity-90">
+
+             {/* Word-by-Word Comparison View */}
+             <div className="flex flex-wrap justify-center items-center gap-1 text-base font-mono border-t border-white/10 pt-3 opacity-90">
                 <span className="text-xs text-slate-400 mr-2">YOU:</span>
-                {inputArray.map((char, idx) => {
-                    const targetChar = targetArray[idx];
-                    const isCorrect = targetChar && char.toLowerCase() === targetChar.toLowerCase();
+                {tokens.map((token, idx) => {
+                  if (token.type === TokenType.WORD) {
+                    // Find the comparison result for this word
+                    const wordResult = comparisonResults.find(r => r.tokenIndex === token.index);
+
+                    if (!wordResult) return null;
+
+                    const isCorrect = wordResult.isCorrect;
+                    const displayWord = wordResult.inputWord || '';
+
                     return (
-                    <span 
-                        key={idx} 
-                        className={`${isCorrect ? 'text-emerald-400' : 'text-rose-400 font-bold bg-rose-500/10'}`}
-                    >
-                        {char === ' ' ? '\u00A0' : char}
-                    </span>
+                      <span
+                        key={idx}
+                        className={`px-1 rounded ${
+                          isCorrect
+                            ? 'text-emerald-400'
+                            : 'text-rose-400 font-bold bg-rose-500/20 border border-rose-500/30'
+                        }`}
+                        title={!isCorrect ? `Expected: ${wordResult.targetWord}` : ''}
+                      >
+                        {displayWord}
+                      </span>
                     );
+                  } else if (token.type === TokenType.PUNCTUATION) {
+                    // Display punctuation as-is (not part of comparison)
+                    return (
+                      <span key={idx} className="text-slate-400">
+                        {token.value}
+                      </span>
+                    );
+                  } else if (token.type === TokenType.SPACE) {
+                    // Display space
+                    return <span key={idx}>{token.value}</span>;
+                  }
+                  return null;
                 })}
             </div>
          </div>
@@ -342,7 +370,7 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
                   onPaste={handlePaste}
                   style={{ minWidth: '3ch', width: `${Math.max(3, token.value.length + 1)}ch` }}
                   className={`bg-black/50 backdrop-blur-md border focus:bg-black/70 focus:ring-1 text-white text-xl md:text-2xl p-2 rounded-lg outline-none shadow-lg transition-all text-center font-medium placeholder-slate-700 ${
-                    wordInputs[currentWordIndex] && isInputCorrect(wordInputs[currentWordIndex], token.value)
+                    wordInputs[currentWordIndex] && isInputCorrectFlexibleCase(wordInputs[currentWordIndex], token.value)
                       ? 'border-emerald-500/50 focus:border-emerald-500 bg-emerald-500/10'
                       : 'border-white/20 focus:border-brand-500'
                   }`}
