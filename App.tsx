@@ -22,12 +22,14 @@ import { AppState, PracticeMode, Subtitle, VideoSection, VideoRecord } from './t
 import { parseSRT } from './utils/srtParser';
 import * as Storage from './utils/storage';
 import * as Anki from './utils/anki';
-import * as VideoStorage from './utils/videoStorage';
 import InputFeedback from './components/InputFeedback';
 import SavedLibrary from './components/SavedLibrary';
 import Settings from './components/Settings';
 import VideoLibrary from './components/VideoLibrary';
 import UploadSection from './components/UploadSection';
+import { useVideoPlayer } from './hooks/useVideoPlayer';
+import { useVideoHistory } from './hooks/useVideoHistory';
+import { usePracticeSession } from './hooks/usePracticeSession';
 
 export default function App() {
   // --- State ---
@@ -38,27 +40,43 @@ export default function App() {
   const [subtitleFile, setSubtitleFile] = useState<File | null>(null);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
 
-  // Video History
-  const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
+  // Video History Hook
+  const {
+    currentVideoId,
+    setCurrentVideoId,
+    createVideoRecord,
+    updateProgress,
+    getVideoFileFromRecord,
+    getSubtitleFileFromRecord,
+    saveVideoFileHandle
+  } = useVideoHistory();
   const [uploadTab, setUploadTab] = useState<'library' | 'upload'>('library');
-  
-  // Subtitles & Sections
-  const [fullSubtitles, setFullSubtitles] = useState<Subtitle[]>([]);
-  const [subtitles, setSubtitles] = useState<Subtitle[]>([]); // Currently active list
-  const [sections, setSections] = useState<VideoSection[]>([]);
-  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
 
-  // Playback State
-  const [currentSubtitleIndex, setCurrentSubtitleIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState(1);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [progress, setProgress] = useState(0); // 0 to 100
-  
-  // Practice Mode State
-  const [mode, setMode] = useState<PracticeMode>(PracticeMode.LISTENING);
-  const [showSectionComplete, setShowSectionComplete] = useState(false);
-  const [shouldAutoAdvance, setShouldAutoAdvance] = useState(false);
+  // Practice Session Hook
+  const {
+    fullSubtitles,
+    subtitles,
+    sections,
+    currentSectionIndex,
+    currentSubtitleIndex,
+    mode,
+    showSectionComplete,
+    shouldAutoAdvance,
+    setFullSubtitles,
+    setSubtitles,
+    setSections,
+    setCurrentSectionIndex,
+    setCurrentSubtitleIndex,
+    setMode,
+    setShowSectionComplete,
+    setShouldAutoAdvance,
+    switchSection,
+    handleContinue: practiceHandleContinue,
+    handleNextSection
+  } = usePracticeSession({
+    videoId: currentVideoId,
+    appState
+  });
 
   // Saved Lines State
   const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
@@ -73,7 +91,43 @@ export default function App() {
 
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
-  const requestRef = useRef<number | undefined>(undefined);
+
+  // Video Player Hook
+  const {
+    isPlaying,
+    volume,
+    playbackSpeed,
+    progress,
+    setIsPlaying,
+    setVolume,
+    setPlaybackSpeed,
+    setProgress,
+    togglePlay,
+    handleProgressSeek: videoPlayerHandleProgressSeek,
+    handleReplayCurrent
+  } = useVideoPlayer({
+    videoRef,
+    subtitles,
+    currentSubtitleIndex,
+    mode,
+    shouldAutoAdvance,
+    onModeChange: setMode,
+    onAutoAdvance: () => {
+      if (currentSubtitleIndex < subtitles.length - 1) {
+        setCurrentSubtitleIndex(prev => prev + 1);
+        setMode(PracticeMode.LISTENING);
+        setAnkiStatus('idle');
+      } else {
+        if (currentSectionIndex < sections.length - 1) {
+          setShowSectionComplete(true);
+        } else {
+          alert("Practice Complete! You have finished the video.");
+          setAppState(AppState.UPLOAD);
+        }
+      }
+    },
+    onShouldAutoAdvanceChange: setShouldAutoAdvance
+  });
 
   // --- Effects & Logic ---
 
@@ -88,118 +142,9 @@ export default function App() {
   // Auto-save progress when subtitle index changes
   useEffect(() => {
     if (currentVideoId && appState === AppState.PRACTICE && currentSubtitleIndex > 0) {
-      VideoStorage.updateProgress(currentVideoId, currentSubtitleIndex, currentSectionIndex);
+      updateProgress(currentVideoId, currentSubtitleIndex, currentSectionIndex);
     }
-  }, [currentSubtitleIndex, currentSectionIndex, currentVideoId, appState]);
-
-  // Video Loop for pausing at end of subtitle
-  const checkVideoTime = useCallback(() => {
-    if (!videoRef.current || subtitles.length === 0) return;
-    
-    const video = videoRef.current;
-    const currentSub = subtitles[currentSubtitleIndex];
-    
-    // If we don't have a valid subtitle index (e.g. empty section), do nothing
-    if (!currentSub) return;
-
-    // We check paused state via isPlaying to avoid fighting manual controls
-    if (isPlaying) {
-      // If we passed the end time of the current subtitle
-      if (video.currentTime >= currentSub.endTime) {
-        video.pause();
-        setIsPlaying(false);
-
-        // Snap to end exactly to look clean
-        video.currentTime = currentSub.endTime;
-
-        // Only switch mode if we were in LISTENING.
-        // If we were in INPUT/FEEDBACK (replaying), we stay there.
-        if (mode === PracticeMode.LISTENING) {
-            setMode(PracticeMode.INPUT);
-        }
-        // If we should auto-advance after replay (all words correct)
-        else if (shouldAutoAdvance) {
-            setShouldAutoAdvance(false);
-            // Auto-advance to next subtitle
-            if (currentSubtitleIndex < subtitles.length - 1) {
-              setCurrentSubtitleIndex(prev => prev + 1);
-              setMode(PracticeMode.LISTENING);
-              setAnkiStatus('idle');
-            } else {
-              // End of current section
-              if (currentSectionIndex < sections.length - 1) {
-                  setShowSectionComplete(true);
-              } else {
-                  alert("Practice Complete! You have finished the video.");
-                  setAppState(AppState.UPLOAD);
-              }
-            }
-        }
-      }
-    }
-    
-    // Update Progress Bar
-    if (video.duration) {
-      setProgress((video.currentTime / video.duration) * 100);
-    }
-
-    requestRef.current = requestAnimationFrame(checkVideoTime);
-  }, [subtitles, currentSubtitleIndex, mode, isPlaying]);
-
-  useEffect(() => {
-    requestRef.current = requestAnimationFrame(checkVideoTime);
-    return () => {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
-    };
-  }, [checkVideoTime]);
-
-  // Handle Volume/Speed changes directly on ref
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.volume = volume;
-      videoRef.current.playbackRate = playbackSpeed;
-    }
-  }, [volume, playbackSpeed]);
-
-  // Initial Seek when index changes (Subtitle Change)
-  useEffect(() => {
-    if (videoRef.current && subtitles.length > 0 && mode === PracticeMode.LISTENING && subtitles[currentSubtitleIndex]) {
-       const currentSub = subtitles[currentSubtitleIndex];
-       
-       // Check if we are way off (e.g. user clicked next/prev)
-       const tolerance = 0.5; // 0.5s tolerance
-       if (videoRef.current.currentTime < currentSub.startTime - tolerance || videoRef.current.currentTime > currentSub.endTime) {
-         videoRef.current.currentTime = currentSub.startTime;
-       }
-       
-       if (!isPlaying && !showSectionComplete) {
-         videoRef.current.play().catch(e => console.error("Autoplay blocked", e));
-         setIsPlaying(true);
-       }
-    }
-  }, [currentSubtitleIndex, subtitles, mode, showSectionComplete]); 
-
-  // Change current active subtitles when section changes
-  const switchSection = (index: number) => {
-      if (index < 0 || index >= sections.length) return;
-      
-      const newSection = sections[index];
-      setCurrentSectionIndex(index);
-      setSubtitles(newSection.subtitles);
-      setCurrentSubtitleIndex(0);
-      setMode(PracticeMode.LISTENING);
-      setShowSectionComplete(false);
-      setIsPlaying(false);
-      
-      // Seek to start of section
-      if (videoRef.current) {
-          // If the section has subtitles, jump to first sub start.
-          // Otherwise jump to section logical start.
-          const startTime = newSection.subtitles.length > 0 ? newSection.subtitles[0].startTime : newSection.startTime;
-          videoRef.current.currentTime = startTime;
-      }
-  };
-
+  }, [currentSubtitleIndex, currentSectionIndex, currentVideoId, appState, updateProgress]);
 
   // --- Handlers ---
 
@@ -270,7 +215,7 @@ export default function App() {
         let recordId = videoId;
         if (!videoId) {
           try {
-            const record = await VideoStorage.createVideoRecord(
+            const record = await createVideoRecord(
               vf,
               sf,
               subText,
@@ -312,7 +257,7 @@ export default function App() {
   const handleContinueFromLibrary = async (record: VideoRecord) => {
     try {
       // Try to get video file from stored handle (File System Access API)
-      let videoFileFromHandle = await VideoStorage.getVideoFileFromRecord(record);
+      let videoFileFromHandle = await getVideoFileFromRecord(record);
 
       // If file handle not available, prompt user to select the video file
       if (!videoFileFromHandle) {
@@ -336,7 +281,7 @@ export default function App() {
           videoFileFromHandle = await fileHandle.getFile();
 
           // Save the new file handle for future use
-          await VideoStorage.saveVideoFileHandle(record.id, fileHandle);
+          await saveVideoFileHandle(record.id, fileHandle);
         } catch (err) {
           console.error('User cancelled file selection:', err);
           return;
@@ -344,7 +289,7 @@ export default function App() {
       }
 
       // Create subtitle file from stored text
-      const subtitleFileFromRecord = VideoStorage.getSubtitleFileFromRecord(record);
+      const subtitleFileFromRecord = getSubtitleFileFromRecord(record);
 
       // Set files for display
       setVideoFile(videoFileFromHandle);
@@ -365,33 +310,19 @@ export default function App() {
   };
 
   const handleContinue = () => {
-     if (currentSubtitleIndex < subtitles.length - 1) {
-       setCurrentSubtitleIndex(prev => prev + 1);
-       setMode(PracticeMode.LISTENING);
-       setAnkiStatus('idle'); 
-     } else {
-       // End of current section
-       if (currentSectionIndex < sections.length - 1) {
-           setShowSectionComplete(true);
-       } else {
-           alert("Practice Complete! You have finished the video.");
-           setAppState(AppState.UPLOAD);
-       }
-     }
+    practiceHandleContinue(
+      () => {}, // onSectionComplete - already handled by setShowSectionComplete in hook
+      () => {
+        alert("Practice Complete! You have finished the video.");
+        setAppState(AppState.UPLOAD);
+      },
+      (status: string) => setAnkiStatus(status as 'idle' | 'recording' | 'adding' | 'success' | 'error')
+    );
   };
 
-  const handleNextSection = () => {
-      switchSection(currentSectionIndex + 1);
+  const handleNextSectionClick = () => {
+    handleNextSection(videoRef, setIsPlaying);
   };
-
-  const handleReplayCurrent = useCallback((autoAdvanceAfter: boolean = false) => {
-    if (videoRef.current && subtitles[currentSubtitleIndex]) {
-        videoRef.current.currentTime = subtitles[currentSubtitleIndex].startTime;
-        videoRef.current.play();
-        setIsPlaying(true);
-        setShouldAutoAdvance(autoAdvanceAfter);
-    }
-  }, [subtitles, currentSubtitleIndex]);
 
   const handleSkip = useCallback((direction: 'prev' | 'next') => {
       if (direction === 'prev' && currentSubtitleIndex > 0) {
@@ -423,48 +354,19 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleReplayCurrent, handleSkip]);
 
-  const togglePlay = () => {
-      if (!videoRef.current) return;
-      if (isPlaying) {
-          videoRef.current.pause();
-          setIsPlaying(false);
-      } else {
-          if (mode === PracticeMode.INPUT || mode === PracticeMode.FEEDBACK) {
-             handleReplayCurrent();
-          } else {
-            videoRef.current.play();
-            setIsPlaying(true);
-          }
-      }
-  };
-
   const handleProgressSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (videoRef.current && videoRef.current.duration) {
-       const newTime = (Number(e.target.value) / 100) * videoRef.current.duration;
-       videoRef.current.currentTime = newTime;
-       setProgress(Number(e.target.value));
-       
-       // When seeking globally, we might jump out of current section bounds.
-       // Find which section this time belongs to.
-       const targetSectionIndex = sections.findIndex(s => newTime >= s.startTime && newTime < s.endTime);
-       
-       if (targetSectionIndex !== -1) {
-           if (targetSectionIndex !== currentSectionIndex) {
-               const newSection = sections[targetSectionIndex];
-               setCurrentSectionIndex(targetSectionIndex);
-               setSubtitles(newSection.subtitles);
-               // Find subtitle in that section
-               const subIndex = newSection.subtitles.findIndex(s => newTime >= s.startTime && newTime <= s.endTime);
-               setCurrentSubtitleIndex(subIndex !== -1 ? subIndex : 0);
-           } else {
-               // Same section, just find subtitle
-               const subIndex = subtitles.findIndex(s => newTime >= s.startTime && newTime <= s.endTime);
-               if (subIndex !== -1) setCurrentSubtitleIndex(subIndex);
-           }
-           setMode(PracticeMode.LISTENING);
-           setAnkiStatus('idle');
-       }
-    }
+    videoPlayerHandleProgressSeek(e, sections, currentSectionIndex, (sectionIndex, subIndex) => {
+      if (sectionIndex !== currentSectionIndex) {
+        const newSection = sections[sectionIndex];
+        setCurrentSectionIndex(sectionIndex);
+        setSubtitles(newSection.subtitles);
+        setCurrentSubtitleIndex(subIndex);
+      } else {
+        setCurrentSubtitleIndex(subIndex);
+      }
+      setMode(PracticeMode.LISTENING);
+      setAnkiStatus('idle');
+    });
   };
 
   const toggleSaveCurrent = () => {
@@ -659,7 +561,7 @@ export default function App() {
          const sectionIdx = sections.findIndex(sec => sub.startTime >= sec.startTime && sub.startTime < sec.endTime);
          if (sectionIdx !== -1) {
              if (sectionIdx !== currentSectionIndex) {
-                 switchSection(sectionIdx);
+                 switchSection(sectionIdx, videoRef, setIsPlaying);
                  const newSectionSubs = sections[sectionIdx].subtitles;
                  const subIndex = newSectionSubs.findIndex(s => s.id === id);
                  if (subIndex !== -1) setCurrentSubtitleIndex(subIndex);
@@ -778,8 +680,8 @@ export default function App() {
             {/* Section Selector */}
             {sections.length > 1 && (
                 <div className="flex items-center gap-1 ml-2 bg-black/50 backdrop-blur border border-white/10 rounded-lg p-1">
-                    <button 
-                        onClick={() => switchSection(currentSectionIndex - 1)}
+                    <button
+                        onClick={() => switchSection(currentSectionIndex - 1, videoRef, setIsPlaying)}
                         disabled={currentSectionIndex === 0}
                         className="p-1 hover:bg-white/10 rounded text-slate-400 hover:text-white disabled:opacity-30"
                     >
@@ -789,8 +691,8 @@ export default function App() {
                          <span className="hidden sm:inline">Section</span>
                          <span>{currentSectionIndex + 1} / {sections.length}</span>
                     </div>
-                    <button 
-                        onClick={() => switchSection(currentSectionIndex + 1)}
+                    <button
+                        onClick={() => switchSection(currentSectionIndex + 1, videoRef, setIsPlaying)}
                         disabled={currentSectionIndex === sections.length - 1}
                         className="p-1 hover:bg-white/10 rounded text-slate-400 hover:text-white disabled:opacity-30"
                     >
@@ -845,8 +747,8 @@ export default function App() {
                         <h2 className="text-2xl font-bold text-white mb-2">Section Complete!</h2>
                         <p className="text-slate-400 mb-6">Great job. You've finished all lines in this section.</p>
                         <div className="flex flex-col gap-3">
-                            <button 
-                                onClick={handleNextSection}
+                            <button
+                                onClick={handleNextSectionClick}
                                 className="w-full py-3 bg-brand-600 hover:bg-brand-500 text-white font-bold rounded-xl transition-all"
                             >
                                 Continue to Next Section
@@ -921,7 +823,7 @@ export default function App() {
                 {/* Control Buttons */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 w-24">
-                         <button onClick={() => setVolume(v => v === 0 ? 1 : 0)} className="text-slate-400 hover:text-white transition-colors">
+                         <button onClick={() => setVolume(volume === 0 ? 1 : 0)} className="text-slate-400 hover:text-white transition-colors">
                             {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
                         </button>
                     </div>
@@ -930,8 +832,8 @@ export default function App() {
                         <button onClick={() => handleSkip('prev')} className="text-slate-400 hover:text-white hover:scale-110 transition-all" title="Previous (Ctrl+Left)">
                             <SkipBack size={20} />
                         </button>
-                        
-                        <button onClick={handleReplayCurrent} className="text-slate-400 hover:text-brand-400 hover:rotate-[-90deg] transition-all" title="Replay (Shift+Space)">
+
+                        <button onClick={() => handleReplayCurrent()} className="text-slate-400 hover:text-brand-400 hover:rotate-[-90deg] transition-all" title="Replay (Shift+Space)">
                             <RotateCcw size={18} />
                         </button>
 
