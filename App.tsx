@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Bookmark, Settings as SettingsIcon } from 'lucide-react';
 import { AppState, PracticeMode, VideoRecord } from './types';
 import * as Storage from './utils/storage';
@@ -13,6 +13,7 @@ import { usePracticeSession } from './hooks/usePracticeSession';
 import { useAnkiIntegration } from './hooks/useAnkiIntegration';
 import { useSavedLines } from './hooks/useSavedLines';
 import { useVideoController } from './hooks/useVideoController';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 export default function App() {
   // --- State ---
@@ -285,24 +286,6 @@ export default function App() {
       }
   }, [currentSubtitleIndex, subtitles.length]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.shiftKey && e.code === 'Space') {
-        e.preventDefault();
-        handleReplayCurrent();
-      } else if ((e.ctrlKey || e.metaKey) && e.code === 'ArrowLeft') {
-         e.preventDefault();
-         handleSkip('prev');
-      } else if ((e.ctrlKey || e.metaKey) && e.code === 'ArrowRight') {
-         e.preventDefault();
-         handleSkip('next');
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleReplayCurrent, handleSkip]);
-
   const handleProgressSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
     videoPlayerHandleProgressSeek(e, sections, currentSectionIndex, (sectionIndex, subIndex) => {
       if (sectionIndex !== currentSectionIndex) {
@@ -331,6 +314,55 @@ export default function App() {
     if (!currentSub) return;
     await ankiHandleAddToAnki(currentSub);
   };
+
+  const handleAddToAnkiShortcut = useCallback((event: KeyboardEvent) => {
+    if (appState !== AppState.PRACTICE) {
+      alert('Add to Anki shortcut only works during an active practice session.');
+      return;
+    }
+
+    const activeSubtitle = subtitles[currentSubtitleIndex];
+    if (!activeSubtitle) {
+      alert('No subtitle is currently selected to add.');
+      return;
+    }
+
+    if (ankiStatus !== 'idle') {
+      alert('Please wait for the current Anki action to finish.');
+      return;
+    }
+
+    event.preventDefault();
+    handleAddToAnki();
+  }, [appState, subtitles, currentSubtitleIndex, ankiStatus, handleAddToAnki]);
+
+  const keyboardShortcuts = useMemo(() => ([
+    {
+      code: 'Space',
+      shiftKey: true,
+      preventDefault: true,
+      handler: () => handleReplayCurrent(),
+    },
+    {
+      code: 'ArrowLeft',
+      ctrlOrMeta: true,
+      preventDefault: true,
+      handler: () => handleSkip('prev'),
+    },
+    {
+      code: 'ArrowRight',
+      ctrlOrMeta: true,
+      preventDefault: true,
+      handler: () => handleSkip('next'),
+    },
+    {
+      code: 'KeyN',
+      altKey: true,
+      handler: handleAddToAnkiShortcut,
+    },
+  ]), [handleReplayCurrent, handleSkip, handleAddToAnkiShortcut]);
+
+  useKeyboardShortcuts(keyboardShortcuts);
 
   const handleWordToAnki = async (word: string, definition: string, includeAudio: boolean = true) => {
     const currentSub = subtitles[currentSubtitleIndex];
