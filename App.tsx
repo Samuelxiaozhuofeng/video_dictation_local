@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Bookmark, Settings as SettingsIcon } from 'lucide-react';
 import { AppState, PracticeMode, VideoRecord } from './types';
 import * as Storage from './utils/storage';
@@ -14,6 +14,7 @@ import { useAnkiIntegration } from './hooks/useAnkiIntegration';
 import { useSavedLines } from './hooks/useSavedLines';
 import { useVideoController } from './hooks/useVideoController';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { usePracticeActions } from './hooks/usePracticeActions';
 
 export default function App() {
   // --- State ---
@@ -199,10 +200,6 @@ export default function App() {
     }
   };
 
-  const handleInputComplete = (wasCorrect: boolean) => {
-     setMode(PracticeMode.FEEDBACK);
-  };
-
   // Handle continuing practice from video library
   const handleContinueFromLibrary = async (record: VideoRecord) => {
     try {
@@ -270,71 +267,50 @@ export default function App() {
     );
   };
 
-  const handleNextSectionClick = () => {
-    handleNextSection(videoRef, setIsPlaying);
+  const {
+    handleSkip,
+    toggleSaveCurrent,
+    handleAddToAnki,
+    handleWordToAnki,
+    deleteSavedItem,
+    jumpToSaved,
+    handleProgressSeek,
+    handleInputComplete,
+    handleContinue: practiceActionsHandleContinue,
+    handleNextSectionClick,
+    handleAddToAnkiShortcut,
+  } = usePracticeActions({
+    subtitles,
+    fullSubtitles,
+    currentSubtitleIndex,
+    sections,
+    currentSectionIndex,
+    mode,
+    ankiStatus,
+    setCurrentSubtitleIndex,
+    setCurrentSectionIndex,
+    setMode,
+    setAnkiStatus,
+    setSubtitles,
+    setShowSavedList,
+    videoRef,
+    setIsPlaying,
+    switchSection,
+    savedLinesToggleSave,
+    savedLinesDeleteSavedItem,
+    ankiHandleAddToAnki,
+    ankiHandleWordToAnki,
+    practiceHandleContinue,
+    handleNextSection,
+    setAppState,
+    AppStateEnum: AppState,
+    videoPlayerHandleProgressSeek,
+  });
+
+  // Use handle from practice actions for continue
+  const effectiveHandleContinue = () => {
+    practiceActionsHandleContinue();
   };
-
-  const handleSkip = useCallback((direction: 'prev' | 'next') => {
-      if (direction === 'prev' && currentSubtitleIndex > 0) {
-          setCurrentSubtitleIndex(prev => prev - 1);
-          setMode(PracticeMode.LISTENING);
-          setAnkiStatus('idle');
-      } else if (direction === 'next' && currentSubtitleIndex < subtitles.length - 1) {
-          setCurrentSubtitleIndex(prev => prev + 1);
-          setMode(PracticeMode.LISTENING);
-          setAnkiStatus('idle');
-      }
-  }, [currentSubtitleIndex, subtitles.length]);
-
-  const handleProgressSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    videoPlayerHandleProgressSeek(e, sections, currentSectionIndex, (sectionIndex, subIndex) => {
-      if (sectionIndex !== currentSectionIndex) {
-        const newSection = sections[sectionIndex];
-        setCurrentSectionIndex(sectionIndex);
-        setSubtitles(newSection.subtitles);
-        setCurrentSubtitleIndex(subIndex);
-      } else {
-        setCurrentSubtitleIndex(subIndex);
-      }
-      setMode(PracticeMode.LISTENING);
-      setAnkiStatus('idle');
-    });
-  };
-
-  const toggleSaveCurrent = () => {
-      const currentSub = subtitles[currentSubtitleIndex];
-      if (!currentSub) return;
-      savedLinesToggleSave(currentSub);
-  };
-
-  // --- Anki Integration (using Hook) ---
-
-  const handleAddToAnki = async () => {
-    const currentSub = subtitles[currentSubtitleIndex];
-    if (!currentSub) return;
-    await ankiHandleAddToAnki(currentSub);
-  };
-
-  const handleAddToAnkiShortcut = useCallback((event: KeyboardEvent) => {
-    if (appState !== AppState.PRACTICE) {
-      alert('Add to Anki shortcut only works during an active practice session.');
-      return;
-    }
-
-    const activeSubtitle = subtitles[currentSubtitleIndex];
-    if (!activeSubtitle) {
-      alert('No subtitle is currently selected to add.');
-      return;
-    }
-
-    if (ankiStatus !== 'idle') {
-      alert('Please wait for the current Anki action to finish.');
-      return;
-    }
-
-    event.preventDefault();
-    handleAddToAnki();
-  }, [appState, subtitles, currentSubtitleIndex, ankiStatus, handleAddToAnki]);
 
   const keyboardShortcuts = useMemo(() => ([
     {
@@ -358,42 +334,17 @@ export default function App() {
     {
       code: 'KeyN',
       altKey: true,
-      handler: handleAddToAnkiShortcut,
+      handler: (event: KeyboardEvent) => {
+        if (appState !== AppState.PRACTICE) {
+          alert('Add to Anki shortcut only works during an active practice session.');
+          return;
+        }
+        handleAddToAnkiShortcut(event);
+      },
     },
-  ]), [handleReplayCurrent, handleSkip, handleAddToAnkiShortcut]);
+  ]), [handleReplayCurrent, handleSkip, handleAddToAnkiShortcut, appState]);
 
   useKeyboardShortcuts(keyboardShortcuts);
-
-  const handleWordToAnki = async (word: string, definition: string, includeAudio: boolean = true) => {
-    const currentSub = subtitles[currentSubtitleIndex];
-    if (!currentSub) return;
-    await ankiHandleWordToAnki(word, definition, currentSub, includeAudio);
-  };
-
-  const deleteSavedItem = (id: number, e: React.MouseEvent) => {
-      savedLinesDeleteSavedItem(id, e);
-  };
-
-  const jumpToSaved = (id: number) => {
-      const sub = fullSubtitles.find(s => s.id === id);
-      if (sub) {
-         const sectionIdx = sections.findIndex(sec => sub.startTime >= sec.startTime && sub.startTime < sec.endTime);
-         if (sectionIdx !== -1) {
-             if (sectionIdx !== currentSectionIndex) {
-                 switchSection(sectionIdx, videoRef, setIsPlaying);
-                 const newSectionSubs = sections[sectionIdx].subtitles;
-                 const subIndex = newSectionSubs.findIndex(s => s.id === id);
-                 if (subIndex !== -1) setCurrentSubtitleIndex(subIndex);
-             } else {
-                 const subIndex = subtitles.findIndex(s => s.id === id);
-                 if (subIndex !== -1) setCurrentSubtitleIndex(subIndex);
-             }
-             setMode(PracticeMode.LISTENING);
-             setAnkiStatus('idle');
-             setShowSavedList(false);
-         }
-      }
-  };
 
   // --- Render ---
 
