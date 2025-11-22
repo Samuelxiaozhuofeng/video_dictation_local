@@ -14,12 +14,12 @@ export interface UseAnkiIntegrationReturn {
   // State
   ankiConfig: Anki.AnkiConfig | null;
   ankiStatus: AnkiStatus;
-  
+
   // Actions
   setAnkiConfig: (config: Anki.AnkiConfig | null) => void;
   setAnkiStatus: (status: AnkiStatus) => void;
   handleAddToAnki: (subtitle: Subtitle) => Promise<void>;
-  handleWordToAnki: (word: string, definition: string, subtitle: Subtitle) => Promise<void>;
+  handleWordToAnki: (word: string, definition: string, subtitle: Subtitle, includeAudio?: boolean) => Promise<void>;
   reloadConfig: () => void;
 }
 
@@ -112,7 +112,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
   }, [videoRef]);
 
   // Capture media (screenshot and/or audio) for a subtitle
-  const captureMedia = useCallback(async (currentSub: Subtitle) => {
+  const captureMedia = useCallback(async (currentSub: Subtitle, includeAudio: boolean = true) => {
       let screenshotBase64 = undefined;
       let audioBase64 = undefined;
 
@@ -138,8 +138,8 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
           }
       }
 
-      // 2. Capture Audio
-      if (needsAudio && videoRef.current) {
+      // 2. Capture Audio (only if includeAudio is true)
+      if (includeAudio && needsAudio && videoRef.current) {
           try {
               const result = await captureAudioClip(currentSub.startTime, currentSub.endTime);
               if (result) audioBase64 = result;
@@ -185,10 +185,10 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
   }, [ankiConfig, ankiStatus, captureMedia, videoFileName]);
 
   // Add word with definition to Anki
-  const handleWordToAnki = useCallback(async (word: string, definition: string, subtitle: Subtitle) => {
+  const handleWordToAnki = useCallback(async (word: string, definition: string, subtitle: Subtitle, includeAudio: boolean = true) => {
       if (!ankiConfig) return;
 
-      const { screenshotBase64, audioBase64 } = await captureMedia(subtitle);
+      const { screenshotBase64, audioBase64 } = await captureMedia(subtitle, includeAudio);
 
       await Anki.addNote(ankiConfig, {
           sentence: subtitle.text,

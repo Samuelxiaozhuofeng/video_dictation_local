@@ -331,10 +331,10 @@ export default function App() {
     await ankiHandleAddToAnki(currentSub);
   };
 
-  const handleWordToAnki = async (word: string, definition: string) => {
+  const handleWordToAnki = async (word: string, definition: string, includeAudio: boolean = true) => {
     const currentSub = subtitles[currentSubtitleIndex];
     if (!currentSub) return;
-    await ankiHandleWordToAnki(word, definition, currentSub);
+    await ankiHandleWordToAnki(word, definition, currentSub, includeAudio);
   };
 
   const deleteSavedItem = (id: number, e: React.MouseEvent) => {

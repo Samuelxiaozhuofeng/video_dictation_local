@@ -9,7 +9,7 @@ interface InputFeedbackProps {
   mode: PracticeMode;
   onComplete: (wasCorrect: boolean) => void;
   onReplay: (autoAdvanceAfter?: boolean) => void;
-  onWordToAnki?: (word: string, definition: string) => Promise<void>;
+  onWordToAnki?: (word: string, definition: string, includeAudio?: boolean) => Promise<void>;
 }
 
 const InputFeedback: React.FC<InputFeedbackProps> = ({
@@ -31,7 +31,7 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const [definitionData, setDefinitionData] = useState<AI.WordDefinition | null>(null);
   const [isLoadingDef, setIsLoadingDef] = useState(false);
-  const [ankiWordStatus, setAnkiWordStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [ankiWordStatus, setAnkiWordStatus] = useState<'idle' | 'loading-only-word' | 'loading-with-audio' | 'success-only-word' | 'success-with-audio' | 'error'>('idle');
 
   // Initialize inputs
   useEffect(() => {
@@ -167,16 +167,20 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
     }
   };
 
-  const handleAddWordToAnki = async () => {
+  const handleAddWordToAnki = async (includeAudio: boolean) => {
       if (!onWordToAnki || !selectedWord || !definitionData) return;
-      
-      setAnkiWordStatus('loading');
+
+      setAnkiWordStatus(includeAudio ? 'loading-with-audio' : 'loading-only-word');
       try {
           const defString = `<b>${definitionData.word}</b> <i>(${definitionData.partOfSpeech})</i><br/>${definitionData.definition}`;
-          await onWordToAnki(selectedWord, defString);
-          setAnkiWordStatus('success');
+          await onWordToAnki(selectedWord, defString, includeAudio);
+          setAnkiWordStatus(includeAudio ? 'success-with-audio' : 'success-only-word');
+          // Reset to idle after 2 seconds
+          setTimeout(() => setAnkiWordStatus('idle'), 2000);
       } catch (e) {
           setAnkiWordStatus('error');
+          // Reset to idle after 3 seconds on error
+          setTimeout(() => setAnkiWordStatus('idle'), 3000);
       }
   };
 
@@ -299,24 +303,45 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
                                 </p>
                             </div>
                             
-                            <div className="pt-3 border-t border-slate-800 flex justify-end">
+                            <div className="pt-3 border-t border-slate-800 flex justify-end gap-2">
                                 {onWordToAnki && (
-                                    <button 
-                                        onClick={handleAddWordToAnki}
-                                        disabled={ankiWordStatus !== 'idle'}
-                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                                            ankiWordStatus === 'success' 
-                                            ? 'bg-emerald-500/20 text-emerald-400' 
-                                            : ankiWordStatus === 'error'
-                                            ? 'bg-rose-500/20 text-rose-400'
-                                            : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
-                                        }`}
-                                    >
-                                        {ankiWordStatus === 'loading' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 
-                                         ankiWordStatus === 'success' ? <Check className="w-3.5 h-3.5" /> :
-                                         <PlusCircle className="w-3.5 h-3.5" />}
-                                        {ankiWordStatus === 'success' ? 'Added' : 'Add to Anki'}
-                                    </button>
+                                    <>
+                                        {/* Only Word Button */}
+                                        <button
+                                            onClick={() => handleAddWordToAnki(false)}
+                                            disabled={ankiWordStatus !== 'idle'}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                                                ankiWordStatus === 'success-only-word'
+                                                ? 'bg-emerald-500/20 text-emerald-400'
+                                                : ankiWordStatus === 'error'
+                                                ? 'bg-rose-500/20 text-rose-400'
+                                                : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                                            }`}
+                                        >
+                                            {ankiWordStatus === 'loading-only-word' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> :
+                                             ankiWordStatus === 'success-only-word' ? <Check className="w-3.5 h-3.5" /> :
+                                             <PlusCircle className="w-3.5 h-3.5" />}
+                                            {ankiWordStatus === 'success-only-word' ? 'Added (Word)' : 'Only Word'}
+                                        </button>
+
+                                        {/* With Audio Button */}
+                                        <button
+                                            onClick={() => handleAddWordToAnki(true)}
+                                            disabled={ankiWordStatus !== 'idle'}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                                                ankiWordStatus === 'success-with-audio'
+                                                ? 'bg-emerald-500/20 text-emerald-400'
+                                                : ankiWordStatus === 'error'
+                                                ? 'bg-rose-500/20 text-rose-400'
+                                                : 'bg-blue-800 hover:bg-blue-700 text-blue-200'
+                                            }`}
+                                        >
+                                            {ankiWordStatus === 'loading-with-audio' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> :
+                                             ankiWordStatus === 'success-with-audio' ? <Check className="w-3.5 h-3.5" /> :
+                                             <PlusCircle className="w-3.5 h-3.5" />}
+                                            {ankiWordStatus === 'success-with-audio' ? 'Added (Audio)' : 'With Audio'}
+                                        </button>
+                                    </>
                                 )}
                             </div>
                         </div>
