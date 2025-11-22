@@ -151,7 +151,7 @@ export default function PracticeLayout() {
           <video
             ref={videoRef}
             src={videoSrc}
-            className="max-h-full max-w-full rounded-xl shadow-2xl bg-black"
+            className="max-h-[70vh] max-w-5xl w-full rounded-xl shadow-2xl bg-black object-contain"
           />
         ) : (
           <div className="text-slate-500">No video loaded.</div>
