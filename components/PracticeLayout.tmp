@@ -4,65 +4,71 @@ import {
   RotateCcw, Bookmark, X, Trash2, PlayCircle, PlusCircle,
   Check, Mic, ChevronLeft, ChevronRight, Settings
 } from 'lucide-react';
-import { PracticeMode, AudioPaddingConfig } from '../types';
+import { PracticeMode, Subtitle, VideoSection, AnkiConfig, AudioPaddingConfig } from '../types';
 import * as Storage from '../utils/storage';
 import InputFeedback from './InputFeedback';
-import { usePracticeContext } from '../hooks/usePracticeContext';
 
-export default function PracticeLayout() {
-  const { practice, video, saved, anki, actions } = usePracticeContext();
+interface PracticeLayoutProps {
+  // 字幕和分�?  subtitles: Subtitle[];
+  fullSubtitles: Subtitle[];
+  sections: VideoSection[];
+  currentSectionIndex: number;
+  currentSubtitleIndex: number;
+  
+  // 练习状�?  mode: PracticeMode;
+  showSectionComplete: boolean;
+  
+  // 视频控制
+  videoRef: React.RefObject<HTMLVideoElement>;
+  videoSrc: string | null;
+  isPlaying: boolean;
+  volume: number;
+  playbackSpeed: number;
+  progress: number;
+  
+  // Saved Lines
+  savedIds: Set<number>;
+  showSavedList: boolean;
+  savedItems: Subtitle[];
+  isCurrentSaved: boolean;
+  
+  // Anki
+  ankiConfig: AnkiConfig | null;
+  ankiStatus: 'idle' | 'recording' | 'adding' | 'success' | 'error';
+  
+  // 事件处理
+  onExit: () => void;
+  onSwitchSection: (index: number) => void;
+  onToggleSavedList: (show: boolean) => void;
+  onTogglePlay: () => void;
+  onReplayCurrent: (autoAdvanceAfter?: boolean) => void;
+  onSkip: (direction: 'prev' | 'next') => void;
+  onProgressSeek: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onToggleSaveCurrent: () => void;
+  onAddToAnki: () => void;
+  onWordToAnki: (word: string, definition: string, includeAudio?: boolean) => void;
+  onNextSection: () => void;
+  onSetShowSectionComplete: (show: boolean) => void;
+  onSetVolume: (volume: number) => void;
+  onSetPlaybackSpeed: (speed: number) => void;
+  onInputComplete: (wasCorrect: boolean) => void;
+  onContinue: () => void;
+  onDeleteSavedItem: (id: number, e: React.MouseEvent) => void;
+  onJumpToSaved: (id: number) => void;
+}
 
+export default function PracticeLayout(props: PracticeLayoutProps) {
   const {
-    subtitles,
-    fullSubtitles,
-    sections,
-    currentSectionIndex,
-    currentSubtitleIndex,
-    mode,
-    showSectionComplete,
-  } = practice;
-
-  const {
-    videoRef,
-    videoSrc,
-    isPlaying,
-    volume,
-    playbackSpeed,
-    progress,
-  } = video;
-
-  const {
-    savedIds,
-    showSavedList,
-    savedItems,
-    isCurrentSaved,
-  } = saved;
-
-  const {
-    ankiConfig,
-    ankiStatus,
-  } = anki;
-
-  const {
-    onExit,
-    onSwitchSection,
-    onToggleSavedList,
-    onTogglePlay,
-    onReplayCurrent,
-    onSkip,
-    onProgressSeek,
-    onToggleSaveCurrent,
-    onAddToAnki,
-    onWordToAnki,
-    onNextSection,
-    onSetShowSectionComplete,
-    onSetVolume,
-    onSetPlaybackSpeed,
-    onInputComplete,
-    onContinue,
-    onDeleteSavedItem,
-    onJumpToSaved,
-  } = actions;
+    subtitles, sections, currentSectionIndex, currentSubtitleIndex,
+    mode, showSectionComplete, videoRef, videoSrc, isPlaying,
+    volume, playbackSpeed, progress, savedIds, showSavedList,
+    savedItems, isCurrentSaved, ankiConfig, ankiStatus,
+    onExit, onSwitchSection, onToggleSavedList, onTogglePlay,
+    onReplayCurrent, onSkip, onProgressSeek, onToggleSaveCurrent,
+    onAddToAnki, onWordToAnki, onNextSection, onSetShowSectionComplete,
+    onSetVolume, onSetPlaybackSpeed, onInputComplete, onContinue,
+    onDeleteSavedItem, onJumpToSaved
+  } = props;
 
   const currentSub = subtitles[currentSubtitleIndex];
 
@@ -116,97 +122,75 @@ export default function PracticeLayout() {
             )}
         </div>
 
-        <div className="flex items-center gap-2">
-            {/* Exit Button */}
-            <button
-                onClick={onExit}
-                className="px-3 py-1.5 rounded-full text-xs font-medium bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-all"
+        <div className="flex items-center gap-4">
+            <button 
+                onClick={() => onToggleSavedList(true)}
+                className="flex items-center gap-2 text-xs font-medium text-slate-300 hover:text-brand-400 transition-colors bg-black/50 hover:bg-black/70 backdrop-blur px-3 py-1.5 rounded-full border border-white/10"
             >
-                Exit
+                <Bookmark size={14} className={savedIds.size > 0 ? "fill-brand-400 text-brand-400" : ""} />
+                <span className="hidden sm:inline">Saved ({savedIds.size})</span>
             </button>
 
-            {/* Saved List Toggle */}
-            <button
-                onClick={() => onToggleSavedList(!showSavedList)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                    showSavedList
-                      ? 'bg-brand-600/20 border-brand-500/50 text-brand-300'
-                      : 'bg-black/40 border-white/10 text-slate-300 hover:bg-white/5'
-                }`}
-            >
-                <Bookmark className="w-4 h-4" />
-                Saved
-                {savedIds.size > 0 && (
-                    <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-brand-500 text-white">
-                        {savedIds.size}
-                    </span>
-                )}
+            <button onClick={onExit} className="text-xs font-medium text-slate-400 hover:text-white transition-colors bg-black/50 hover:bg-red-900/30 px-3 py-1.5 rounded-full border border-white/10 backdrop-blur">
+                Exit
             </button>
         </div>
       </header>
 
-      {/* --- Video Layer --- */}
-      <div className="relative flex-1 flex items-center justify-center bg-black">
-        {videoSrc ? (
-          <video
-            ref={videoRef}
-            src={videoSrc}
-            className="max-h-full max-w-full rounded-xl shadow-2xl bg-black"
-          />
-        ) : (
-          <div className="text-slate-500">No video loaded.</div>
-        )}
+      {/* --- Main Fullscreen Video Layer --- */}
+      <div className="absolute inset-0 z-0 flex items-center justify-center bg-black">
+             {videoSrc && (
+                 <video 
+                    ref={videoRef}
+                    src={videoSrc}
+                    className="w-full h-full object-contain"
+                    playsInline
+                    onClick={onTogglePlay}
+                    crossOrigin="anonymous"
+                 />
+             )}
+             
+             {/* Overlays */}
+             {ankiStatus === 'recording' && (
+                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm z-50">
+                     <div className="p-4 rounded-full bg-red-500/20 mb-4 animate-pulse">
+                         <Mic className="w-10 h-10 text-red-500" />
+                     </div>
+                     <p className="text-white font-medium text-lg">Capturing Audio...</p>
+                 </div>
+             )}
 
-        {/* Section Complete Overlay */}
-        {showSectionComplete && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-md z-30">
-            <div className="bg-slate-900/90 border border-slate-700 rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl">
-              <div className="flex items-center justify-center mb-4">
-                <Check className="w-10 h-10 text-emerald-400" />
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Section Complete!</h2>
-              <p className="text-slate-400 mb-6">Great work. You have finished this section.</p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <button
-                  onClick={onNextSection}
-                  className="flex-1 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-lg shadow-md flex items-center justify-center gap-2 transition-all"
-                >
-                  <PlayCircle className="w-4 h-4" />
-                  Next Section
-                </button>
-                <button
-                  onClick={() => onSetShowSectionComplete(false)}
-                  className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium rounded-lg border border-slate-700 flex items-center justify-center gap-2 transition-all"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  Review
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+             {showSectionComplete && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-md z-50 animate-in fade-in zoom-in duration-300">
+                    <div className="bg-slate-900 border border-slate-700 p-8 rounded-2xl text-center max-w-md shadow-2xl">
+                        <Check className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                        <h2 className="text-2xl font-bold text-white mb-2">Section Complete!</h2>
+                        <p className="text-slate-400 mb-6">Great job. You've finished all lines in this section.</p>
+                        <div className="flex flex-col gap-3">
+                            <button
+                                onClick={onNextSection}
+                                className="w-full py-3 bg-brand-600 hover:bg-brand-500 text-white font-bold rounded-xl transition-all"
+                            >
+                                Continue to Next Section
+                            </button>
+                            <button
+                                onClick={() => onSetShowSectionComplete(false)}
+                                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl transition-all"
+                            >
+                                Review Current Section
+                            </button>
+                        </div>
+                    </div>
+                </div>
+             )}
 
-        {/* Recording Overlay for Anki */}
-        {ankiStatus === 'recording' && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-20">
-            <div className="bg-slate-900/95 border border-red-500/40 rounded-2xl px-6 py-4 flex items-center gap-3 shadow-xl">
-              <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-              <div className="flex items-center gap-2 text-sm text-slate-100 font-medium">
-                <Mic className="w-4 h-4 text-red-400" />
-                <span>Recording audio clip for Anki...</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Center Play Button when paused */}
-        {!isPlaying && mode === PracticeMode.LISTENING && ankiStatus !== 'recording' && !showSectionComplete && (
-          <button onClick={onTogglePlay} className="absolute inset-0 flex items-center justify-center z-10 group">
-            <div className="p-6 bg-black/40 backdrop-blur-sm rounded-full shadow-2xl transform transition-all group-hover:scale-110 group-hover:bg-brand-600/80 border border-white/10">
-              <Play className="w-12 h-12 text-white fill-current ml-1" />
-            </div>
-          </button>
-        )}
+             {!isPlaying && mode === PracticeMode.LISTENING && ankiStatus !== 'recording' && !showSectionComplete && (
+                 <button onClick={onTogglePlay} className="absolute inset-0 flex items-center justify-center z-10 group">
+                     <div className="p-6 bg-black/40 backdrop-blur-sm rounded-full shadow-2xl transform transition-all group-hover:scale-110 group-hover:bg-brand-600/80 border border-white/10">
+                        <Play className="w-12 h-12 text-white fill-current ml-1" />
+                     </div>
+                 </button>
+             )}
       </div>
 
       {/* --- Bottom Interaction Layer --- */}
@@ -452,3 +436,4 @@ export default function PracticeLayout() {
     </div>
   );
 }
+

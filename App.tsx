@@ -7,6 +7,7 @@ import Settings from './components/Settings';
 import VideoLibrary from './components/VideoLibrary';
 import UploadSection from './components/UploadSection';
 import PracticeLayout from './components/PracticeLayout';
+import { PracticeProvider } from './hooks/usePracticeContext';
 import { useVideoHistory } from './hooks/useVideoHistory';
 import { usePracticeSession } from './hooks/usePracticeSession';
 import { useAnkiIntegration } from './hooks/useAnkiIntegration';
@@ -455,44 +456,56 @@ export default function App() {
   const isCurrentSaved = savedLinesIsCurrentSaved(currentSub);
 
   return (
-    <PracticeLayout
-      subtitles={subtitles}
-      fullSubtitles={fullSubtitles}
-      sections={sections}
-      currentSectionIndex={currentSectionIndex}
-      currentSubtitleIndex={currentSubtitleIndex}
-      mode={mode}
-      showSectionComplete={showSectionComplete}
-      videoRef={videoRef}
-      videoSrc={videoSrc}
-      isPlaying={isPlaying}
-      volume={volume}
-      playbackSpeed={playbackSpeed}
-      progress={progress}
-      savedIds={savedIds}
-      showSavedList={showSavedList}
-      savedItems={savedItems}
-      isCurrentSaved={isCurrentSaved}
-      ankiConfig={ankiConfig}
-      ankiStatus={ankiStatus}
-      onExit={() => setAppState(AppState.UPLOAD)}
-      onSwitchSection={(index) => switchSection(index, videoRef, setIsPlaying)}
-      onToggleSavedList={setShowSavedList}
-      onTogglePlay={togglePlay}
-      onReplayCurrent={handleReplayCurrent}
-      onSkip={handleSkip}
-      onProgressSeek={handleProgressSeek}
-      onToggleSaveCurrent={toggleSaveCurrent}
-      onAddToAnki={handleAddToAnki}
-      onWordToAnki={handleWordToAnki}
-      onNextSection={handleNextSectionClick}
-      onSetShowSectionComplete={setShowSectionComplete}
-      onSetVolume={setVolume}
-      onSetPlaybackSpeed={setPlaybackSpeed}
-      onInputComplete={handleInputComplete}
-      onContinue={handleContinue}
-      onDeleteSavedItem={deleteSavedItem}
-      onJumpToSaved={jumpToSaved}
-    />
+    <PracticeProvider
+      practice={{
+        subtitles,
+        fullSubtitles,
+        sections,
+        currentSectionIndex,
+        currentSubtitleIndex,
+        mode,
+        showSectionComplete,
+      }}
+      video={{
+        videoRef,
+        videoSrc,
+        isPlaying,
+        volume,
+        playbackSpeed,
+        progress,
+      }}
+      saved={{
+        savedIds,
+        showSavedList,
+        savedItems,
+        isCurrentSaved,
+      }}
+      anki={{
+        ankiConfig,
+        ankiStatus,
+      }}
+      actions={{
+        onExit: () => setAppState(AppState.UPLOAD),
+        onSwitchSection: (index: number) => switchSection(index, videoRef, setIsPlaying),
+        onToggleSavedList: setShowSavedList,
+        onTogglePlay: togglePlay,
+        onReplayCurrent: handleReplayCurrent,
+        onSkip: handleSkip,
+        onProgressSeek: handleProgressSeek,
+        onToggleSaveCurrent: toggleSaveCurrent,
+        onAddToAnki: handleAddToAnki,
+        onWordToAnki: handleWordToAnki,
+        onNextSection: handleNextSectionClick,
+        onSetShowSectionComplete: setShowSectionComplete,
+        onSetVolume: setVolume,
+        onSetPlaybackSpeed: setPlaybackSpeed,
+        onInputComplete: handleInputComplete,
+        onContinue: handleContinue,
+        onDeleteSavedItem: deleteSavedItem,
+        onJumpToSaved: jumpToSaved,
+      }}
+    >
+      <PracticeLayout />
+    </PracticeProvider>
   );
 }
