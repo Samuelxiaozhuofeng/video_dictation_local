@@ -10,6 +10,7 @@ interface SettingsProps {
 }
 
 const Settings: React.FC<SettingsProps> = ({ onBack }) => {
+  const [activeTab, setActiveTab] = useState<'general' | 'ai' | 'anki'>('general');
   // Anki Configuration State
   const [url, setUrl] = useState('http://127.0.0.1:8765');
   const [wordDeckName, setWordDeckName] = useState('');
@@ -40,6 +41,7 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   // UI State
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [statusMsg, setStatusMsg] = useState('');
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
   // Load existing config on mount
   useEffect(() => {
@@ -176,7 +178,9 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     // Save Audio Padding
     Storage.saveAudioPaddingConfig(audioPadding);
 
-    onBack();
+    // Show a lightweight success message (without leaving Settings)
+    setSaveNotice('Settings saved successfully.');
+    setTimeout(() => setSaveNotice(null), 2500);
   };
 
   const updateWordMapping = (ankiField: string, appDataKey: string) => {
@@ -221,8 +225,56 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         </button>
       </header>
 
-      <div className="flex-1 max-w-3xl w-full mx-auto p-6 space-y-8 pb-20">
-        
+      <div className="flex-1 max-w-3xl w-full mx-auto p-6 pb-20">
+        {saveNotice && (
+          <div className="mb-4 px-4 py-3 bg-emerald-500/10 border border-emerald-500/40 rounded-lg text-sm text-emerald-300 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4" />
+              <span>{saveNotice}</span>
+            </div>
+            <button
+              onClick={() => setSaveNotice(null)}
+              className="text-emerald-300 hover:text-emerald-100 text-xs"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+        <div className="mb-4 border-b border-slate-800 flex gap-2">
+          <button
+            onClick={() => setActiveTab('general')}
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 -mb-px transition-colors ${
+              activeTab === 'general'
+                ? 'border-brand-500 text-white'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            General
+          </button>
+          <button
+            onClick={() => setActiveTab('ai')}
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 -mb-px transition-colors ${
+              activeTab === 'ai'
+                ? 'border-brand-500 text-white'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            AI
+          </button>
+          <button
+            onClick={() => setActiveTab('anki')}
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 -mb-px transition-colors ${
+              activeTab === 'anki'
+                ? 'border-brand-500 text-white'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            Anki
+          </button>
+        </div>
+
+        {activeTab === 'general' && (
+          <div className="space-y-8">
         {/* Practice Configuration Section */}
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
@@ -313,11 +365,14 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                          <strong className="text-slate-300">Recommended:</strong> Start 100ms, End 200ms
                      </p>
                  </div>
-             </div>
-        </section>
-
-        {/* AI Configuration Section */}
-        <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
+               </div>
+          </section>
+          </div>
+        )}
+  
+        {activeTab === 'ai' && (
+          <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
+          {/* AI Configuration Section */}
              <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-brand-400" />
                 AI Configuration
@@ -407,11 +462,14 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                  <p className="text-xs text-slate-500 mt-2">
                     Use <code>{'{word}'}</code> and <code>{'{context}'}</code> as placeholders. The response must still be compatible with the expected JSON schema (word, definition, partOfSpeech).
                  </p>
-             </div>
-        </section>
-
-        {/* Anki Connection Section */}
-        <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
+               </div>
+          </section>
+        )}
+  
+        {activeTab === 'anki' && (
+          <>
+          {/* Anki Connection Section */}
+          <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
           <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <Link className="w-5 h-5 text-brand-400" />
             AnkiConnect Setup
@@ -566,7 +624,9 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
              </div>
           </section>
         )}
-        
+          </>
+        )}
+
         <div className="flex justify-end pb-10">
              <button 
                  onClick={handleSave}
