@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Subtitle } from '../types';
+import { Subtitle, AnkiConfig, AnkiCardTemplateConfig } from '../types';
 import * as Anki from '../utils/anki';
 import * as Storage from '../utils/storage';
 
@@ -12,7 +12,7 @@ export interface UseAnkiIntegrationParams {
 
 export interface UseAnkiIntegrationReturn {
   // State
-  ankiConfig: Anki.AnkiConfig | null;
+  ankiConfig: AnkiConfig | null;
   ankiStatus: AnkiStatus;
 
   // Actions
@@ -26,7 +26,7 @@ export interface UseAnkiIntegrationReturn {
 export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiIntegrationReturn {
   const { videoRef, videoFileName } = params;
 
-  const [ankiConfig, setAnkiConfig] = useState<Anki.AnkiConfig | null>(Anki.getAnkiConfig());
+  const [ankiConfig, setAnkiConfig] = useState<AnkiConfig | null>(Anki.getAnkiConfig());
   const [ankiStatus, setAnkiStatus] = useState<AnkiStatus>('idle');
 
   // Reload config from storage
@@ -112,13 +112,13 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
   }, [videoRef]);
 
   // Capture media (screenshot and/or audio) for a subtitle
-  const captureMedia = useCallback(async (currentSub: Subtitle, includeAudio: boolean = true) => {
+  const captureMedia = useCallback(async (currentSub: Subtitle, template: AnkiCardTemplateConfig | null, includeAudio: boolean = true) => {
       let screenshotBase64 = undefined;
       let audioBase64 = undefined;
 
-      if (!ankiConfig) return { screenshotBase64, audioBase64 };
+      if (!template) return { screenshotBase64, audioBase64 };
 
-      const mappingValues = Object.values(ankiConfig.fieldMapping);
+      const mappingValues = Object.values(template.fieldMapping);
       const needsScreenshot = mappingValues.includes('screenshot');
       const needsAudio = mappingValues.includes('audio');
 
@@ -159,15 +159,24 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
     }
     if (ankiStatus !== 'idle') return;
 
-    const needsAudio = Object.values(ankiConfig.fieldMapping).includes('audio');
+    // 优先使用 Audio 卡片模板，其次回退到 Word 模板
+    const template: AnkiCardTemplateConfig | null =
+      ankiConfig.audioCard || ankiConfig.wordCard || null;
+
+    if (!template) {
+      alert("Please configure Anki card templates in Settings.");
+      return;
+    }
+
+    const needsAudio = Object.values(template.fieldMapping).includes('audio');
     if (needsAudio) setAnkiStatus('recording');
     else setAnkiStatus('adding');
 
-    const { screenshotBase64, audioBase64 } = await captureMedia(subtitle);
+    const { screenshotBase64, audioBase64 } = await captureMedia(subtitle, template, true);
 
     setAnkiStatus('adding');
     try {
-        await Anki.addNote(ankiConfig, {
+        await Anki.addNote(ankiConfig.url, template, {
             sentence: subtitle.text,
             videoName: videoFileName || 'Unknown',
             timestamp: Storage.formatTimeCode(subtitle.startTime),
@@ -186,11 +195,28 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
 
   // Add word with definition to Anki
   const handleWordToAnki = useCallback(async (word: string, definition: string, subtitle: Subtitle, includeAudio: boolean = true) => {
-      if (!ankiConfig) return;
+      if (!ankiConfig) {
+        alert("Please configure Anki settings first.");
+        return;
+      }
 
-      const { screenshotBase64, audioBase64 } = await captureMedia(subtitle, includeAudio);
+      // 只有 Only Word（includeAudio === false）使用 Word 卡片模板；
+      // 其余（With Audio 等）优先使用 Audio 模板
+      let template: AnkiCardTemplateConfig | null;
+      if (includeAudio) {
+        template = ankiConfig.audioCard || ankiConfig.wordCard || null;
+      } else {
+        template = ankiConfig.wordCard || ankiConfig.audioCard || null;
+      }
 
-      await Anki.addNote(ankiConfig, {
+      if (!template) {
+        alert("Please configure Anki card templates in Settings.");
+        return;
+      }
+
+      const { screenshotBase64, audioBase64 } = await captureMedia(subtitle, template, includeAudio);
+
+      await Anki.addNote(ankiConfig.url, template, {
           sentence: subtitle.text,
           videoName: videoFileName || 'Unknown',
           timestamp: Storage.formatTimeCode(subtitle.startTime),
@@ -211,4 +237,3 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
     reloadConfig
   };
 }
-

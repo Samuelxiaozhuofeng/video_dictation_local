@@ -46,11 +46,16 @@ export interface VideoSection {
 }
 
 // Anki specific types
-export interface AnkiConfig {
-  url: string;
+export interface AnkiCardTemplateConfig {
   deckName: string;
   modelName: string;
   fieldMapping: Record<string, string>; // Anki Field Name -> App Data Key
+}
+
+export interface AnkiConfig {
+  url: string;
+  wordCard: AnkiCardTemplateConfig | null;
+  audioCard: AnkiCardTemplateConfig | null;
 }
 
 // AI Configuration

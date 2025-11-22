@@ -48,7 +48,7 @@ interface PracticeLayoutProps {
   onProgressSeek: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onToggleSaveCurrent: () => void;
   onAddToAnki: () => void;
-  onWordToAnki: (word: string, definition: string) => void;
+  onWordToAnki: (word: string, definition: string, includeAudio?: boolean) => void;
   onNextSection: () => void;
   onSetShowSectionComplete: (show: boolean) => void;
   onSetVolume: (volume: number) => void;
@@ -280,7 +280,7 @@ export default function PracticeLayout(props: PracticeLayoutProps) {
 
                     <div className="flex items-center gap-2 w-24 justify-end relative">
                         {/* Anki Button Mini */}
-                        {ankiConfig && (
+                        {ankiConfig && (ankiConfig.audioCard || ankiConfig.wordCard) && (
                              <button
                                 onClick={onAddToAnki}
                                 disabled={ankiStatus !== 'idle'}
@@ -438,4 +438,3 @@ export default function PracticeLayout(props: PracticeLayoutProps) {
     </div>
   );
 }
-

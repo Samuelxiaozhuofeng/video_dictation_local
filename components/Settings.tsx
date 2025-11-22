@@ -12,9 +12,12 @@ interface SettingsProps {
 const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   // Anki Configuration State
   const [url, setUrl] = useState('http://127.0.0.1:8765');
-  const [deckName, setDeckName] = useState('');
-  const [modelName, setModelName] = useState('');
-  const [fieldMapping, setFieldMapping] = useState<Record<string, string>>({});
+  const [wordDeckName, setWordDeckName] = useState('');
+  const [wordModelName, setWordModelName] = useState('');
+  const [wordFieldMapping, setWordFieldMapping] = useState<Record<string, string>>({});
+  const [audioDeckName, setAudioDeckName] = useState('');
+  const [audioModelName, setAudioModelName] = useState('');
+  const [audioFieldMapping, setAudioFieldMapping] = useState<Record<string, string>>({});
 
   // AI Configuration State
   const [aiModel, setAiModel] = useState('gemini-2.5-flash');
@@ -31,7 +34,8 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   // Data from Anki
   const [decks, setDecks] = useState<string[]>([]);
   const [models, setModels] = useState<string[]>([]);
-  const [modelFields, setModelFields] = useState<string[]>([]);
+  const [wordModelFields, setWordModelFields] = useState<string[]>([]);
+  const [audioModelFields, setAudioModelFields] = useState<string[]>([]);
   
   // UI State
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -43,9 +47,17 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     const savedAnki = Anki.getAnkiConfig();
     if (savedAnki) {
       setUrl(savedAnki.url);
-      setDeckName(savedAnki.deckName);
-      setModelName(savedAnki.modelName);
-      setFieldMapping(savedAnki.fieldMapping);
+
+      if (savedAnki.wordCard) {
+        setWordDeckName(savedAnki.wordCard.deckName);
+        setWordModelName(savedAnki.wordCard.modelName);
+        setWordFieldMapping(savedAnki.wordCard.fieldMapping || {});
+      }
+      if (savedAnki.audioCard) {
+        setAudioDeckName(savedAnki.audioCard.deckName);
+        setAudioModelName(savedAnki.audioCard.modelName);
+        setAudioFieldMapping(savedAnki.audioCard.fieldMapping || {});
+      }
       // If we have a saved URL, try to fetch lists immediately
       fetchAnkiData(savedAnki.url);
     }
@@ -66,14 +78,14 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     setAudioPadding(savedAudioPadding);
   }, []);
 
-  // When model changes, fetch its fields
+  // When model changes, fetch its fields (Word card)
   useEffect(() => {
-    if (modelName && status === 'success') {
-      Anki.getModelFieldNames(modelName, url)
+    if (wordModelName && status === 'success') {
+      Anki.getModelFieldNames(wordModelName, url)
         .then(fields => {
-           setModelFields(fields);
+           setWordModelFields(fields);
            // Preserve existing mapping where possible
-           setFieldMapping(prev => {
+           setWordFieldMapping(prev => {
              const newMapping: Record<string, string> = {};
              fields.forEach(f => {
                if (prev[f]) newMapping[f] = prev[f];
@@ -83,7 +95,26 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         })
         .catch(err => console.error("Failed to fetch fields", err));
     }
-  }, [modelName]);
+  }, [wordModelName, status, url]);
+
+  // When model changes, fetch its fields (Audio card)
+  useEffect(() => {
+    if (audioModelName && status === 'success') {
+      Anki.getModelFieldNames(audioModelName, url)
+        .then(fields => {
+           setAudioModelFields(fields);
+           // Preserve existing mapping where possible
+           setAudioFieldMapping(prev => {
+             const newMapping: Record<string, string> = {};
+             fields.forEach(f => {
+               if (prev[f]) newMapping[f] = prev[f];
+             });
+             return newMapping;
+           });
+        })
+        .catch(err => console.error("Failed to fetch fields", err));
+    }
+  }, [audioModelName, status, url]);
 
   const fetchAnkiData = async (targetUrl: string) => {
     setStatus('loading');
@@ -108,15 +139,24 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
 
   const handleSave = () => {
     // Save Anki
-    if (deckName && modelName) {
-        const config: AnkiConfig = {
-            url,
-            deckName,
-            modelName,
-            fieldMapping
-        };
-        Anki.saveAnkiConfig(config);
-    }
+    const config: AnkiConfig = {
+      url,
+      wordCard: wordDeckName && wordModelName
+        ? {
+            deckName: wordDeckName,
+            modelName: wordModelName,
+            fieldMapping: wordFieldMapping,
+          }
+        : null,
+      audioCard: audioDeckName && audioModelName
+        ? {
+            deckName: audioDeckName,
+            modelName: audioModelName,
+            fieldMapping: audioFieldMapping,
+          }
+        : null,
+    };
+    Anki.saveAnkiConfig(config);
 
     // Save AI
     const aiConfig: AIConfig = {
@@ -139,8 +179,15 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
     onBack();
   };
 
-  const updateMapping = (ankiField: string, appDataKey: string) => {
-    setFieldMapping(prev => ({
+  const updateWordMapping = (ankiField: string, appDataKey: string) => {
+    setWordFieldMapping(prev => ({
+      ...prev,
+      [ankiField]: appDataKey
+    }));
+  };
+
+  const updateAudioMapping = (ankiField: string, appDataKey: string) => {
+    setAudioFieldMapping(prev => ({
       ...prev,
       [ankiField]: appDataKey
     }));
@@ -412,54 +459,111 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                 Card Configuration
              </h2>
              
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div>
-                   <label className="block text-sm text-slate-400 mb-2">Target Deck</label>
-                   <select 
-                      value={deckName}
-                      onChange={(e) => setDeckName(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-brand-500 outline-none"
-                   >
-                      <option value="">Select a Deck...</option>
-                      {decks.map(d => <option key={d} value={d}>{d}</option>)}
-                   </select>
-                </div>
-                <div>
-                   <label className="block text-sm text-slate-400 mb-2">Note Type</label>
-                   <select 
-                      value={modelName}
-                      onChange={(e) => setModelName(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-brand-500 outline-none"
-                   >
-                      <option value="">Select a Note Type...</option>
-                      {models.map(m => <option key={m} value={m}>{m}</option>)}
-                   </select>
-                </div>
-             </div>
-
-             {modelName && modelFields.length > 0 && (
-               <div className="border-t border-slate-800 pt-6">
-                  <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">Field Mapping</h3>
-                  <div className="space-y-4">
-                    {modelFields.map(field => (
-                      <div key={field} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                         <div className="w-full sm:w-1/3 text-sm font-medium text-slate-400 truncate" title={field}>{field}</div>
-                         <ArrowLeft className="hidden sm:block w-4 h-4 text-slate-600" />
-                         <select 
-                           value={fieldMapping[field] || ''}
-                           onChange={(e) => updateMapping(field, e.target.value)}
-                           className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:border-brand-500 outline-none w-full"
-                         >
-                           <option value="">(Leave Empty)</option>
-                           {APP_DATA_FIELDS.map(opt => (
-                             <option key={opt.key} value={opt.key}>{opt.label}</option>
-                           ))}
-                         </select>
-                      </div>
-                    ))}
+             {/* Word Card Configuration */}
+             <div className="mb-8">
+               <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3">Word Card</h3>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                  <div>
+                     <label className="block text-sm text-slate-400 mb-2">Target Deck</label>
+                     <select 
+                        value={wordDeckName}
+                        onChange={(e) => setWordDeckName(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-brand-500 outline-none"
+                     >
+                        <option value="">Select a Deck...</option>
+                        {decks.map(d => <option key={d} value={d}>{d}</option>)}
+                     </select>
+                  </div>
+                  <div>
+                     <label className="block text-sm text-slate-400 mb-2">Note Type</label>
+                     <select 
+                        value={wordModelName}
+                        onChange={(e) => setWordModelName(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-brand-500 outline-none"
+                     >
+                        <option value="">Select a Note Type...</option>
+                        {models.map(m => <option key={m} value={m}>{m}</option>)}
+                     </select>
                   </div>
                </div>
-             )}
+
+               {wordModelName && wordModelFields.length > 0 && (
+                 <div className="border-t border-slate-800 pt-4">
+                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Field Mapping</h4>
+                    <div className="space-y-4">
+                      {wordModelFields.map(field => (
+                        <div key={field} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                           <div className="w-full sm:w-1/3 text-sm font-medium text-slate-400 truncate" title={field}>{field}</div>
+                           <ArrowLeft className="hidden sm:block w-4 h-4 text-slate-600" />
+                           <select 
+                             value={wordFieldMapping[field] || ''}
+                             onChange={(e) => updateWordMapping(field, e.target.value)}
+                             className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:border-brand-500 outline-none w-full"
+                           >
+                             <option value="">(Leave Empty)</option>
+                             {APP_DATA_FIELDS.map(opt => (
+                               <option key={opt.key} value={opt.key}>{opt.label}</option>
+                             ))}
+                           </select>
+                        </div>
+                      ))}
+                    </div>
+                 </div>
+               )}
+             </div>
+
+             {/* Audio Card Configuration */}
+             <div>
+               <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3">Audio Card</h3>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                  <div>
+                     <label className="block text-sm text-slate-400 mb-2">Target Deck</label>
+                     <select 
+                        value={audioDeckName}
+                        onChange={(e) => setAudioDeckName(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-brand-500 outline-none"
+                     >
+                        <option value="">Select a Deck...</option>
+                        {decks.map(d => <option key={d} value={d}>{d}</option>)}
+                     </select>
+                  </div>
+                  <div>
+                     <label className="block text-sm text-slate-400 mb-2">Note Type</label>
+                     <select 
+                        value={audioModelName}
+                        onChange={(e) => setAudioModelName(e.target.value)}
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-brand-500 outline-none"
+                     >
+                        <option value="">Select a Note Type...</option>
+                        {models.map(m => <option key={m} value={m}>{m}</option>)}
+                     </select>
+                  </div>
+               </div>
+
+               {audioModelName && audioModelFields.length > 0 && (
+                 <div className="border-t border-slate-800 pt-4">
+                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Field Mapping</h4>
+                    <div className="space-y-4">
+                      {audioModelFields.map(field => (
+                        <div key={field} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                           <div className="w-full sm:w-1/3 text-sm font-medium text-slate-400 truncate" title={field}>{field}</div>
+                           <ArrowLeft className="hidden sm:block w-4 h-4 text-slate-600" />
+                           <select 
+                             value={audioFieldMapping[field] || ''}
+                             onChange={(e) => updateAudioMapping(field, e.target.value)}
+                             className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:border-brand-500 outline-none w-full"
+                           >
+                             <option value="">(Leave Empty)</option>
+                             {APP_DATA_FIELDS.map(opt => (
+                               <option key={opt.key} value={opt.key}>{opt.label}</option>
+                             ))}
+                           </select>
+                        </div>
+                      ))}
+                    </div>
+                 </div>
+               )}
+             </div>
           </section>
         )}
         

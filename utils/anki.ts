@@ -1,4 +1,4 @@
-import { AnkiConfig } from '../types';
+import { AnkiConfig, AnkiCardTemplateConfig } from '../types';
 
 const STORAGE_KEY_ANKI = 'linguaclip_anki_config';
 const DEFAULT_URL = 'http://127.0.0.1:8765';
@@ -6,7 +6,36 @@ const DEFAULT_URL = 'http://127.0.0.1:8765';
 export const getAnkiConfig = (): AnkiConfig | null => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY_ANKI);
-    return stored ? JSON.parse(stored) : null;
+    if (!stored) return null;
+
+    const parsed: any = JSON.parse(stored);
+
+    // Backwards compatibility: old shape was a single template
+    if (parsed && typeof parsed === 'object' && 'deckName' in parsed && 'modelName' in parsed) {
+      const url = parsed.url || DEFAULT_URL;
+      const template: AnkiCardTemplateConfig = {
+        deckName: parsed.deckName,
+        modelName: parsed.modelName,
+        fieldMapping: parsed.fieldMapping || {},
+      };
+      return {
+        url,
+        // 默认将旧配置同时作为两种卡片的模板，避免用户升级后不能用
+        wordCard: template,
+        audioCard: template,
+      };
+    }
+
+    // New shape
+    if (parsed && typeof parsed === 'object' && 'url' in parsed) {
+      return {
+        url: parsed.url || DEFAULT_URL,
+        wordCard: parsed.wordCard || null,
+        audioCard: parsed.audioCard || null,
+      };
+    }
+
+    return null;
   } catch (e) {
     return null;
   }
@@ -51,7 +80,8 @@ export const getModelFieldNames = async (modelName: string, url: string) => {
 };
 
 export const addNote = async (
-  config: AnkiConfig, 
+  url: string,
+  template: AnkiCardTemplateConfig,
   data: { 
     sentence: string; 
     videoName: string; 
@@ -67,7 +97,7 @@ export const addNote = async (
   const audio: any[] = [];
 
   // Map app data to Anki fields
-  Object.entries(config.fieldMapping).forEach(([ankiField, appKey]) => {
+  Object.entries(template.fieldMapping).forEach(([ankiField, appKey]) => {
     if (!appKey) return;
 
     if (appKey === 'sentence') fields[ankiField] = data.sentence;
@@ -93,8 +123,8 @@ export const addNote = async (
   });
 
   const note = {
-    deckName: config.deckName,
-    modelName: config.modelName,
+    deckName: template.deckName,
+    modelName: template.modelName,
     fields: fields,
     options: {
       allowDuplicate: true, // Fix for "cannot create note because it is a duplicate"
@@ -104,5 +134,8 @@ export const addNote = async (
     audio: audio.length > 0 ? audio : undefined,
   };
 
-  return invokeAnki('addNote', { note }, config.url);
+  return invokeAnki('addNote', { note }, url);
 };
+
+// Re-export types for convenience in hooks/components
+export type { AnkiConfig, AnkiCardTemplateConfig };
