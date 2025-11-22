@@ -32,6 +32,8 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
   const [definitionData, setDefinitionData] = useState<AI.WordDefinition | null>(null);
   const [isLoadingDef, setIsLoadingDef] = useState(false);
   const [ankiWordStatus, setAnkiWordStatus] = useState<'idle' | 'loading-only-word' | 'loading-with-audio' | 'success-only-word' | 'success-with-audio' | 'error'>('idle');
+  const [revealedWordIndex, setRevealedWordIndex] = useState<number | null>(null);
+  const revealTimeoutRef = useRef<number | null>(null);
 
   // Initialize inputs
   useEffect(() => {
@@ -45,6 +47,26 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
       }, 50);
     }
   }, [mode, targetText, wordTokens.length]);
+
+  const clearReveal = () => {
+    if (revealTimeoutRef.current) {
+      window.clearTimeout(revealTimeoutRef.current);
+      revealTimeoutRef.current = null;
+    }
+    setRevealedWordIndex(null);
+  };
+
+  const handleRevealWord = (index: number) => {
+    if (!wordTokens[index]) return;
+    if (revealTimeoutRef.current) {
+      window.clearTimeout(revealTimeoutRef.current);
+    }
+    setRevealedWordIndex(index);
+    revealTimeoutRef.current = window.setTimeout(() => {
+      setRevealedWordIndex(null);
+      revealTimeoutRef.current = null;
+    }, 2000);
+  };
 
   const handleInputChange = (index: number, value: string) => {
     const newInputs = [...wordInputs];
@@ -85,6 +107,12 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
       e.preventDefault();
       e.stopPropagation();
       onReplay(false);
+      return;
+    }
+
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x') {
+      e.preventDefault();
+      handleRevealWord(index);
       return;
     }
 
@@ -267,6 +295,14 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
     );
   };
 
+  useEffect(() => {
+    clearReveal();
+  }, [targetText, mode]);
+
+  useEffect(() => {
+    return () => clearReveal();
+  }, []);
+
   if (mode === PracticeMode.FEEDBACK) {
     return (
       <div className="w-full flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-300 gap-4">
@@ -385,24 +421,30 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
               wordInputIndex++;
 
               return (
-                <input
-                  key={tokenIndex}
-                  ref={el => { inputRefs.current[currentWordIndex] = el; }}
-                  type="text"
-                  value={wordInputs[currentWordIndex] || ''}
-                  onChange={(e) => handleInputChange(currentWordIndex, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(currentWordIndex, e)}
-                  onPaste={handlePaste}
-                  style={{ minWidth: '3ch', width: `${Math.max(3, token.value.length + 1)}ch` }}
-                  className={`bg-black/50 backdrop-blur-md border focus:bg-black/70 focus:ring-1 text-white text-xl md:text-2xl p-2 rounded-lg outline-none shadow-lg transition-all text-center font-medium placeholder-slate-700 ${
-                    wordInputs[currentWordIndex] && isInputCorrectFlexibleCase(wordInputs[currentWordIndex], token.value)
-                      ? 'border-emerald-500/50 focus:border-emerald-500 bg-emerald-500/10'
-                      : 'border-white/20 focus:border-brand-500'
-                  }`}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck="false"
-                />
+                <div key={tokenIndex} className="relative inline-flex">
+                  <input
+                    ref={el => { inputRefs.current[currentWordIndex] = el; }}
+                    type="text"
+                    value={wordInputs[currentWordIndex] || ''}
+                    onChange={(e) => handleInputChange(currentWordIndex, e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(currentWordIndex, e)}
+                    onPaste={handlePaste}
+                    style={{ minWidth: '3ch', width: `${Math.max(3, token.value.length + 1)}ch` }}
+                    className={`bg-black/50 backdrop-blur-md border focus:bg-black/70 focus:ring-1 text-white text-xl md:text-2xl p-2 rounded-lg outline-none shadow-lg transition-all text-center font-medium placeholder-slate-700 ${
+                      wordInputs[currentWordIndex] && isInputCorrectFlexibleCase(wordInputs[currentWordIndex], token.value)
+                        ? 'border-emerald-500/50 focus:border-emerald-500 bg-emerald-500/10'
+                        : 'border-white/20 focus:border-brand-500'
+                    }`}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck="false"
+                  />
+                  {revealedWordIndex === currentWordIndex && (
+                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900/95 text-brand-200 text-xs font-semibold px-3 py-1 rounded-full border border-brand-500/40 shadow-lg whitespace-nowrap pointer-events-none">
+                      {token.value}
+                    </div>
+                  )}
+                </div>
               );
             } else if (token.type === TokenType.PUNCTUATION) {
               // Display punctuation as static text
@@ -433,7 +475,7 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
        {/* Hint / Help Text */}
        <div className="mt-4 text-center animate-pulse text-slate-500 text-xs font-medium">
           <span className="bg-black/40 px-3 py-1 rounded-full border border-white/5">
-            Type words • Auto-advance when correct • Space to Next
+            Type words - Auto-advance when correct - Space for next - Ctrl+X to peek word
           </span>
        </div>
     </div>
