@@ -244,15 +244,15 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
     return (
       <div className="w-full max-w-3xl mx-auto relative">
          {/* Glass Panel */}
-         <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl transform transition-all">
+         <div className="bg-neutral-900/70 backdrop-blur-xl border border-neutral-700/50 rounded-3xl p-8 shadow-soft-xl transform transition-all">
              {/* Correct Text */}
-             <div className="mb-3">
+             <div className="mb-5">
                  {renderTokenizedText(targetText)}
              </div>
 
              {/* Word-by-Word Comparison View */}
-             <div className="flex flex-wrap justify-center items-center gap-1 text-base font-mono border-t border-white/10 pt-3 opacity-90">
-                <span className="text-xs text-slate-400 mr-2">YOU:</span>
+             <div className="flex flex-wrap justify-center items-center gap-1.5 text-base font-mono border-t border-neutral-700/50 pt-5">
+                <span className="text-xs text-neutral-400 mr-2 font-semibold uppercase tracking-wider">Your Input:</span>
                 {tokens.map((token, idx) => {
                   if (token.type === TokenType.WORD) {
                     // Find the comparison result for this word
@@ -266,10 +266,10 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
                     return (
                       <span
                         key={idx}
-                        className={`px-1 rounded ${
+                        className={`px-2 py-0.5 rounded-lg ${
                           isCorrect
-                            ? 'text-emerald-400'
-                            : 'text-rose-400 font-bold bg-rose-500/20 border border-rose-500/30'
+                            ? 'text-emerald-400 bg-emerald-500/10'
+                            : 'text-rose-400 font-semibold bg-rose-500/20 border border-rose-500/40'
                         }`}
                         title={!isCorrect ? `Expected: ${wordResult.targetWord}` : ''}
                       >
@@ -279,7 +279,7 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
                   } else if (token.type === TokenType.PUNCTUATION) {
                     // Display punctuation as-is (not part of comparison)
                     return (
-                      <span key={idx} className="text-slate-400">
+                      <span key={idx} className="text-neutral-400">
                         {token.value}
                       </span>
                     );
@@ -305,84 +305,84 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
 
   if (mode === PracticeMode.FEEDBACK) {
     return (
-      <div className="w-full flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-300 gap-4">
+      <div className="w-full flex flex-col items-center animate-fade-in gap-5">
         {renderDetailedFeedback()}
-        
+
         {/* Definition Popover (Absolute over everything) */}
         {selectedWord && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]" onClick={() => setSelectedWord(null)}>
-                <div className="bg-slate-900/95 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                    <div className="flex justify-between items-start mb-4">
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-neutral-950/60 backdrop-blur-md" onClick={() => setSelectedWord(null)}>
+                <div className="bg-neutral-900/95 border border-neutral-700/50 rounded-3xl p-7 max-w-sm w-full shadow-soft-xl animate-scale-in" onClick={e => e.stopPropagation()}>
+                    <div className="flex justify-between items-start mb-5">
                         <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-brand-400" />
+                            <Sparkles className="w-5 h-5 text-brand-400" />
                             AI Explanation
                         </h3>
-                        <button onClick={() => setSelectedWord(null)} className="text-slate-400 hover:text-white">
+                        <button onClick={() => setSelectedWord(null)} className="text-neutral-400 hover:text-white p-1 hover:bg-neutral-700/50 rounded-lg transition-all">
                              <X className="w-5 h-5" />
                         </button>
                     </div>
 
                     {isLoadingDef ? (
-                        <div className="flex flex-col items-center justify-center py-6 text-slate-500">
-                            <Loader2 className="w-6 h-6 animate-spin mb-2 text-brand-500" />
+                        <div className="flex flex-col items-center justify-center py-8 text-neutral-400">
+                            <Loader2 className="w-7 h-7 animate-spin mb-3 text-brand-500" />
                             <p className="text-sm">Consulting Gemini...</p>
                         </div>
                     ) : definitionData ? (
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                             <div>
-                                <div className="flex items-baseline gap-2">
-                                    <span className="text-xl font-bold text-white">{definitionData.word}</span>
-                                    <span className="text-xs text-slate-400 italic border border-slate-700 px-1.5 py-0.5 rounded">{definitionData.partOfSpeech}</span>
+                                <div className="flex items-baseline gap-2 mb-3">
+                                    <span className="text-2xl font-bold text-white">{definitionData.word}</span>
+                                    <span className="text-xs text-neutral-400 italic bg-neutral-800/50 border border-neutral-700/50 px-2 py-1 rounded-lg">{definitionData.partOfSpeech}</span>
                                 </div>
-                                <p className="mt-2 text-sm text-slate-300 leading-relaxed">
+                                <p className="text-sm text-neutral-200 leading-relaxed">
                                     {definitionData.definition}
                                 </p>
                             </div>
-                            
-                            <div className="pt-3 border-t border-slate-800 flex justify-end gap-2">
+
+                            <div className="pt-4 border-t border-neutral-700/50 flex justify-end gap-2">
                                 {onWordToAnki && (
                                     <>
                                         {/* Only Word Button */}
                                         <button
                                             onClick={() => handleAddWordToAnki(false)}
                                             disabled={ankiWordStatus !== 'idle'}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
                                                 ankiWordStatus === 'success-only-word'
-                                                ? 'bg-emerald-500/20 text-emerald-400'
+                                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                                                 : ankiWordStatus === 'error'
-                                                ? 'bg-rose-500/20 text-rose-400'
-                                                : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                                : 'bg-neutral-800/50 hover:bg-neutral-800 text-neutral-200 border border-neutral-700/50'
                                             }`}
                                         >
-                                            {ankiWordStatus === 'loading-only-word' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> :
-                                             ankiWordStatus === 'success-only-word' ? <Check className="w-3.5 h-3.5" /> :
-                                             <PlusCircle className="w-3.5 h-3.5" />}
-                                            {ankiWordStatus === 'success-only-word' ? 'Added (Word)' : 'Only Word'}
+                                            {ankiWordStatus === 'loading-only-word' ? <Loader2 className="w-4 h-4 animate-spin" /> :
+                                             ankiWordStatus === 'success-only-word' ? <Check className="w-4 h-4" /> :
+                                             <PlusCircle className="w-4 h-4" />}
+                                            {ankiWordStatus === 'success-only-word' ? 'Added' : 'Word Only'}
                                         </button>
 
                                         {/* With Audio Button */}
                                         <button
                                             onClick={() => handleAddWordToAnki(true)}
                                             disabled={ankiWordStatus !== 'idle'}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
                                                 ankiWordStatus === 'success-with-audio'
-                                                ? 'bg-emerald-500/20 text-emerald-400'
+                                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                                                 : ankiWordStatus === 'error'
-                                                ? 'bg-rose-500/20 text-rose-400'
-                                                : 'bg-blue-800 hover:bg-blue-700 text-blue-200'
+                                                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                                : 'bg-brand-500 hover:bg-brand-600 text-white border border-brand-500/50'
                                             }`}
                                         >
-                                            {ankiWordStatus === 'loading-with-audio' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> :
-                                             ankiWordStatus === 'success-with-audio' ? <Check className="w-3.5 h-3.5" /> :
-                                             <PlusCircle className="w-3.5 h-3.5" />}
-                                            {ankiWordStatus === 'success-with-audio' ? 'Added (Audio)' : 'With Audio'}
+                                            {ankiWordStatus === 'loading-with-audio' ? <Loader2 className="w-4 h-4 animate-spin" /> :
+                                             ankiWordStatus === 'success-with-audio' ? <Check className="w-4 h-4" /> :
+                                             <PlusCircle className="w-4 h-4" />}
+                                            {ankiWordStatus === 'success-with-audio' ? 'Added' : 'With Audio'}
                                         </button>
                                     </>
                                 )}
                             </div>
                         </div>
                     ) : (
-                        <div className="text-rose-400 text-sm">Failed to load definition.</div>
+                        <div className="text-rose-400 text-sm bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">Failed to load definition.</div>
                     )}
                 </div>
             </div>
@@ -391,7 +391,7 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
         <div className="flex gap-3">
           <button
             onClick={() => onReplay(false)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-800/80 hover:bg-slate-700 hover:text-white text-slate-300 rounded-full text-sm font-medium transition-colors border border-white/10 backdrop-blur"
+            className="flex items-center gap-2 px-5 py-2.5 bg-neutral-800/60 hover:bg-neutral-800 hover:text-white text-neutral-300 rounded-2xl text-sm font-semibold transition-all border border-neutral-700/50 backdrop-blur-md"
           >
             <RefreshCw className="w-4 h-4" />
             Retry
@@ -399,7 +399,7 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
           <button
             onClick={() => onComplete(true)}
             autoFocus
-            className="flex items-center gap-2 px-6 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-full text-sm font-bold shadow-lg shadow-brand-900/30 transition-all"
+            className="flex items-center gap-2 px-7 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-2xl text-sm font-bold shadow-soft transition-all active:scale-[0.98]"
           >
             Next Line
             <ArrowRight className="w-4 h-4" />
@@ -414,7 +414,7 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
 
   return (
     <div className="w-full max-w-5xl mx-auto relative group px-4">
-       <form onSubmit={handleSubmit} className="relative w-full flex flex-wrap justify-center gap-1 items-center">
+       <form onSubmit={handleSubmit} className="relative w-full flex flex-wrap justify-center gap-2 items-center">
           {tokens.map((token: Token, tokenIndex: number) => {
             if (token.type === TokenType.WORD) {
               const currentWordIndex = wordInputIndex;
@@ -430,17 +430,17 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
                     onKeyDown={(e) => handleKeyDown(currentWordIndex, e)}
                     onPaste={handlePaste}
                     style={{ minWidth: '3ch', width: `${Math.max(3, token.value.length + 1)}ch` }}
-                    className={`bg-black/50 backdrop-blur-md border focus:bg-black/70 focus:ring-1 text-white text-xl md:text-2xl p-2 rounded-lg outline-none shadow-lg transition-all text-center font-medium placeholder-slate-700 ${
+                    className={`bg-neutral-900/60 backdrop-blur-xl border focus:bg-neutral-900/80 focus:ring-2 text-white text-xl md:text-2xl p-3 rounded-xl outline-none shadow-soft transition-all text-center font-medium placeholder-neutral-700 ${
                       wordInputs[currentWordIndex] && isInputCorrectFlexibleCase(wordInputs[currentWordIndex], token.value)
-                        ? 'border-emerald-500/50 focus:border-emerald-500 bg-emerald-500/10'
-                        : 'border-white/20 focus:border-brand-500'
+                        ? 'border-emerald-500/50 focus:border-emerald-500 focus:ring-emerald-500/30 bg-emerald-500/10'
+                        : 'border-neutral-700/50 focus:border-brand-500 focus:ring-brand-500/30'
                     }`}
                     autoComplete="off"
                     autoCorrect="off"
                     spellCheck="false"
                   />
                   {revealedWordIndex === currentWordIndex && (
-                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900/95 text-brand-200 text-xs font-semibold px-3 py-1 rounded-full border border-brand-500/40 shadow-lg whitespace-nowrap pointer-events-none">
+                    <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-neutral-900/95 text-brand-300 text-sm font-semibold px-4 py-2 rounded-xl border border-brand-500/40 shadow-soft-lg whitespace-nowrap pointer-events-none animate-scale-in">
                       {token.value}
                     </div>
                   )}
@@ -466,16 +466,16 @@ const InputFeedback: React.FC<InputFeedbackProps> = ({
           <button
             type="submit"
             disabled={wordInputs.every(w => w === '')}
-            className="ml-2 p-3 bg-brand-600 text-white rounded-full hover:bg-brand-500 disabled:opacity-0 disabled:scale-90 disabled:pointer-events-none transition-all shadow-lg flex-shrink-0"
+            className="ml-3 p-3.5 bg-brand-500 text-white rounded-full hover:bg-brand-600 disabled:opacity-0 disabled:scale-90 disabled:pointer-events-none transition-all shadow-soft flex-shrink-0 active:scale-95"
           >
             <Send className="w-5 h-5" />
           </button>
        </form>
 
        {/* Hint / Help Text */}
-       <div className="mt-4 text-center animate-pulse text-slate-500 text-xs font-medium">
-          <span className="bg-black/40 px-3 py-1 rounded-full border border-white/5">
-            Type words - Auto-advance when correct - Space for next - Ctrl+X to peek word
+       <div className="mt-5 text-center animate-pulse text-neutral-400 text-xs font-medium">
+          <span className="bg-neutral-900/50 px-4 py-2 rounded-xl border border-neutral-700/50 backdrop-blur-md">
+            Type words • Auto-advance when correct • Space for next • Ctrl+X to peek word
           </span>
        </div>
     </div>

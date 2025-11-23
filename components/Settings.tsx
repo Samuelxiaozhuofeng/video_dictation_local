@@ -202,23 +202,25 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
   };
 
   return (
-    <div className="h-full bg-slate-950 text-slate-200 flex flex-col overflow-y-auto">
-      <header className="sticky top-0 z-10 bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between shadow-lg shrink-0">
+    <div className="h-full bg-neutral-950 text-neutral-200 flex flex-col overflow-y-auto">
+      <header className="sticky top-0 z-10 bg-gradient-to-b from-neutral-950 to-neutral-900 border-b border-neutral-800/50 px-6 py-5 flex items-center justify-between shadow-soft shrink-0 backdrop-blur-xl">
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={onBack}
-            className="p-2 -ml-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors"
+            className="p-2 -ml-2 text-neutral-400 hover:text-white hover:bg-neutral-800/50 rounded-xl transition-all"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <SettingsIcon className="w-6 h-6" />
-            Settings
-          </h1>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-brand-500 to-brand-600 rounded-2xl">
+              <SettingsIcon className="w-5 h-5 text-white" />
+            </div>
+            <h1 className="text-xl font-bold text-white">Settings</h1>
+          </div>
         </div>
-        <button 
+        <button
              onClick={handleSave}
-             className="px-6 py-2 bg-brand-600 hover:bg-brand-500 text-white font-bold rounded-xl shadow-lg shadow-brand-900/20 transition-all transform active:scale-95 flex items-center gap-2"
+             className="px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-xl shadow-soft transition-all transform active:scale-95 flex items-center gap-2"
            >
              <Save className="w-5 h-5" />
              Save
@@ -227,46 +229,48 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
 
       <div className="flex-1 max-w-3xl w-full mx-auto p-6 pb-20">
         {saveNotice && (
-          <div className="mb-4 px-4 py-3 bg-emerald-500/10 border border-emerald-500/40 rounded-lg text-sm text-emerald-300 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4" />
-              <span>{saveNotice}</span>
+          <div className="mb-6 px-5 py-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-sm text-emerald-300 flex items-center justify-between shadow-soft">
+            <div className="flex items-center gap-3">
+              <div className="p-1.5 bg-emerald-500/20 rounded-lg">
+                <CheckCircle className="w-4 h-4" />
+              </div>
+              <span className="font-medium">{saveNotice}</span>
             </div>
             <button
               onClick={() => setSaveNotice(null)}
-              className="text-emerald-300 hover:text-emerald-100 text-xs"
+              className="text-emerald-300 hover:text-emerald-100 text-xs font-semibold px-3 py-1 hover:bg-emerald-500/10 rounded-lg transition-all"
             >
               Dismiss
             </button>
           </div>
         )}
-        <div className="mb-4 border-b border-slate-800 flex gap-2">
+        <div className="mb-6 flex gap-2 p-1.5 bg-neutral-900/50 rounded-2xl border border-neutral-800/50 w-fit">
           <button
             onClick={() => setActiveTab('general')}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 -mb-px transition-colors ${
+            className={`px-5 py-2 text-sm font-semibold rounded-xl transition-all ${
               activeTab === 'general'
-                ? 'border-brand-500 text-white'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'bg-brand-500 text-white shadow-soft'
+                : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50'
             }`}
           >
             General
           </button>
           <button
             onClick={() => setActiveTab('ai')}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 -mb-px transition-colors ${
+            className={`px-5 py-2 text-sm font-semibold rounded-xl transition-all ${
               activeTab === 'ai'
-                ? 'border-brand-500 text-white'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'bg-brand-500 text-white shadow-soft'
+                : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50'
             }`}
           >
             AI
           </button>
           <button
             onClick={() => setActiveTab('anki')}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 -mb-px transition-colors ${
+            className={`px-5 py-2 text-sm font-semibold rounded-xl transition-all ${
               activeTab === 'anki'
-                ? 'border-brand-500 text-white'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
+                ? 'bg-brand-500 text-white shadow-soft'
+                : 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50'
             }`}
           >
             Anki
@@ -274,33 +278,35 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         </div>
 
         {activeTab === 'general' && (
-          <div className="space-y-8">
+          <div className="space-y-6">
         {/* Practice Configuration Section */}
-        <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
-             <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-                <Scissors className="w-5 h-5 text-brand-400" />
+        <section className="bg-neutral-900/50 border border-neutral-800/50 rounded-2xl p-7 shadow-soft">
+             <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
+                <div className="p-2 bg-brand-500/10 rounded-xl border border-brand-500/20">
+                  <Scissors className="w-5 h-5 text-brand-400" />
+                </div>
                 Practice Mode
              </h2>
-             
+
              <div>
-                 <label className="block text-sm text-slate-400 mb-3">Section Length (Video Segmentation)</label>
+                 <label className="block text-sm text-neutral-300 mb-4 font-medium">Section Length (Video Segmentation)</label>
                  <div className="flex flex-wrap gap-3">
                      {[0, 1, 2, 3, 5, 10].map((mins) => (
                          <button
                              key={mins}
                              onClick={() => setSectionLength(mins)}
-                             className={`px-4 py-2 rounded-lg border font-medium transition-all ${
-                                 sectionLength === mins 
-                                 ? 'bg-brand-600 border-brand-500 text-white shadow-lg shadow-brand-900/20' 
-                                 : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                             className={`px-5 py-2.5 rounded-xl border font-semibold transition-all ${
+                                 sectionLength === mins
+                                 ? 'bg-brand-500 border-brand-500/50 text-white shadow-soft'
+                                 : 'bg-neutral-800/50 border-neutral-700/50 text-neutral-300 hover:bg-neutral-800 hover:border-neutral-600'
                              }`}
                          >
                              {mins === 0 ? 'Full Video' : `${mins} min${mins > 1 ? 's' : ''}`}
                          </button>
                      ))}
                  </div>
-                 <p className="text-xs text-slate-500 mt-3">
-                     {sectionLength === 0 
+                 <p className="text-xs text-neutral-400 mt-4 bg-neutral-800/30 rounded-xl p-3 leading-relaxed">
+                     {sectionLength === 0
                          ? "The entire video will be played as one continuous session."
                          : `The video will be automatically divided into ${sectionLength}-minute sections to reduce practice fatigue.`}
                  </p>
@@ -308,17 +314,19 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
         </section>
 
         {/* Audio Padding Configuration Section */}
-        <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
-             <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-                <Volume2 className="w-5 h-5 text-brand-400" />
+        <section className="bg-neutral-900/50 border border-neutral-800/50 rounded-2xl p-7 shadow-soft">
+             <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
+                <div className="p-2 bg-brand-500/10 rounded-xl border border-brand-500/20">
+                  <Volume2 className="w-5 h-5 text-brand-400" />
+                </div>
                 Audio Recording Padding
              </h2>
 
              <div className="space-y-6">
                  {/* Start Padding */}
                  <div>
-                     <label className="block text-sm text-slate-400 mb-3">
-                         Start Padding: <span className="text-white font-semibold">{audioPadding.startPadding}ms</span>
+                     <label className="block text-sm text-neutral-300 mb-4 font-medium">
+                         Start Padding: <span className="text-brand-400 font-bold">{audioPadding.startPadding}ms</span>
                      </label>
                      <input
                          type="range"
@@ -327,9 +335,9 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                          step="50"
                          value={audioPadding.startPadding}
                          onChange={(e) => setAudioPadding({ ...audioPadding, startPadding: parseInt(e.target.value) })}
-                         className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-500"
+                         className="w-full h-2.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-brand-500"
                      />
-                     <div className="flex justify-between text-xs text-slate-500 mt-1">
+                     <div className="flex justify-between text-xs text-neutral-500 mt-2 font-medium">
                          <span>0ms</span>
                          <span>1000ms</span>
                      </div>
@@ -337,8 +345,8 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
 
                  {/* End Padding */}
                  <div>
-                     <label className="block text-sm text-slate-400 mb-3">
-                         End Padding: <span className="text-white font-semibold">{audioPadding.endPadding}ms</span>
+                     <label className="block text-sm text-neutral-300 mb-4 font-medium">
+                         End Padding: <span className="text-brand-400 font-bold">{audioPadding.endPadding}ms</span>
                      </label>
                      <input
                          type="range"
@@ -347,40 +355,42 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                          step="50"
                          value={audioPadding.endPadding}
                          onChange={(e) => setAudioPadding({ ...audioPadding, endPadding: parseInt(e.target.value) })}
-                         className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-500"
+                         className="w-full h-2.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-brand-500"
                      />
-                     <div className="flex justify-between text-xs text-slate-500 mt-1">
+                     <div className="flex justify-between text-xs text-neutral-500 mt-2 font-medium">
                          <span>0ms</span>
                          <span>1000ms</span>
                      </div>
                  </div>
 
-                 <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-                     <p className="text-xs text-slate-400 leading-relaxed">
-                         <strong className="text-slate-300">What is this?</strong><br/>
+                 <div className="bg-neutral-800/30 border border-neutral-700/50 rounded-xl p-4">
+                     <p className="text-xs text-neutral-300 leading-relaxed">
+                         <strong className="text-white">What is this?</strong><br/>
                          When adding audio clips to Anki, padding adds extra time before and after the subtitle timing to ensure complete audio capture.
                          This prevents cutting off the beginning or end of words.
                      </p>
-                     <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                         <strong className="text-slate-300">Recommended:</strong> Start 100ms, End 200ms
+                     <p className="text-xs text-neutral-300 mt-3 leading-relaxed">
+                         <strong className="text-white">Recommended:</strong> Start 100ms, End 200ms
                      </p>
                  </div>
                </div>
           </section>
           </div>
         )}
-  
+
         {activeTab === 'ai' && (
-          <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
+          <section className="bg-neutral-900/50 border border-neutral-800/50 rounded-2xl p-7 shadow-soft">
           {/* AI Configuration Section */}
-             <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-brand-400" />
+             <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
+                <div className="p-2 bg-brand-500/10 rounded-xl border border-brand-500/20">
+                  <Sparkles className="w-5 h-5 text-brand-400" />
+                </div>
                 AI Configuration
              </h2>
 
              {/* API Key Input */}
-             <div className="mb-6 pb-6 border-b border-slate-800">
-                <label className="block text-sm text-slate-400 mb-2">
+             <div className="mb-6 pb-6 border-b border-neutral-800/50">
+                <label className="block text-sm text-neutral-300 mb-3 font-medium">
                    Gemini API Key
                    <span className="text-red-400 ml-1">*</span>
                 </label>
@@ -388,20 +398,20 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
                    type="password"
                    value={aiApiKey}
                    onChange={(e) => setAiApiKey(e.target.value)}
-                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-brand-500 outline-none font-mono text-sm"
+                   className="w-full bg-neutral-800/50 border border-neutral-700/50 rounded-xl px-4 py-3 text-neutral-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 outline-none font-mono text-sm transition-all"
                    placeholder="Enter your Gemini API Key..."
                 />
-                <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                   <p className="text-xs text-blue-300 mb-2">
-                      <strong>How to get your API Key:</strong>
+                <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                   <p className="text-xs text-blue-300 mb-3 font-semibold">
+                      How to get your API Key:
                    </p>
-                   <ol className="text-xs text-blue-200 space-y-1 ml-4 list-decimal">
-                      <li>Visit <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline hover:text-white">Google AI Studio</a></li>
+                   <ol className="text-xs text-blue-200 space-y-1.5 ml-4 list-decimal leading-relaxed">
+                      <li>Visit <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline hover:text-white font-medium">Google AI Studio</a></li>
                       <li>Sign in with your Google account</li>
                       <li>Click "Create API Key"</li>
                       <li>Copy and paste it here</li>
                    </ol>
-                   <p className="text-xs text-blue-300 mt-2">
+                   <p className="text-xs text-blue-300 mt-3 bg-blue-500/10 rounded-lg p-2">
                       🔒 Your API Key is stored locally in your browser and never sent to our servers.
                    </p>
                 </div>
@@ -409,83 +419,85 @@ const Settings: React.FC<SettingsProps> = ({ onBack }) => {
 
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                   <label className="block text-sm text-slate-400 mb-2">Model</label>
-                   <select 
+                   <label className="block text-sm text-neutral-300 mb-3 font-medium">Model</label>
+                   <select
                       value={aiModel}
                       onChange={(e) => setAiModel(e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-brand-500 outline-none"
+                      className="w-full bg-neutral-800/50 border border-neutral-700/50 rounded-xl px-4 py-3 text-neutral-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 outline-none transition-all"
                    >
                       <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended)</option>
                       <option value="gemini-flash-lite-latest">Gemini Flash Lite (Fastest)</option>
                       <option value="gemini-3-pro-preview">Gemini 3 Pro (Best Quality)</option>
                    </select>
-                   <p className="text-xs text-slate-500 mt-2">
+                   <p className="text-xs text-neutral-400 mt-3 bg-neutral-800/30 rounded-lg p-2">
                       Choose the model balancing speed vs quality of definitions.
                    </p>
                 </div>
                 <div>
-                   <label className="block text-sm text-slate-400 mb-2 flex justify-between">
+                   <label className="block text-sm text-neutral-300 mb-3 flex justify-between font-medium">
                        <span>Creativity (Temperature)</span>
-                       <span>{aiTemperature}</span>
+                       <span className="text-brand-400 font-bold">{aiTemperature}</span>
                    </label>
-                   <input 
-                      type="range" 
-                      min="0" 
-                      max="2" 
+                   <input
+                      type="range"
+                      min="0"
+                      max="2"
                       step="0.1"
                       value={aiTemperature}
                       onChange={(e) => setAiTemperature(parseFloat(e.target.value))}
-                      className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-brand-500 [&::-webkit-slider-thumb]:rounded-full"
+                      className="w-full h-2.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-brand-500 [&::-webkit-slider-thumb]:rounded-full"
                    />
-                   <p className="text-xs text-slate-500 mt-2">
+                   <p className="text-xs text-neutral-400 mt-3 bg-neutral-800/30 rounded-lg p-2">
                       Lower values are more deterministic; higher values are more creative.
                    </p>
                 </div>
              </div>
-             
-             <div className="mt-6 pt-6 border-t border-slate-800">
-                 <div className="flex justify-between items-center mb-2">
-                    <label className="block text-sm text-slate-400 flex items-center gap-2">
+
+             <div className="mt-6 pt-6 border-t border-neutral-800/50">
+                 <div className="flex justify-between items-center mb-3">
+                    <label className="block text-sm text-neutral-300 flex items-center gap-2 font-medium">
                         <MessageSquare className="w-4 h-4" />
                         System Prompt Template
                     </label>
-                    <button onClick={resetPrompt} className="text-xs text-brand-400 hover:text-brand-300 underline">
+                    <button onClick={resetPrompt} className="text-xs text-brand-400 hover:text-brand-300 font-semibold px-3 py-1.5 hover:bg-brand-500/10 rounded-lg transition-all">
                         Reset to Default
                     </button>
                  </div>
                  <textarea
                     value={aiPrompt}
                     onChange={(e) => setAiPrompt(e.target.value)}
-                    className="w-full h-32 bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-slate-200 focus:border-brand-500 outline-none font-mono text-sm leading-relaxed"
+                    className="w-full h-32 bg-neutral-800/50 border border-neutral-700/50 rounded-xl px-4 py-3 text-neutral-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 outline-none font-mono text-sm leading-relaxed transition-all"
                     placeholder="Enter prompt..."
                  />
-                 <p className="text-xs text-slate-500 mt-2">
-                    Use <code>{'{word}'}</code> and <code>{'{context}'}</code> as placeholders. The response must still be compatible with the expected JSON schema (word, definition, partOfSpeech).
+                 <p className="text-xs text-neutral-400 mt-3 bg-neutral-800/30 rounded-lg p-3">
+                    Use <code className="bg-neutral-700/50 px-1.5 py-0.5 rounded">{'{word}'}</code> and <code className="bg-neutral-700/50 px-1.5 py-0.5 rounded">{'{context}'}</code> as placeholders. The response must still be compatible with the expected JSON schema (word, definition, partOfSpeech).
                  </p>
                </div>
           </section>
         )}
-  
+
         {activeTab === 'anki' && (
           <>
           {/* Anki Connection Section */}
-          <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <Link className="w-5 h-5 text-brand-400" />
+          <section className="bg-neutral-900/50 border border-neutral-800/50 rounded-2xl p-7 shadow-soft">
+          <h2 className="text-lg font-semibold text-white mb-5 flex items-center gap-3">
+            <div className="p-2 bg-brand-500/10 rounded-xl border border-brand-500/20">
+              <Link className="w-5 h-5 text-brand-400" />
+            </div>
             AnkiConnect Setup
           </h2>
           <div className="flex flex-col md:flex-row gap-4 items-end">
             <div className="flex-1 w-full">
-              <label className="block text-sm text-slate-400 mb-1">AnkiConnect URL</label>
-              <input 
-                type="text" 
+              <label className="block text-sm text-neutral-300 mb-2 font-medium">AnkiConnect URL</label>
+              <input
+                type="text"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-slate-200 focus:border-brand-500 outline-none"
+                className="w-full bg-neutral-800/50 border border-neutral-700/50 rounded-xl px-4 py-3 text-neutral-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 outline-none transition-all"
                 placeholder="http://127.0.0.1:8765"
               />
             </div>
-            <button 
+            <button
               onClick={handleConnect}
               disabled={status === 'loading'}
               className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 shrink-0"

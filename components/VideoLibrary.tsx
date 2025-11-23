@@ -54,18 +54,18 @@ const VideoLibrary: React.FC<VideoLibraryProps> = ({ onContinuePractice }) => {
 
   // Render progress bar
   const renderProgressBar = (completionRate: number) => {
-    const filledDots = Math.round(completionRate / 10);
     return (
-      <div className="flex items-center gap-1">
-        {Array.from({ length: 10 }).map((_, i) => (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-neutral-400 font-medium">Progress</span>
+          <span className="text-brand-400 font-semibold">{completionRate}%</span>
+        </div>
+        <div className="h-2 bg-neutral-800/50 rounded-full overflow-hidden">
           <div
-            key={i}
-            className={`w-2 h-2 rounded-full transition-colors ${
-              i < filledDots ? 'bg-brand-500' : 'bg-slate-700'
-            }`}
+            className="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full transition-all duration-500"
+            style={{ width: `${completionRate}%` }}
           />
-        ))}
-        <span className="ml-2 text-sm font-medium text-slate-400">{completionRate}%</span>
+        </div>
       </div>
     );
   };
@@ -74,7 +74,7 @@ const VideoLibrary: React.FC<VideoLibraryProps> = ({ onContinuePractice }) => {
     return (
       <div className="w-full max-w-4xl mx-auto flex flex-col items-center justify-center py-20">
         <Loader2 className="w-8 h-8 text-brand-500 animate-spin mb-4" />
-        <p className="text-slate-400">Loading your videos...</p>
+        <p className="text-neutral-400">Loading your videos...</p>
       </div>
     );
   }
@@ -82,16 +82,16 @@ const VideoLibrary: React.FC<VideoLibraryProps> = ({ onContinuePractice }) => {
   if (videos.length === 0) {
     return (
       <div className="w-full max-w-4xl mx-auto text-center py-20">
-        <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Film className="w-10 h-10 text-slate-600" />
+        <div className="w-20 h-20 bg-neutral-900/50 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-neutral-800/50">
+          <Film className="w-10 h-10 text-neutral-600" />
         </div>
-        <h3 className="text-xl font-medium text-slate-300 mb-2">No videos yet</h3>
-        <p className="text-slate-500 mb-6">
+        <h3 className="text-2xl font-semibold text-white mb-2">No videos yet</h3>
+        <p className="text-neutral-400 mb-8">
           Upload your first video to start practicing!
         </p>
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 max-w-md mx-auto text-left">
-          <p className="text-sm text-slate-400">
-            💡 <strong className="text-slate-300">Tip:</strong> Your practice progress and subtitles will be saved automatically.
+        <div className="bg-neutral-900/30 border border-neutral-800/50 rounded-2xl p-5 max-w-md mx-auto text-left">
+          <p className="text-sm text-neutral-400 leading-relaxed">
+            💡 <strong className="text-neutral-200">Tip:</strong> Your practice progress and subtitles will be saved automatically.
             You may need to re-select the video file when continuing practice.
           </p>
         </div>
@@ -101,22 +101,22 @@ const VideoLibrary: React.FC<VideoLibraryProps> = ({ onContinuePractice }) => {
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      <div className="mb-6">
+      <div className="mb-8">
         <h2 className="text-2xl font-bold text-white mb-2">My Videos</h2>
-        <p className="text-slate-400">Continue where you left off</p>
+        <p className="text-neutral-400">Continue where you left off</p>
       </div>
 
       <div className="space-y-4">
         {videos.map((video) => (
           <div
             key={video.id}
-            className="bg-slate-900 border border-slate-800 rounded-xl p-6 hover:border-slate-600 transition-all group"
+            className="bg-neutral-900/30 border border-neutral-800/50 rounded-2xl p-6 hover:bg-neutral-900/50 hover:border-neutral-700/50 transition-all group shadow-soft hover:shadow-soft-lg"
           >
             <div className="flex items-start justify-between gap-4">
               {/* Video Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="p-2 bg-brand-500/10 rounded-lg">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2.5 bg-brand-500/10 rounded-xl border border-brand-500/20">
                     <Film className="w-5 h-5 text-brand-400" />
                   </div>
                   <h3 className="text-lg font-semibold text-white truncate">
@@ -130,7 +130,7 @@ const VideoLibrary: React.FC<VideoLibraryProps> = ({ onContinuePractice }) => {
                 </div>
 
                 {/* Stats */}
-                <div className="flex flex-wrap gap-4 text-sm text-slate-400">
+                <div className="flex flex-wrap gap-4 text-sm text-neutral-400">
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-4 h-4" />
                     <span>
@@ -144,7 +144,7 @@ const VideoLibrary: React.FC<VideoLibraryProps> = ({ onContinuePractice }) => {
                 </div>
 
                 {/* Info message */}
-                <div className="mt-3 text-xs text-slate-500 flex items-start gap-1.5">
+                <div className="mt-3 text-xs text-neutral-500 flex items-start gap-1.5 bg-neutral-800/30 rounded-lg px-3 py-2">
                   <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
                   <span>You may need to select the video file again to continue</span>
                 </div>
@@ -154,7 +154,7 @@ const VideoLibrary: React.FC<VideoLibraryProps> = ({ onContinuePractice }) => {
               <div className="flex flex-col gap-2 shrink-0">
                 <button
                   onClick={() => handleContinue(video)}
-                  className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white font-medium rounded-lg transition-all shadow-lg"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-xl transition-all shadow-soft hover:shadow-soft-lg active:scale-[0.98]"
                 >
                   <Play className="w-4 h-4 fill-current" />
                   {video.completionRate === 0 ? 'Start' : 'Continue'}
@@ -162,7 +162,7 @@ const VideoLibrary: React.FC<VideoLibraryProps> = ({ onContinuePractice }) => {
                 <button
                   onClick={(e) => handleDelete(video.id, e)}
                   disabled={deletingId === video.id}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-red-900/30 text-slate-400 hover:text-red-400 font-medium rounded-lg transition-all disabled:opacity-50"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-neutral-800/50 hover:bg-red-500/10 text-neutral-400 hover:text-red-400 font-medium rounded-xl transition-all disabled:opacity-50 border border-neutral-700/50 hover:border-red-500/30"
                 >
                   {deletingId === video.id ? (
                     <Loader2 className="w-4 h-4 animate-spin" />

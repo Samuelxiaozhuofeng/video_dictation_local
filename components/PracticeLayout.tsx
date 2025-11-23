@@ -84,31 +84,31 @@ export default function PracticeLayout() {
   };
 
   return (
-    <div className="h-screen w-screen bg-black text-slate-200 overflow-hidden relative flex flex-col">
-      
+    <div className="h-screen w-screen bg-neutral-950 text-neutral-100 overflow-hidden relative flex flex-col">
+
       {/* --- Top Floating Header --- */}
-      <header className="absolute top-0 left-0 right-0 h-20 z-40 bg-gradient-to-b from-black/90 via-black/60 to-transparent flex items-start pt-4 px-6 justify-between transition-opacity hover:opacity-100 opacity-0 sm:opacity-100">
+      <header className="absolute top-0 left-0 right-0 h-20 z-40 bg-gradient-to-b from-neutral-950/95 via-neutral-950/60 to-transparent flex items-start pt-5 px-6 justify-between transition-opacity hover:opacity-100 opacity-0 sm:opacity-100">
         <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-brand-600/90 backdrop-blur rounded-lg flex items-center justify-center font-bold text-white shadow-lg">LC</div>
-            
+            <div className="w-9 h-9 bg-gradient-to-br from-brand-500 to-brand-600 backdrop-blur rounded-2xl flex items-center justify-center font-bold text-white shadow-soft-lg">LC</div>
+
             {/* Section Selector */}
             {sections.length > 1 && (
-                <div className="flex items-center gap-1 ml-2 bg-black/50 backdrop-blur border border-white/10 rounded-lg p-1">
+                <div className="flex items-center gap-1 ml-2 bg-neutral-900/60 backdrop-blur-xl border border-neutral-700/50 rounded-xl p-1">
                     <button
                         onClick={() => onSwitchSection(currentSectionIndex - 1)}
                         disabled={currentSectionIndex === 0}
-                        className="p-1 hover:bg-white/10 rounded text-slate-400 hover:text-white disabled:opacity-30"
+                        className="p-1.5 hover:bg-neutral-700/50 rounded-lg text-neutral-400 hover:text-white disabled:opacity-30 transition-all"
                     >
                         <ChevronLeft size={16} />
                     </button>
-                    <div className="px-2 text-xs font-medium text-slate-300 flex items-center gap-2">
+                    <div className="px-3 text-xs font-semibold text-neutral-200 flex items-center gap-2">
                          <span className="hidden sm:inline">Section</span>
                          <span>{currentSectionIndex + 1} / {sections.length}</span>
                     </div>
                     <button
                         onClick={() => onSwitchSection(currentSectionIndex + 1)}
                         disabled={currentSectionIndex === sections.length - 1}
-                        className="p-1 hover:bg-white/10 rounded text-slate-400 hover:text-white disabled:opacity-30"
+                        className="p-1.5 hover:bg-neutral-700/50 rounded-lg text-neutral-400 hover:text-white disabled:opacity-30 transition-all"
                     >
                         <ChevronRight size={16} />
                     </button>
@@ -120,7 +120,7 @@ export default function PracticeLayout() {
             {/* Exit Button */}
             <button
                 onClick={onExit}
-                className="px-3 py-1.5 rounded-full text-xs font-medium bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-all"
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-neutral-800/50 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-700/50 transition-all"
             >
                 Exit
             </button>
@@ -128,16 +128,16 @@ export default function PracticeLayout() {
             {/* Saved List Toggle */}
             <button
                 onClick={() => onToggleSavedList(!showSavedList)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
                     showSavedList
-                      ? 'bg-brand-600/20 border-brand-500/50 text-brand-300'
-                      : 'bg-black/40 border-white/10 text-slate-300 hover:bg-white/5'
+                      ? 'bg-brand-500/20 border-brand-500/50 text-brand-300'
+                      : 'bg-neutral-800/50 border-neutral-700/50 text-neutral-300 hover:bg-neutral-800 hover:text-white'
                 }`}
             >
                 <Bookmark className="w-4 h-4" />
-                Saved
+                <span className="hidden sm:inline">Saved</span>
                 {savedIds.size > 0 && (
-                    <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-brand-500 text-white">
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-brand-500 text-white font-semibold">
                         {savedIds.size}
                     </span>
                 )}
@@ -146,39 +146,41 @@ export default function PracticeLayout() {
       </header>
 
       {/* --- Video Layer --- */}
-      <div className="relative flex-1 flex items-center justify-center bg-black">
+      <div className="relative flex-1 flex items-center justify-center bg-neutral-950">
         {videoSrc ? (
           <video
             ref={videoRef}
             src={videoSrc}
-            className="max-h-[70vh] max-w-5xl w-full rounded-xl shadow-2xl bg-black object-contain"
+            className="max-h-[70vh] max-w-5xl w-full rounded-2xl shadow-soft-xl bg-neutral-950 object-contain"
           />
         ) : (
-          <div className="text-slate-500">No video loaded.</div>
+          <div className="text-neutral-500">No video loaded.</div>
         )}
 
         {/* Section Complete Overlay */}
         {showSectionComplete && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-md z-30">
-            <div className="bg-slate-900/90 border border-slate-700 rounded-2xl p-8 max-w-md w-full mx-4 text-center shadow-2xl">
-              <div className="flex items-center justify-center mb-4">
-                <Check className="w-10 h-10 text-emerald-400" />
+          <div className="absolute inset-0 flex items-center justify-center bg-neutral-950/80 backdrop-blur-xl z-30">
+            <div className="bg-neutral-900/95 border border-neutral-700/50 rounded-3xl p-10 max-w-md w-full mx-4 text-center shadow-soft-xl">
+              <div className="flex items-center justify-center mb-5">
+                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center border border-emerald-500/20">
+                  <Check className="w-8 h-8 text-emerald-400" />
+                </div>
               </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Section Complete!</h2>
-              <p className="text-slate-400 mb-6">Great work. You have finished this section.</p>
+              <h2 className="text-2xl font-bold text-white mb-3">Section Complete!</h2>
+              <p className="text-neutral-400 mb-8">Great work. You have finished this section.</p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <button
                   onClick={onNextSection}
-                  className="flex-1 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white font-semibold rounded-lg shadow-md flex items-center justify-center gap-2 transition-all"
+                  className="flex-1 px-5 py-3 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-xl shadow-soft flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                 >
-                  <PlayCircle className="w-4 h-4" />
+                  <PlayCircle className="w-5 h-5" />
                   Next Section
                 </button>
                 <button
                   onClick={() => onSetShowSectionComplete(false)}
-                  className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium rounded-lg border border-slate-700 flex items-center justify-center gap-2 transition-all"
+                  className="flex-1 px-5 py-3 bg-neutral-800/50 hover:bg-neutral-800 text-neutral-200 font-medium rounded-xl border border-neutral-700/50 flex items-center justify-center gap-2 transition-all"
                 >
-                  <RotateCcw className="w-4 h-4" />
+                  <RotateCcw className="w-5 h-5" />
                   Review
                 </button>
               </div>
@@ -188,11 +190,11 @@ export default function PracticeLayout() {
 
         {/* Recording Overlay for Anki */}
         {ankiStatus === 'recording' && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm z-20">
-            <div className="bg-slate-900/95 border border-red-500/40 rounded-2xl px-6 py-4 flex items-center gap-3 shadow-xl">
+          <div className="absolute inset-0 flex items-center justify-center bg-neutral-950/70 backdrop-blur-md z-20">
+            <div className="bg-neutral-900/95 border border-red-500/30 rounded-2xl px-8 py-5 flex items-center gap-4 shadow-soft-xl">
               <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-              <div className="flex items-center gap-2 text-sm text-slate-100 font-medium">
-                <Mic className="w-4 h-4 text-red-400" />
+              <div className="flex items-center gap-3 text-sm text-white font-medium">
+                <Mic className="w-5 h-5 text-red-400" />
                 <span>Recording audio clip for Anki...</span>
               </div>
             </div>
@@ -202,23 +204,23 @@ export default function PracticeLayout() {
         {/* Center Play Button when paused */}
         {!isPlaying && mode === PracticeMode.LISTENING && ankiStatus !== 'recording' && !showSectionComplete && (
           <button onClick={onTogglePlay} className="absolute inset-0 flex items-center justify-center z-10 group">
-            <div className="p-6 bg-black/40 backdrop-blur-sm rounded-full shadow-2xl transform transition-all group-hover:scale-110 group-hover:bg-brand-600/80 border border-white/10">
-              <Play className="w-12 h-12 text-white fill-current ml-1" />
+            <div className="p-7 bg-neutral-900/40 backdrop-blur-md rounded-full shadow-soft-xl transform transition-all group-hover:scale-110 group-hover:bg-brand-500/90 border border-neutral-700/30 group-hover:border-brand-500/50">
+              <Play className="w-14 h-14 text-white fill-current ml-1" />
             </div>
           </button>
         )}
       </div>
 
       {/* --- Bottom Interaction Layer --- */}
-      <div className="absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black via-black/90 to-transparent pt-32 pb-6 px-4 flex flex-col items-center justify-end transition-all duration-300 pointer-events-none">
+      <div className="absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-neutral-950 via-neutral-950/95 to-transparent pt-32 pb-8 px-4 flex flex-col items-center justify-end transition-all duration-300 pointer-events-none">
 
         <div className="w-full max-w-4xl pointer-events-auto">
             {/* Input / Feedback Zone */}
-            <div className="mb-6 min-h-[80px] flex items-end justify-center">
+            <div className="mb-8 min-h-[80px] flex items-end justify-center">
                 {currentSub ? (
                     mode === PracticeMode.LISTENING ? (
-                        <div className="flex flex-col items-center justify-center text-slate-400 animate-pulse pb-4">
-                            <p className="text-xs uppercase tracking-[0.2em] font-medium bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm border border-white/5">Listen Carefully</p>
+                        <div className="flex flex-col items-center justify-center text-neutral-400 animate-pulse pb-4">
+                            <p className="text-xs uppercase tracking-[0.25em] font-semibold bg-neutral-900/50 px-4 py-2 rounded-full backdrop-blur-md border border-neutral-700/50">Listen Carefully</p>
                         </div>
                     ) : (
                         <InputFeedback
@@ -230,18 +232,18 @@ export default function PracticeLayout() {
                         />
                     )
                 ) : (
-                        <div className="text-slate-500">End of content.</div>
+                        <div className="text-neutral-500">End of content.</div>
                 )}
             </div>
 
             {/* Progress & Controls */}
-            <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-4 shadow-2xl">
+            <div className="bg-neutral-900/60 backdrop-blur-xl border border-neutral-700/50 rounded-3xl p-5 shadow-soft-xl">
                 {/* Progress Bar */}
-                <div className="flex items-center gap-3 text-xs font-mono text-slate-400 mb-3">
-                    <span>{videoRef.current ? Storage.formatTimeCode(videoRef.current.currentTime) : "00:00"}</span>
-                    <div className="flex-1 relative h-1.5 bg-white/10 rounded-full overflow-hidden group">
+                <div className="flex items-center gap-4 text-xs font-mono text-neutral-400 mb-4">
+                    <span className="font-semibold">{videoRef.current ? Storage.formatTimeCode(videoRef.current.currentTime) : "00:00"}</span>
+                    <div className="flex-1 relative h-2 bg-neutral-800/50 rounded-full overflow-hidden group">
                          <div
-                            className="absolute top-0 left-0 h-full bg-brand-500 transition-all duration-100"
+                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-brand-500 to-brand-400 transition-all duration-100 rounded-full"
                             style={{ width: `${progress}%` }}
                          />
                          <input
@@ -253,75 +255,75 @@ export default function PracticeLayout() {
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         />
                     </div>
-                    <span>{videoRef.current ? Storage.formatTimeCode(videoRef.current.duration) : "00:00"}</span>
+                    <span className="font-semibold">{videoRef.current ? Storage.formatTimeCode(videoRef.current.duration) : "00:00"}</span>
                 </div>
 
                 {/* Control Buttons */}
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 w-24">
-                         <button onClick={() => onSetVolume(volume === 0 ? 1 : 0)} className="text-slate-400 hover:text-white transition-colors">
-                            {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                    <div className="flex items-center gap-3 w-28">
+                         <button onClick={() => onSetVolume(volume === 0 ? 1 : 0)} className="text-neutral-400 hover:text-white transition-all p-1.5 hover:bg-neutral-700/50 rounded-lg">
+                            {volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
                         </button>
                     </div>
 
-                    <div className="flex items-center gap-6">
-                        <button onClick={() => onSkip('prev')} className="text-slate-400 hover:text-white hover:scale-110 transition-all" title="Previous (Ctrl+Left)">
-                            <SkipBack size={20} />
+                    <div className="flex items-center gap-5">
+                        <button onClick={() => onSkip('prev')} className="text-neutral-400 hover:text-white hover:scale-110 transition-all p-1.5" title="Previous (Ctrl+Left)">
+                            <SkipBack size={22} />
                         </button>
 
-                        <button onClick={() => onReplayCurrent()} className="text-slate-400 hover:text-brand-400 hover:rotate-[-90deg] transition-all" title="Replay (Shift+Space)">
-                            <RotateCcw size={18} />
+                        <button onClick={() => onReplayCurrent()} className="text-neutral-400 hover:text-brand-400 hover:rotate-[-90deg] transition-all p-1.5" title="Replay (Shift+Space)">
+                            <RotateCcw size={20} />
                         </button>
 
                         <button
                             onClick={onTogglePlay}
-                            className="w-10 h-10 flex items-center justify-center bg-white text-black rounded-full hover:bg-brand-400 hover:text-white transition-all shadow-lg transform active:scale-95"
+                            className="w-12 h-12 flex items-center justify-center bg-white text-neutral-950 rounded-full hover:bg-brand-500 hover:text-white transition-all shadow-soft transform active:scale-95"
                         >
-                            {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-0.5" />}
+                            {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-0.5" />}
                         </button>
 
                         <button
                             onClick={onToggleSaveCurrent}
-                            className={`transition-all hover:scale-110 ${isCurrentSaved ? 'text-brand-500 fill-current' : 'text-slate-400 hover:text-white'}`}
+                            className={`transition-all hover:scale-110 p-1.5 ${isCurrentSaved ? 'text-brand-500 fill-current' : 'text-neutral-400 hover:text-white'}`}
                         >
-                            <Bookmark size={18} />
+                            <Bookmark size={20} />
                         </button>
 
-                        <button onClick={() => onSkip('next')} className="text-slate-400 hover:text-white hover:scale-110 transition-all" title="Next (Ctrl+Right)">
-                            <SkipForward size={20} />
+                        <button onClick={() => onSkip('next')} className="text-neutral-400 hover:text-white hover:scale-110 transition-all p-1.5" title="Next (Ctrl+Right)">
+                            <SkipForward size={22} />
                         </button>
                     </div>
 
-                    <div className="flex items-center gap-2 w-24 justify-end relative">
+                    <div className="flex items-center gap-2 w-28 justify-end relative">
                         {/* Anki Button Mini */}
                         {ankiConfig && (ankiConfig.audioCard || ankiConfig.wordCard) && (
                              <button
                                 onClick={onAddToAnki}
                                 disabled={ankiStatus !== 'idle'}
-                                className={`mr-2 transition-all ${
-                                    ankiStatus === 'success' ? 'text-green-400' :
-                                    ankiStatus === 'error' ? 'text-red-400' :
-                                    'text-slate-400 hover:text-white'
+                                className={`transition-all p-1.5 rounded-lg ${
+                                    ankiStatus === 'success' ? 'text-green-400 bg-green-500/10' :
+                                    ankiStatus === 'error' ? 'text-red-400 bg-red-500/10' :
+                                    'text-neutral-400 hover:text-white hover:bg-neutral-700/50'
                                 }`}
                                 title="Add to Anki"
                             >
-                                <PlusCircle size={18} />
+                                <PlusCircle size={20} />
                             </button>
                         )}
 
                         {/* Audio Padding Control Button */}
                         <button
                             onClick={() => setShowPaddingControl(!showPaddingControl)}
-                            className="text-slate-400 hover:text-white transition-all mr-2"
+                            className="text-neutral-400 hover:text-white transition-all p-1.5 hover:bg-neutral-700/50 rounded-lg"
                             title="Audio Padding Settings"
                         >
-                            <Settings size={16} />
+                            <Settings size={18} />
                         </button>
 
                         <select
                             value={playbackSpeed}
                             onChange={(e) => onSetPlaybackSpeed(parseFloat(e.target.value))}
-                            className="bg-transparent text-slate-400 text-xs font-medium focus:outline-none focus:text-white cursor-pointer"
+                            className="bg-neutral-800/50 border border-neutral-700/50 rounded-lg px-2 py-1 text-neutral-300 text-xs font-medium focus:outline-none focus:border-brand-500 cursor-pointer"
                         >
                             <option value="0.5">0.5x</option>
                             <option value="0.75">0.75x</option>
@@ -332,22 +334,22 @@ export default function PracticeLayout() {
 
                         {/* Audio Padding Control Panel */}
                         {showPaddingControl && (
-                            <div className="absolute bottom-full right-0 mb-2 bg-slate-900/95 backdrop-blur border border-white/20 rounded-lg p-3 shadow-2xl w-64 z-50">
-                                <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-xs font-semibold text-white">Audio Padding</h3>
+                            <div className="absolute bottom-full right-0 mb-3 bg-neutral-900/95 backdrop-blur-xl border border-neutral-700/50 rounded-2xl p-4 shadow-soft-xl w-72 z-50">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-sm font-semibold text-white">Audio Padding</h3>
                                     <button
                                         onClick={() => setShowPaddingControl(false)}
-                                        className="text-slate-400 hover:text-white"
+                                        className="text-neutral-400 hover:text-white p-1 hover:bg-neutral-700/50 rounded-lg transition-all"
                                     >
-                                        <X size={14} />
+                                        <X size={16} />
                                     </button>
                                 </div>
 
-                                <div className="space-y-3">
+                                <div className="space-y-4">
                                     {/* Start Padding */}
                                     <div>
-                                        <label className="text-xs text-slate-400 mb-1 block">
-                                            Start: {audioPadding.startPadding}ms
+                                        <label className="text-xs text-neutral-300 mb-2 block font-medium">
+                                            Start: <span className="text-brand-400">{audioPadding.startPadding}ms</span>
                                         </label>
                                         <input
                                             type="range"
@@ -356,14 +358,14 @@ export default function PracticeLayout() {
                                             step="50"
                                             value={audioPadding.startPadding}
                                             onChange={(e) => handlePaddingChange('startPadding', parseInt(e.target.value))}
-                                            className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-500"
+                                            className="w-full h-2 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-brand-500"
                                         />
                                     </div>
 
                                     {/* End Padding */}
                                     <div>
-                                        <label className="text-xs text-slate-400 mb-1 block">
-                                            End: {audioPadding.endPadding}ms
+                                        <label className="text-xs text-neutral-300 mb-2 block font-medium">
+                                            End: <span className="text-brand-400">{audioPadding.endPadding}ms</span>
                                         </label>
                                         <input
                                             type="range"
@@ -372,12 +374,12 @@ export default function PracticeLayout() {
                                             step="50"
                                             value={audioPadding.endPadding}
                                             onChange={(e) => handlePaddingChange('endPadding', parseInt(e.target.value))}
-                                            className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-500"
+                                            className="w-full h-2 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-brand-500"
                                         />
                                     </div>
                                 </div>
 
-                                <p className="text-xs text-slate-500 mt-3 leading-relaxed">
+                                <p className="text-xs text-neutral-400 mt-4 leading-relaxed bg-neutral-800/30 rounded-lg p-2">
                                     Adds extra time when recording audio for Anki cards.
                                 </p>
                             </div>
@@ -392,49 +394,53 @@ export default function PracticeLayout() {
       {showSavedList && (
             <>
                 <div
-                    className="absolute inset-0 bg-black/60 backdrop-blur-sm z-40 transition-opacity"
+                    className="absolute inset-0 bg-neutral-950/70 backdrop-blur-sm z-40 transition-opacity"
                     onClick={() => onToggleSavedList(false)}
                 />
-                <div className="absolute top-0 right-0 h-full w-80 sm:w-96 bg-slate-900/95 backdrop-blur border-l border-white/10 z-50 shadow-2xl flex flex-col transform transition-transform duration-300 animate-in slide-in-from-right">
-                    <div className="p-5 border-b border-white/10 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Bookmark className="w-5 h-5 text-brand-500 fill-brand-500" />
+                <div className="absolute top-0 right-0 h-full w-80 sm:w-96 bg-neutral-900/95 backdrop-blur-xl border-l border-neutral-700/50 z-50 shadow-soft-xl flex flex-col transform transition-transform duration-300 animate-in slide-in-from-right">
+                    <div className="p-6 border-b border-neutral-700/50 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-brand-500/10 rounded-xl border border-brand-500/20">
+                                <Bookmark className="w-5 h-5 text-brand-400" />
+                            </div>
                             <h2 className="text-lg font-bold text-white">Saved Lines</h2>
                         </div>
                         <button
                             onClick={() => onToggleSavedList(false)}
-                            className="p-1 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-colors"
+                            className="p-2 hover:bg-neutral-700/50 rounded-xl text-neutral-400 hover:text-white transition-all"
                         >
                             <X size={20} />
                         </button>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    <div className="flex-1 overflow-y-auto p-5 space-y-3">
                         {savedItems.length === 0 ? (
-                            <div className="text-center mt-20 text-slate-500">
-                                <Bookmark className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                                <p>No lines saved from this video.</p>
+                            <div className="text-center mt-20 text-neutral-500">
+                                <div className="w-16 h-16 bg-neutral-800/50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-neutral-700/50">
+                                    <Bookmark className="w-8 h-8 opacity-30" />
+                                </div>
+                                <p className="text-sm">No lines saved from this video.</p>
                             </div>
                         ) : (
                             savedItems.map(item => (
-                                <div key={item.id} className="bg-black/40 hover:bg-black/60 border border-white/5 rounded-xl p-3 transition-all group">
-                                    <p className="text-sm text-slate-200 font-medium mb-2 line-clamp-2 font-serif">
+                                <div key={item.id} className="bg-neutral-800/30 hover:bg-neutral-800/50 border border-neutral-700/50 rounded-2xl p-4 transition-all group">
+                                    <p className="text-sm text-neutral-100 font-medium mb-3 line-clamp-2 leading-relaxed">
                                         "{item.text}"
                                     </p>
                                     <div className="flex items-center justify-between mt-2">
-                                        <span className="text-xs font-mono text-slate-500">
+                                        <span className="text-xs font-mono text-neutral-400 bg-neutral-900/50 px-2 py-1 rounded-lg">
                                             {Storage.formatTimeCode(item.startTime)}
                                         </span>
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={(e) => onDeleteSavedItem(item.id, e)}
-                                                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                                                className="p-2 text-neutral-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all border border-transparent hover:border-red-400/20"
                                             >
                                                 <Trash2 size={14} />
                                             </button>
                                             <button
                                                 onClick={() => onJumpToSaved(item.id)}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold rounded-lg transition-all"
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold rounded-lg transition-all shadow-soft active:scale-95"
                                             >
                                                 <PlayCircle size={14} />
                                                 Go

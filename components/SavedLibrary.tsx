@@ -28,18 +28,18 @@ const SavedLibrary: React.FC<SavedLibraryProps> = ({ onBack }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col">
+    <div className="min-h-screen bg-neutral-950 text-neutral-200 flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between shadow-lg">
+      <header className="sticky top-0 z-10 bg-gradient-to-b from-neutral-950 to-neutral-900 border-b border-neutral-800/50 px-6 py-5 flex items-center justify-between shadow-soft backdrop-blur-xl">
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={onBack}
-            className="p-2 -ml-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors"
+            className="p-2 -ml-2 text-neutral-400 hover:text-white hover:bg-neutral-800/50 rounded-xl transition-all"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
           <h1 className="text-xl font-bold text-white">My Saved Collection</h1>
-          <span className="bg-slate-800 text-slate-400 text-xs px-2 py-1 rounded-full border border-slate-700">
+          <span className="bg-brand-500/10 text-brand-400 text-xs font-semibold px-3 py-1.5 rounded-xl border border-brand-500/20">
             {savedLines.length}
           </span>
         </div>
@@ -47,51 +47,51 @@ const SavedLibrary: React.FC<SavedLibraryProps> = ({ onBack }) => {
 
       {/* Content */}
       <div className="flex-1 max-w-5xl w-full mx-auto p-6">
-        
+
         {/* Search */}
         <div className="mb-8 relative">
-           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-             <Search className="w-5 h-5 text-slate-500" />
+           <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+             <Search className="w-5 h-5 text-neutral-500" />
            </div>
-           <input 
+           <input
               type="text"
               placeholder="Search your saved lines..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-slate-200 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
+              className="w-full pl-14 pr-5 py-4 bg-neutral-900/50 border border-neutral-800/50 rounded-2xl text-neutral-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 outline-none transition-all shadow-soft"
            />
         </div>
 
         {/* Grid */}
         {filteredLines.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {filteredLines.map((line) => (
-              <div key={line.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-600 transition-colors group flex flex-col relative">
-                 <div className="flex-1 mb-4">
-                    <p className="text-lg md:text-xl font-medium text-slate-100 leading-relaxed font-serif">
+              <div key={line.id} className="bg-neutral-900/50 border border-neutral-800/50 rounded-2xl p-6 hover:border-neutral-700 hover:shadow-soft transition-all group flex flex-col relative">
+                 <div className="flex-1 mb-5">
+                    <p className="text-lg md:text-xl font-medium text-neutral-100 leading-relaxed">
                       "{line.text}"
                     </p>
                  </div>
-                 
-                 <div className="flex items-center justify-between text-xs text-slate-500 mt-auto pt-4 border-t border-slate-800/50">
-                    <div className="flex flex-col gap-1">
+
+                 <div className="flex items-center justify-between text-xs text-neutral-400 mt-auto pt-4 border-t border-neutral-800/50">
+                    <div className="flex flex-col gap-2">
                        {line.videoName && (
-                         <div className="flex items-center gap-1.5 text-brand-400">
-                            <Film className="w-3 h-3" />
-                            <span className="truncate max-w-[200px]">{line.videoName}</span>
-                            <span className="text-slate-600">•</span>
+                         <div className="flex items-center gap-2 text-brand-400">
+                            <Film className="w-3.5 h-3.5" />
+                            <span className="truncate max-w-[200px] font-medium">{line.videoName}</span>
+                            <span className="text-neutral-600">•</span>
                             <span>{line.timeDisplay}</span>
                          </div>
                        )}
-                       <div className="flex items-center gap-1.5">
-                          <Calendar className="w-3 h-3" />
+                       <div className="flex items-center gap-2">
+                          <Calendar className="w-3.5 h-3.5" />
                           <span>Saved on {formatDate(line.dateSaved)}</span>
                        </div>
                     </div>
 
-                    <button 
+                    <button
                       onClick={() => handleDelete(line.text)}
-                      className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                      className="p-2.5 text-neutral-400 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 border border-transparent hover:border-red-400/20"
                       title="Remove from collection"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -102,11 +102,11 @@ const SavedLibrary: React.FC<SavedLibraryProps> = ({ onBack }) => {
           </div>
         ) : (
           <div className="text-center py-20">
-            <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-4">
-               <Search className="w-8 h-8 text-slate-600" />
+            <div className="w-24 h-24 bg-neutral-900/50 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-neutral-800/50">
+               <Search className="w-10 h-10 text-neutral-600" />
             </div>
-            <h3 className="text-lg font-medium text-slate-300 mb-1">No lines found</h3>
-            <p className="text-slate-500">
+            <h3 className="text-lg font-semibold text-neutral-300 mb-2">No lines found</h3>
+            <p className="text-neutral-500 text-sm">
               {searchTerm ? "Try adjusting your search terms." : "Go practice and save some interesting lines!"}
             </p>
           </div>
