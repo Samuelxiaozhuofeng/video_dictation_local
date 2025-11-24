@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { PracticeMode, Subtitle, VideoSection } from '../types';
+import { PracticeMode, Subtitle, VideoSection, LearningMode, BlurPlaybackMode } from '../types';
 import { useVideoPlayer } from './useVideoPlayer';
 
 export interface UseVideoControllerParams {
@@ -7,6 +7,8 @@ export interface UseVideoControllerParams {
   currentSubtitleIndex: number;
   mode: PracticeMode;
   shouldAutoAdvance: boolean;
+  learningMode?: LearningMode;
+  blurPlaybackMode?: BlurPlaybackMode;
   onModeChange?: (mode: PracticeMode) => void;
   onAutoAdvance?: () => void;
   onShouldAutoAdvanceChange?: (value: boolean) => void;
@@ -40,6 +42,8 @@ export function useVideoController(params: UseVideoControllerParams): UseVideoCo
     currentSubtitleIndex,
     mode,
     shouldAutoAdvance,
+    learningMode,
+    blurPlaybackMode,
     onModeChange,
     onAutoAdvance,
     onShouldAutoAdvanceChange
@@ -47,7 +51,7 @@ export function useVideoController(params: UseVideoControllerParams): UseVideoCo
 
   // Create video ref internally
   const videoRef = useRef<HTMLVideoElement>(null);
-  
+
   // Manage video source
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
 
@@ -70,6 +74,8 @@ export function useVideoController(params: UseVideoControllerParams): UseVideoCo
     currentSubtitleIndex,
     mode,
     shouldAutoAdvance,
+    learningMode,
+    blurPlaybackMode,
     onModeChange,
     onAutoAdvance,
     onShouldAutoAdvanceChange

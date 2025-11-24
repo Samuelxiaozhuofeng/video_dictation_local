@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import { PracticeMode, Subtitle, VideoSection, AnkiConfig } from '../types';
+import { PracticeMode, Subtitle, VideoSection, AnkiConfig, LearningMode, BlurPlaybackMode } from '../types';
 
 export interface PracticeContextPractice {
   subtitles: Subtitle[];
@@ -9,6 +9,8 @@ export interface PracticeContextPractice {
   currentSubtitleIndex: number;
   mode: PracticeMode;
   showSectionComplete: boolean;
+  learningMode: LearningMode;
+  blurPlaybackMode: BlurPlaybackMode;
 }
 
 export interface PracticeContextVideo {
@@ -42,7 +44,7 @@ export interface PracticeContextActions {
   onProgressSeek: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onToggleSaveCurrent: () => void;
   onAddToAnki: () => void;
-  onWordToAnki: (word: string, definition: string, includeAudio?: boolean) => void;
+  onWordToAnki: (word: string, definition: string, includeAudio?: boolean) => void | Promise<void>;
   onNextSection: () => void;
   onSetShowSectionComplete: (show: boolean) => void;
   onSetVolume: (volume: number) => void;
@@ -51,6 +53,7 @@ export interface PracticeContextActions {
   onContinue: () => void;
   onDeleteSavedItem: (id: number, e: React.MouseEvent) => void;
   onJumpToSaved: (id: number) => void;
+  onSetBlurPlaybackMode?: (mode: BlurPlaybackMode) => void;
 }
 
 export interface PracticeContextValue {

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Bookmark, Settings as SettingsIcon } from 'lucide-react';
-import { VideoRecord } from '../types';
+import { VideoRecord, LearningMode, BlurPlaybackMode } from '../types';
 import VideoLibrary from './VideoLibrary';
 import UploadSection from './UploadSection';
 
 interface UploadPageProps {
-  onStartPractice: (videoFile: File, subtitleFile: File) => void;
-  onContinuePractice: (record: VideoRecord) => void;
+  onStartPractice: (videoFile: File, subtitleFile: File, learningMode: LearningMode, blurPlaybackMode?: BlurPlaybackMode) => void | Promise<void>;
+  onContinuePractice: (record: VideoRecord) => void | Promise<void>;
   onOpenSettings: () => void;
   onOpenLibrary: () => void;
 }

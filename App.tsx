@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { AppState, PracticeMode, VideoRecord } from './types';
+import { AppState, PracticeMode, VideoRecord, LearningMode, BlurPlaybackMode } from './types';
 import SavedLibrary from './components/SavedLibrary';
 import Settings from './components/Settings';
 import UploadPage from './components/UploadPage';
@@ -20,6 +20,10 @@ export default function App() {
   // Resources
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [subtitleFile, setSubtitleFile] = useState<File | null>(null);
+
+  // Learning Mode State
+  const [learningMode, setLearningMode] = useState<LearningMode>(LearningMode.DICTATION);
+  const [blurPlaybackMode, setBlurPlaybackMode] = useState<BlurPlaybackMode>(BlurPlaybackMode.SENTENCE_BY_SENTENCE);
 
   // Video History Hook
   const {
@@ -95,6 +99,8 @@ export default function App() {
     currentSubtitleIndex,
     mode,
     shouldAutoAdvance,
+    learningMode,
+    blurPlaybackMode,
     onModeChange: setMode,
     onAutoAdvance: () => {
       if (currentSubtitleIndex < subtitles.length - 1) {
@@ -145,13 +151,29 @@ export default function App() {
 
   // --- Handlers ---
 
-  const handleStartPractice = async (vFile?: File, sFile?: File, startIndex?: number, startSectionIndex?: number, videoId?: string) => {
+  const handleStartPractice = async (
+    vFile?: File,
+    sFile?: File,
+    selectedLearningMode?: LearningMode,
+    selectedBlurPlaybackMode?: BlurPlaybackMode,
+    startIndex?: number,
+    startSectionIndex?: number,
+    videoId?: string
+  ) => {
     const vf = vFile || videoFile;
     const sf = sFile || subtitleFile;
 
     if (vf && sf) {
       try {
         const subText = await sf.text();
+
+        // Set learning mode
+        if (selectedLearningMode) {
+          setLearningMode(selectedLearningMode);
+        }
+        if (selectedBlurPlaybackMode) {
+          setBlurPlaybackMode(selectedBlurPlaybackMode);
+        }
 
         // Use the hook's initializePractice method
         const result = initializePractice(subText, startIndex, startSectionIndex);
@@ -234,10 +256,12 @@ export default function App() {
       setVideoFile(videoFileFromHandle);
       setSubtitleFile(subtitleFileFromRecord);
 
-      // Start practice with saved progress
+      // Start practice with saved progress (use default learning mode for continued sessions)
       await handleStartPractice(
         videoFileFromHandle,
         subtitleFileFromRecord,
+        undefined, // learningMode - use current state
+        undefined, // blurPlaybackMode - use current state
         record.currentSubtitleIndex,
         record.currentSectionIndex,
         record.id
@@ -289,11 +313,24 @@ export default function App() {
   });
 
   const keyboardShortcuts = useMemo(() => ([
+    // Shift+Space: Replay current subtitle
     {
       code: 'Space',
       shiftKey: true,
       preventDefault: true,
       handler: () => handleReplayCurrent(),
+    },
+    // Space: Toggle play/pause in Blur Continuous mode
+    {
+      code: 'Space',
+      shiftKey: false,
+      preventDefault: true,
+      allowInEditable: false,
+      condition: () =>
+        appState === AppState.PRACTICE &&
+        learningMode === LearningMode.BLUR &&
+        blurPlaybackMode === BlurPlaybackMode.CONTINUOUS,
+      handler: () => togglePlay(),
     },
     {
       code: 'ArrowLeft',
@@ -318,7 +355,7 @@ export default function App() {
         handleAddToAnkiShortcut(event);
       },
     },
-  ]), [handleReplayCurrent, handleSkip, handleAddToAnkiShortcut, appState]);
+  ]), [handleReplayCurrent, handleSkip, handleAddToAnkiShortcut, togglePlay, appState, learningMode, blurPlaybackMode]);
 
   useKeyboardShortcuts(keyboardShortcuts);
 
@@ -335,7 +372,7 @@ export default function App() {
   if (appState === AppState.UPLOAD) {
     return (
       <UploadPage
-        onStartPractice={(vf, sf) => handleStartPractice(vf, sf)}
+        onStartPractice={(vf, sf, lm, bpm) => handleStartPractice(vf, sf, lm, bpm)}
         onContinuePractice={handleContinueFromLibrary}
         onOpenSettings={() => setAppState(AppState.SETTINGS)}
         onOpenLibrary={() => setAppState(AppState.LIBRARY)}
@@ -357,6 +394,8 @@ export default function App() {
         currentSubtitleIndex,
         mode,
         showSectionComplete,
+        learningMode,
+        blurPlaybackMode,
       }}
       video={{
         videoRef,
@@ -395,6 +434,7 @@ export default function App() {
         onContinue: handleContinue,
         onDeleteSavedItem: deleteSavedItem,
         onJumpToSaved: jumpToSaved,
+        onSetBlurPlaybackMode: setBlurPlaybackMode,
       }}
     >
       <PracticeLayout />

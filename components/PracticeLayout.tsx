@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Play, Pause, SkipBack, SkipForward, Volume2, VolumeX,
   RotateCcw, Bookmark, X, Trash2, PlayCircle, PlusCircle,
   Check, Mic, ChevronLeft, ChevronRight, Settings
 } from 'lucide-react';
-import { PracticeMode, AudioPaddingConfig } from '../types';
+import { PracticeMode, AudioPaddingConfig, LearningMode, BlurPlaybackMode } from '../types';
 import * as Storage from '../utils/storage';
+import * as AI from '../utils/ai';
 import InputFeedback from './InputFeedback';
+import BlurSubtitle, { BlurDefinitionSidebar } from './BlurSubtitle';
 import { usePracticeContext } from '../hooks/usePracticeContext';
 
 export default function PracticeLayout() {
@@ -20,6 +22,8 @@ export default function PracticeLayout() {
     currentSubtitleIndex,
     mode,
     showSectionComplete,
+    learningMode,
+    blurPlaybackMode,
   } = practice;
 
   const {
@@ -62,6 +66,7 @@ export default function PracticeLayout() {
     onContinue,
     onDeleteSavedItem,
     onJumpToSaved,
+    onSetBlurPlaybackMode,
   } = actions;
 
   const currentSub = subtitles[currentSubtitleIndex];
@@ -69,6 +74,12 @@ export default function PracticeLayout() {
   // Audio Padding State
   const [showPaddingControl, setShowPaddingControl] = useState(false);
   const [audioPadding, setAudioPadding] = useState<AudioPaddingConfig>({ startPadding: 100, endPadding: 200 });
+
+  // Blur Mode Definition Sidebar State
+  const [selectedWord, setSelectedWord] = useState<string | null>(null);
+  const [definitionData, setDefinitionData] = useState<AI.WordDefinition | null>(null);
+  const [isLoadingDefinition, setIsLoadingDefinition] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(400); // Default 400px, 20% of typical 1920px screen
 
   // Load audio padding config on mount
   useEffect(() => {
@@ -218,18 +229,44 @@ export default function PracticeLayout() {
             {/* Input / Feedback Zone */}
             <div className="mb-8 min-h-[80px] flex items-end justify-center">
                 {currentSub ? (
-                    mode === PracticeMode.LISTENING ? (
-                        <div className="flex flex-col items-center justify-center text-neutral-400 animate-pulse pb-4">
-                            <p className="text-xs uppercase tracking-[0.25em] font-semibold bg-neutral-900/50 px-4 py-2 rounded-full backdrop-blur-md border border-neutral-700/50">Listen Carefully</p>
+                    learningMode === LearningMode.BLUR ? (
+                        // Blur Mode: Show BlurSubtitle component and Continue button
+                        <div className="w-full flex flex-col items-center gap-4">
+                            <BlurSubtitle
+                                targetText={currentSub.text}
+                                onWordToAnki={onWordToAnki}
+                                onWordSelected={(word, definition, loading) => {
+                                    setSelectedWord(word);
+                                    setDefinitionData(definition);
+                                    setIsLoadingDefinition(loading);
+                                }}
+                            />
+                            {/* Continue Button for Sentence-by-Sentence mode */}
+                            {blurPlaybackMode === BlurPlaybackMode.SENTENCE_BY_SENTENCE && !isPlaying && (
+                                <button
+                                    onClick={onContinue}
+                                    className="px-8 py-3 bg-brand-500 hover:bg-brand-600 text-white font-semibold rounded-xl shadow-soft-lg transition-all hover:scale-105 flex items-center gap-2"
+                                >
+                                    <ChevronRight className="w-5 h-5" />
+                                    Continue
+                                </button>
+                            )}
                         </div>
                     ) : (
-                        <InputFeedback
-                            targetText={currentSub.text}
-                            mode={mode}
-                            onComplete={(correct) => correct ? onContinue() : onInputComplete(correct)}
-                            onReplay={onReplayCurrent}
-                            onWordToAnki={onWordToAnki}
-                        />
+                        // Dictation Mode: Original behavior
+                        mode === PracticeMode.LISTENING ? (
+                            <div className="flex flex-col items-center justify-center text-neutral-400 animate-pulse pb-4">
+                                <p className="text-xs uppercase tracking-[0.25em] font-semibold bg-neutral-900/50 px-4 py-2 rounded-full backdrop-blur-md border border-neutral-700/50">Listen Carefully</p>
+                            </div>
+                        ) : (
+                            <InputFeedback
+                                targetText={currentSub.text}
+                                mode={mode}
+                                onComplete={(correct) => correct ? onContinue() : onInputComplete(correct)}
+                                onReplay={onReplayCurrent}
+                                onWordToAnki={onWordToAnki}
+                            />
+                        )
                     )
                 ) : (
                         <div className="text-neutral-500">End of content.</div>
@@ -278,6 +315,7 @@ export default function PracticeLayout() {
                         <button
                             onClick={onTogglePlay}
                             className="w-12 h-12 flex items-center justify-center bg-white text-neutral-950 rounded-full hover:bg-brand-500 hover:text-white transition-all shadow-soft transform active:scale-95"
+                            title={learningMode === LearningMode.BLUR && blurPlaybackMode === BlurPlaybackMode.CONTINUOUS ? (isPlaying ? "Pause (Space)" : "Play (Space)") : undefined}
                         >
                             {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-0.5" />}
                         </button>
@@ -308,6 +346,28 @@ export default function PracticeLayout() {
                                 title="Add to Anki"
                             >
                                 <PlusCircle size={20} />
+                            </button>
+                        )}
+
+                        {/* Blur Playback Mode Toggle (only in Blur Mode) */}
+                        {learningMode === LearningMode.BLUR && onSetBlurPlaybackMode && (
+                            <button
+                                onClick={() => onSetBlurPlaybackMode(
+                                    blurPlaybackMode === BlurPlaybackMode.SENTENCE_BY_SENTENCE
+                                        ? BlurPlaybackMode.CONTINUOUS
+                                        : BlurPlaybackMode.SENTENCE_BY_SENTENCE
+                                )}
+                                className="text-neutral-400 hover:text-white transition-all p-1.5 hover:bg-neutral-700/50 rounded-lg group relative"
+                                title={blurPlaybackMode === BlurPlaybackMode.SENTENCE_BY_SENTENCE ? "Switch to Continuous" : "Switch to Sentence-by-Sentence"}
+                            >
+                                {blurPlaybackMode === BlurPlaybackMode.SENTENCE_BY_SENTENCE ? (
+                                    <PlayCircle size={18} />
+                                ) : (
+                                    <Pause size={18} />
+                                )}
+                                <span className="absolute bottom-full right-0 mb-2 px-2 py-1 bg-neutral-800 text-neutral-200 text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                                    {blurPlaybackMode === BlurPlaybackMode.SENTENCE_BY_SENTENCE ? "Sentence-by-Sentence" : "Continuous"}
+                                </span>
                             </button>
                         )}
 
@@ -453,6 +513,23 @@ export default function PracticeLayout() {
                     </div>
                 </div>
             </>
+        )}
+
+        {/* Blur Mode Definition Sidebar */}
+        {learningMode === LearningMode.BLUR && selectedWord && (
+            <BlurDefinitionSidebar
+                selectedWord={selectedWord}
+                definitionData={definitionData}
+                isLoading={isLoadingDefinition}
+                onWordToAnki={onWordToAnki}
+                onClose={() => {
+                    setSelectedWord(null);
+                    setDefinitionData(null);
+                    setIsLoadingDefinition(false);
+                }}
+                width={sidebarWidth}
+                onWidthChange={setSidebarWidth}
+            />
         )}
 
     </div>

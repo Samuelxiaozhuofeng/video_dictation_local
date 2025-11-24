@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Subtitle, PracticeMode } from '../types';
+import { Subtitle, PracticeMode, LearningMode, BlurPlaybackMode } from '../types';
 
 export interface UseVideoPlayerParams {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -7,6 +7,8 @@ export interface UseVideoPlayerParams {
   currentSubtitleIndex: number;
   mode: PracticeMode;
   shouldAutoAdvance: boolean;
+  learningMode?: LearningMode;
+  blurPlaybackMode?: BlurPlaybackMode;
   onSubtitleEnded?: () => void;
   onModeChange?: (mode: PracticeMode) => void;
   onAutoAdvance?: () => void;
@@ -34,6 +36,8 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
     currentSubtitleIndex,
     mode,
     shouldAutoAdvance,
+    learningMode = LearningMode.DICTATION,
+    blurPlaybackMode = BlurPlaybackMode.SENTENCE_BY_SENTENCE,
     onSubtitleEnded,
     onModeChange,
     onAutoAdvance,
@@ -45,6 +49,14 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [progress, setProgress] = useState(0);
   const requestRef = useRef<number | undefined>(undefined);
+  const blurAutoAdvanceRef = useRef(false);
+  const userPausedRef = useRef(false); // Track if user manually paused in continuous mode
+
+  useEffect(() => {
+    blurAutoAdvanceRef.current = false;
+    // Reset user pause state when subtitle changes
+    userPausedRef.current = false;
+  }, [currentSubtitleIndex, learningMode, blurPlaybackMode]);
 
   // Video Loop for pausing at end of subtitle
   const checkVideoTime = useCallback(() => {
@@ -55,17 +67,30 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
     
     if (!currentSub) return;
 
+    const isBlurContinuous = learningMode === LearningMode.BLUR && blurPlaybackMode === BlurPlaybackMode.CONTINUOUS;
+
     if (isPlaying) {
       if (video.currentTime >= currentSub.endTime) {
-        video.pause();
-        setIsPlaying(false);
-        video.currentTime = currentSub.endTime;
+        if (isBlurContinuous) {
+          if (!blurAutoAdvanceRef.current) {
+            blurAutoAdvanceRef.current = true;
+            onAutoAdvance?.();
+          }
+        } else {
+          video.pause();
+          setIsPlaying(false);
+          video.currentTime = currentSub.endTime;
 
-        if (mode === PracticeMode.LISTENING) {
-          onModeChange?.(PracticeMode.INPUT);
-        } else if (shouldAutoAdvance) {
-          onShouldAutoAdvanceChange?.(false);
-          onAutoAdvance?.();
+          if (learningMode === LearningMode.BLUR) {
+            // Sentence-by-sentence mode waits for user action between lines.
+          } else {
+            if (mode === PracticeMode.LISTENING) {
+              onModeChange?.(PracticeMode.INPUT);
+            } else if (shouldAutoAdvance) {
+              onShouldAutoAdvanceChange?.(false);
+              onAutoAdvance?.();
+            }
+          }
         }
       }
     }
@@ -75,7 +100,19 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
     }
 
     requestRef.current = requestAnimationFrame(checkVideoTime);
-  }, [subtitles, currentSubtitleIndex, mode, isPlaying, shouldAutoAdvance, onModeChange, onAutoAdvance, onShouldAutoAdvanceChange, videoRef]);
+  }, [
+    subtitles,
+    currentSubtitleIndex,
+    mode,
+    isPlaying,
+    shouldAutoAdvance,
+    learningMode,
+    blurPlaybackMode,
+    onModeChange,
+    onAutoAdvance,
+    onShouldAutoAdvanceChange,
+    videoRef
+  ]);
 
   useEffect(() => {
     requestRef.current = requestAnimationFrame(checkVideoTime);
@@ -96,33 +133,36 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
   useEffect(() => {
     if (videoRef.current && subtitles.length > 0 && mode === PracticeMode.LISTENING && subtitles[currentSubtitleIndex]) {
       const currentSub = subtitles[currentSubtitleIndex];
-      
+      const isBlurContinuous = learningMode === LearningMode.BLUR && blurPlaybackMode === BlurPlaybackMode.CONTINUOUS;
+
       const tolerance = 0.5;
-      if (videoRef.current.currentTime < currentSub.startTime - tolerance || videoRef.current.currentTime > currentSub.endTime) {
+      const shouldForceSeek = !(isBlurContinuous && isPlaying);
+      if (
+        shouldForceSeek &&
+        (videoRef.current.currentTime < currentSub.startTime - tolerance ||
+          videoRef.current.currentTime > currentSub.endTime)
+      ) {
         videoRef.current.currentTime = currentSub.startTime;
       }
-      
-      if (!isPlaying) {
-        videoRef.current.play().catch(e => console.error("Autoplay blocked", e));
-        setIsPlaying(true);
-      }
-    }
-  }, [currentSubtitleIndex, subtitles, mode, videoRef]);
 
-  const togglePlay = useCallback(() => {
-    if (!videoRef.current) return;
-    if (isPlaying) {
-      videoRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      if (mode === PracticeMode.INPUT || mode === PracticeMode.FEEDBACK) {
-        handleReplayCurrent();
-      } else {
-        videoRef.current.play();
-        setIsPlaying(true);
+      // Auto-play logic:
+      // - In continuous mode: only auto-play if user hasn't manually paused
+      // - In other modes: always auto-play when subtitle changes
+      if (!isPlaying) {
+        if (isBlurContinuous) {
+          // In continuous mode, respect user's pause preference
+          if (!userPausedRef.current) {
+            videoRef.current.play().catch(e => console.error("Autoplay blocked", e));
+            setIsPlaying(true);
+          }
+        } else {
+          // In other modes, always auto-play
+          videoRef.current.play().catch(e => console.error("Autoplay blocked", e));
+          setIsPlaying(true);
+        }
       }
     }
-  }, [isPlaying, mode, videoRef]);
+  }, [currentSubtitleIndex, subtitles, mode, videoRef, isPlaying, learningMode, blurPlaybackMode]);
 
   const handleReplayCurrent = useCallback((autoAdvanceAfter: boolean = false) => {
     if (videoRef.current && subtitles[currentSubtitleIndex]) {
@@ -132,6 +172,32 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
       onShouldAutoAdvanceChange?.(autoAdvanceAfter);
     }
   }, [subtitles, currentSubtitleIndex, videoRef, onShouldAutoAdvanceChange]);
+
+  const togglePlay = useCallback(() => {
+    if (!videoRef.current) return;
+
+    const isBlurContinuous = learningMode === LearningMode.BLUR && blurPlaybackMode === BlurPlaybackMode.CONTINUOUS;
+
+    if (isPlaying) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+      // Mark that user manually paused in continuous mode
+      if (isBlurContinuous) {
+        userPausedRef.current = true;
+      }
+    } else {
+      if (mode === PracticeMode.INPUT || mode === PracticeMode.FEEDBACK) {
+        handleReplayCurrent();
+      } else {
+        videoRef.current.play().catch(e => console.error("Play failed", e));
+        setIsPlaying(true);
+        // Clear user pause flag when resuming
+        if (isBlurContinuous) {
+          userPausedRef.current = false;
+        }
+      }
+    }
+  }, [isPlaying, mode, videoRef, handleReplayCurrent, learningMode, blurPlaybackMode]);
 
   const handleProgressSeek = useCallback((
     e: React.ChangeEvent<HTMLInputElement>,
@@ -175,4 +241,3 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
     handleReplayCurrent
   };
 }
-

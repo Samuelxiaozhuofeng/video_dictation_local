@@ -16,6 +16,19 @@ export enum PracticeMode {
   LISTENING = 'LISTENING', // Video is playing, controls active
   INPUT = 'INPUT',         // Video paused at end of line, waiting for user input
   FEEDBACK = 'FEEDBACK',   // User submitted, showing corrections
+  BLUR = 'BLUR',           // Blur mode: subtitles shown as placeholders, user can reveal words
+}
+
+// Learning Mode: determines the overall practice approach
+export enum LearningMode {
+  DICTATION = 'DICTATION',  // Original mode: listen, input, feedback
+  BLUR = 'BLUR',            // Blur mode: watch with blurred subtitles, reveal on demand
+}
+
+// Blur Mode Playback Style
+export enum BlurPlaybackMode {
+  SENTENCE_BY_SENTENCE = 'SENTENCE_BY_SENTENCE',  // Auto-pause after each subtitle
+  CONTINUOUS = 'CONTINUOUS',                       // Continuous playback, manual pause
 }
 
 export interface VideoSource {
@@ -34,6 +47,8 @@ export interface SavedLine {
 // Practice Configuration
 export interface PracticeConfig {
   sectionLength: number; // in minutes. 0 means "Full Video" (no sections)
+  learningMode?: LearningMode; // Default learning mode for new videos
+  blurPlaybackMode?: BlurPlaybackMode; // Default playback mode for blur mode
 }
 
 export interface VideoSection {

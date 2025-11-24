@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { FileVideo, FileText, AlertCircle, Check, Play } from 'lucide-react';
+import { FileVideo, FileText, AlertCircle, Check, Play, Pencil, Eye } from 'lucide-react';
+import { LearningMode, BlurPlaybackMode } from '../types';
 
 interface UploadSectionProps {
-  onStartPractice: (videoFile: File, subtitleFile: File) => void;
+  onStartPractice: (videoFile: File, subtitleFile: File, learningMode: LearningMode, blurPlaybackMode?: BlurPlaybackMode) => void | Promise<void>;
 }
 
 // File Upload Component
@@ -72,6 +73,7 @@ const UploadSection: React.FC<UploadSectionProps> = ({ onStartPractice }) => {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [subtitleFile, setSubtitleFile] = useState<File | null>(null);
   const [autoDetectedSubtitle, setAutoDetectedSubtitle] = useState(false);
+  const [learningMode, setLearningMode] = useState<LearningMode>(LearningMode.DICTATION);
 
   const handleVideoFileSelect = async (file: File) => {
     setVideoFile(file);
@@ -106,19 +108,21 @@ const UploadSection: React.FC<UploadSectionProps> = ({ onStartPractice }) => {
 
   const handleStart = () => {
     if (videoFile && subtitleFile) {
-      onStartPractice(videoFile, subtitleFile);
+      // Default to SENTENCE_BY_SENTENCE for blur mode, user can change it in player
+      onStartPractice(videoFile, subtitleFile, learningMode, BlurPlaybackMode.SENTENCE_BY_SENTENCE);
     }
   };
 
-  return (
-    <div className="w-full max-w-2xl mx-auto">
-      <div className="text-center mb-12">
-        <h2 className="text-3xl font-bold text-white mb-3">Upload New Video</h2>
-        <p className="text-neutral-400 text-base">Start a new practice session with your video and subtitles.</p>
-      </div>
+    return (
+      <div className="w-full max-w-3xl mx-auto">
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-bold text-white mb-2">Upload New Video</h2>
+          <p className="text-neutral-400 text-base">Start a new practice session with your video and subtitles.</p>
+        </div>
 
-      <div className="space-y-5">
-        <FileDropZone
+        {/* Upload areas */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
+          <FileDropZone
             accept="video/*,.mp4,.webm,.mkv"
             label="Upload Video (.mp4)"
             icon={FileVideo}
@@ -126,14 +130,60 @@ const UploadSection: React.FC<UploadSectionProps> = ({ onStartPractice }) => {
             onFileSelect={handleVideoFileSelect}
             allowMultiple={true}
             onMultipleFilesSelect={handleMultipleFilesSelect}
-        />
-        <FileDropZone
+          />
+          <FileDropZone
             accept=".srt,.txt"
             label="Upload Subtitles (.srt)"
             icon={FileText}
             selectedFile={subtitleFile}
             onFileSelect={setSubtitleFile}
-        />
+          />
+        </div>
+
+        {/* Learning Mode Selection */}
+        <div className="mt-6 space-y-4">
+        <h3 className="text-lg font-semibold text-white">Choose Learning Mode</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Dictation Mode */}
+          <button
+            onClick={() => setLearningMode(LearningMode.DICTATION)}
+            className={`p-5 rounded-2xl border-2 transition-all text-left ${
+              learningMode === LearningMode.DICTATION
+                ? 'border-brand-500 bg-brand-500/10 shadow-soft-lg'
+                : 'border-neutral-700/50 bg-neutral-900/30 hover:border-neutral-600'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`p-3 rounded-xl ${learningMode === LearningMode.DICTATION ? 'bg-brand-500 text-white' : 'bg-neutral-800 text-neutral-400'}`}>
+                <Pencil className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-white mb-1">Dictation Mode</h4>
+                <p className="text-sm text-neutral-400">Listen and type what you hear. Get instant feedback.</p>
+              </div>
+            </div>
+          </button>
+
+          {/* Blur Mode */}
+          <button
+            onClick={() => setLearningMode(LearningMode.BLUR)}
+            className={`p-5 rounded-2xl border-2 transition-all text-left ${
+              learningMode === LearningMode.BLUR
+                ? 'border-brand-500 bg-brand-500/10 shadow-soft-lg'
+                : 'border-neutral-700/50 bg-neutral-900/30 hover:border-neutral-600'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`p-3 rounded-xl ${learningMode === LearningMode.BLUR ? 'bg-brand-500 text-white' : 'bg-neutral-800 text-neutral-400'}`}>
+                <Eye className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-white mb-1">Blur Mode</h4>
+                <p className="text-sm text-neutral-400">Watch with hidden subtitles. Reveal words on demand.</p>
+              </div>
+            </div>
+          </button>
+        </div>
       </div>
 
       {autoDetectedSubtitle && (
