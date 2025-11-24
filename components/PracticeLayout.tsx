@@ -80,6 +80,7 @@ export default function PracticeLayout() {
   const [definitionData, setDefinitionData] = useState<AI.WordDefinition | null>(null);
   const [isLoadingDefinition, setIsLoadingDefinition] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(400); // Default 400px, 20% of typical 1920px screen
+  const [isDefinitionPanelPinned, setIsDefinitionPanelPinned] = useState(false);
 
   // Load audio padding config on mount
   useEffect(() => {
@@ -93,6 +94,17 @@ export default function PracticeLayout() {
     setAudioPadding(newConfig);
     Storage.saveAudioPaddingConfig(newConfig);
   };
+
+  const handleCloseDefinitionPanel = () => {
+    setSelectedWord(null);
+    setDefinitionData(null);
+    setIsLoadingDefinition(false);
+    setIsDefinitionPanelPinned(false);
+  };
+
+  const shouldShowDefinitionSidebar =
+    learningMode === LearningMode.BLUR &&
+    (isDefinitionPanelPinned || isLoadingDefinition || (selectedWord !== null && definitionData !== null));
 
   return (
     <div className="h-screen w-screen bg-neutral-950 text-neutral-100 overflow-hidden relative flex flex-col">
@@ -516,19 +528,17 @@ export default function PracticeLayout() {
         )}
 
         {/* Blur Mode Definition Sidebar */}
-        {learningMode === LearningMode.BLUR && selectedWord && (
+        {shouldShowDefinitionSidebar && (
             <BlurDefinitionSidebar
                 selectedWord={selectedWord}
                 definitionData={definitionData}
                 isLoading={isLoadingDefinition}
                 onWordToAnki={onWordToAnki}
-                onClose={() => {
-                    setSelectedWord(null);
-                    setDefinitionData(null);
-                    setIsLoadingDefinition(false);
-                }}
+                onClose={handleCloseDefinitionPanel}
                 width={sidebarWidth}
                 onWidthChange={setSidebarWidth}
+                isPinned={isDefinitionPanelPinned}
+                onTogglePin={() => setIsDefinitionPanelPinned(prev => !prev)}
             />
         )}
 

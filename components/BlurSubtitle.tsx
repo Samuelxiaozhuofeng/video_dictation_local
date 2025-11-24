@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Loader2, Check, X } from 'lucide-react';
+import { Loader2, Check, X, Pin, PinOff } from 'lucide-react';
 import * as AI from '../utils/ai';
 import { tokenizeText, getWordTokens, Token, TokenType } from '../utils/textTokenizer';
 
@@ -63,9 +63,15 @@ const BlurSubtitle: React.FC<BlurSubtitleProps> = ({
 
     // First click: reveal the word
     if (!revealedWordIndices.has(wordIndex)) {
-      setRevealedWordIndices(prev => new Set(prev).add(wordIndex));
+      setRevealedWordIndices(prev => {
+        const updated = new Set(prev);
+        updated.add(wordIndex);
+        return updated;
+      });
       setSelectedWordIndex(wordIndex);
       setSelectedWord(cleanWord);
+      setDefinitionData(null);
+      setAnkiWordStatus('idle');
       onWordSelected?.(cleanWord, null, false);
       return;
     }
@@ -172,7 +178,19 @@ export const BlurDefinitionSidebar: React.FC<{
   onClose: () => void;
   width: number;
   onWidthChange: (width: number) => void;
-}> = ({ selectedWord, definitionData, isLoading, onWordToAnki, onClose, width, onWidthChange }) => {
+  isPinned: boolean;
+  onTogglePin: () => void;
+}> = ({
+  selectedWord,
+  definitionData,
+  isLoading,
+  onWordToAnki,
+  onClose,
+  width,
+  onWidthChange,
+  isPinned,
+  onTogglePin
+}) => {
   const [ankiWordStatus, setAnkiWordStatus] = useState<'idle' | 'loading-only-word' | 'loading-with-audio' | 'success-only-word' | 'success-with-audio' | 'error'>('idle');
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -220,7 +238,7 @@ export const BlurDefinitionSidebar: React.FC<{
     };
   }, [isResizing, onWidthChange]);
 
-  if (!selectedWord) return null;
+  if (!selectedWord && !isPinned) return null;
 
   return (
     <div
@@ -238,12 +256,25 @@ export const BlurDefinitionSidebar: React.FC<{
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-neutral-700/50">
         <h3 className="text-lg font-semibold text-white">Word Definition</h3>
-        <button
-          onClick={onClose}
-          className="text-neutral-400 hover:text-white transition-colors p-1"
-        >
-          <X size={20} />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={onTogglePin}
+            className={`p-1.5 rounded-lg border transition-colors ${
+              isPinned
+                ? 'text-brand-300 border-brand-500/40 bg-brand-500/10'
+                : 'text-neutral-400 border-transparent hover:text-white hover:border-neutral-600'
+            }`}
+            title={isPinned ? 'Unpin panel' : 'Pin panel'}
+          >
+            {isPinned ? <PinOff size={18} /> : <Pin size={18} />}
+          </button>
+          <button
+            onClick={onClose}
+            className="text-neutral-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-neutral-800/80"
+          >
+            <X size={18} />
+          </button>
+        </div>
       </div>
 
       {/* Content */}
