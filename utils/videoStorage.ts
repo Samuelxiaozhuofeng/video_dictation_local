@@ -2,7 +2,7 @@
  * Video History and Progress Management
  */
 
-import { VideoRecord, PracticeProgress } from '../types';
+import { VideoRecord, PracticeProgress, LearningMode, BlurPlaybackMode } from '../types';
 import * as FileSystemAccess from './fileSystemAccess';
 
 const STORAGE_KEY_PROGRESS = 'linguaclip_video_progress';
@@ -10,13 +10,24 @@ const STORAGE_KEY_PROGRESS = 'linguaclip_video_progress';
 /**
  * Create a new video record
  */
+export interface CreateVideoRecordOptions {
+  videoFileHandle?: FileSystemFileHandle;
+  learningMode?: LearningMode;
+  blurPlaybackMode?: BlurPlaybackMode;
+}
+
 export const createVideoRecord = async (
   videoFile: File,
   subtitleFile: File,
   subtitleText: string,
   totalSubtitles: number,
-  videoFileHandle?: FileSystemFileHandle
+  options: CreateVideoRecordOptions = {}
 ): Promise<VideoRecord> => {
+  const {
+    videoFileHandle,
+    learningMode = LearningMode.DICTATION,
+    blurPlaybackMode = BlurPlaybackMode.SENTENCE_BY_SENTENCE,
+  } = options;
   const id = crypto.randomUUID();
   
   const record: VideoRecord = {
@@ -32,6 +43,8 @@ export const createVideoRecord = async (
     dateAdded: Date.now(),
     lastPracticed: Date.now(),
     totalPracticeTime: 0,
+    learningMode,
+    blurPlaybackMode,
   };
 
   // Save to IndexedDB
@@ -200,4 +213,3 @@ export const formatLastPracticed = (timestamp: number): string => {
   
   return new Date(timestamp).toLocaleDateString();
 };
-

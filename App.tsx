@@ -166,13 +166,15 @@ export default function App() {
     if (vf && sf) {
       try {
         const subText = await sf.text();
+        const resolvedLearningMode = selectedLearningMode ?? learningMode;
+        const resolvedBlurPlaybackMode = selectedBlurPlaybackMode ?? blurPlaybackMode;
 
         // Set learning mode
-        if (selectedLearningMode) {
-          setLearningMode(selectedLearningMode);
+        if (learningMode !== resolvedLearningMode) {
+          setLearningMode(resolvedLearningMode);
         }
-        if (selectedBlurPlaybackMode) {
-          setBlurPlaybackMode(selectedBlurPlaybackMode);
+        if (blurPlaybackMode !== resolvedBlurPlaybackMode) {
+          setBlurPlaybackMode(resolvedBlurPlaybackMode);
         }
 
         // Use the hook's initializePractice method
@@ -194,7 +196,11 @@ export default function App() {
               vf,
               sf,
               subText,
-              parsed.length
+              parsed.length,
+              {
+                learningMode: resolvedLearningMode,
+                blurPlaybackMode: resolvedBlurPlaybackMode,
+              }
             );
             recordId = record.id;
           } catch (error) {
@@ -219,6 +225,8 @@ export default function App() {
     try {
       // Try to get video file from stored handle (File System Access API)
       let videoFileFromHandle = await getVideoFileFromRecord(record);
+      const recordLearningMode = record.learningMode ?? LearningMode.DICTATION;
+      const recordBlurPlaybackMode = record.blurPlaybackMode ?? BlurPlaybackMode.SENTENCE_BY_SENTENCE;
 
       // If file handle not available, prompt user to select the video file
       if (!videoFileFromHandle) {
@@ -260,8 +268,8 @@ export default function App() {
       await handleStartPractice(
         videoFileFromHandle,
         subtitleFileFromRecord,
-        undefined, // learningMode - use current state
-        undefined, // blurPlaybackMode - use current state
+        recordLearningMode,
+        recordBlurPlaybackMode,
         record.currentSubtitleIndex,
         record.currentSectionIndex,
         record.id

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { VideoRecord } from '../types';
 import * as VideoStorage from '../utils/videoStorage';
+import { CreateVideoRecordOptions } from '../utils/videoStorage';
 
 export interface UseVideoHistoryReturn {
   currentVideoId: string | null;
@@ -9,7 +10,8 @@ export interface UseVideoHistoryReturn {
     videoFile: File,
     subtitleFile: File,
     subtitleText: string,
-    totalSubtitles: number
+    totalSubtitles: number,
+    options?: CreateVideoRecordOptions
   ) => Promise<VideoRecord>;
   updateProgress: (videoId: string, subtitleIndex: number, sectionIndex: number) => Promise<void>;
   getVideoFileFromRecord: (record: VideoRecord) => Promise<File | null>;
@@ -24,13 +26,15 @@ export function useVideoHistory(): UseVideoHistoryReturn {
     videoFile: File,
     subtitleFile: File,
     subtitleText: string,
-    totalSubtitles: number
+    totalSubtitles: number,
+    options: CreateVideoRecordOptions = {}
   ): Promise<VideoRecord> => {
     return await VideoStorage.createVideoRecord(
       videoFile,
       subtitleFile,
       subtitleText,
-      totalSubtitles
+      totalSubtitles,
+      options
     );
   }, []);
 
@@ -64,4 +68,3 @@ export function useVideoHistory(): UseVideoHistoryReturn {
     saveVideoFileHandle
   };
 }
-

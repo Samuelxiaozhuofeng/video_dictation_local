@@ -119,6 +119,8 @@ export interface VideoRecord {
   dateAdded: number;                    // Timestamp when added
   lastPracticed: number;                // Timestamp of last practice
   totalPracticeTime: number;            // Total practice time in seconds
+  learningMode?: LearningMode;          // Last-used practice mode
+  blurPlaybackMode?: BlurPlaybackMode;  // Last-used blur playback variant
 }
 
 export interface PracticeProgress {
