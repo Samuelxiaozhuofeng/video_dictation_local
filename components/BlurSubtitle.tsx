@@ -32,6 +32,16 @@ const BlurSubtitle: React.FC<BlurSubtitleProps> = ({
   const [isLoadingDef, setIsLoadingDef] = useState(false);
   const [ankiWordStatus, setAnkiWordStatus] = useState<'idle' | 'loading-only-word' | 'loading-with-audio' | 'success-only-word' | 'success-with-audio' | 'error'>('idle');
 
+  // Reset all state when subtitle text changes (new subtitle line)
+  useEffect(() => {
+    setRevealedWordIndices(new Set());
+    setSelectedWord(null);
+    setSelectedWordIndex(null);
+    setDefinitionData(null);
+    setIsLoadingDef(false);
+    setAnkiWordStatus('idle');
+  }, [targetText]);
+
   // Reset revealed words when onReset is called (e.g., on replay)
   useEffect(() => {
     if (onReset) {
