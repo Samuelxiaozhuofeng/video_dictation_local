@@ -200,6 +200,20 @@ export default function App() {
   });
 
   const exitPractice = () => { setShowComplete(false); setAppState(AppState.UPLOAD); };
+
+  // "That's enough for today" from the section-done overlay. The autosave has
+  // us parked on the last line of the finished section, so resuming there would
+  // replay that line and pop the same overlay again; park at the top of the
+  // next section instead.
+  const stopAfterSection = () => {
+    const next = Math.min(currentSectionIndex + 1, sections.length - 1);
+    if (currentVideoId) {
+      const done = sections.slice(0, next).reduce((n, s) => n + s.subtitles.length, 0);
+      VideoStorage.updateProgress(currentVideoId, 0, next, done);
+    }
+    setShowSectionComplete(false);
+    exitPractice();
+  };
   const restartPractice = () => {
     setShowComplete(false);
     switchSection(0, videoRef, setIsPlaying);
@@ -254,6 +268,7 @@ export default function App() {
         onAddToAnki: handleAddToAnki,
         onWordToAnki: handleWordToAnki,
         onNextSection: handleNextSectionClick,
+        onStopAfterSection: stopAfterSection,
         onSetShowSectionComplete: setShowSectionComplete,
         onSetVolume: setVolume,
         onSetPlaybackSpeed: setPlaybackSpeed,

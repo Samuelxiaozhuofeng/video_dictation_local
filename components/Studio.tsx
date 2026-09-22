@@ -142,6 +142,7 @@ const Studio: React.FC = () => {
       {showSectionComplete && (
         <Overlay title={t('studio.sectionDoneTitle', { n: currentSectionIndex + 1 })} body={t('studio.sectionDoneBody')}>
           <Btn onClick={() => actions.onSetShowSectionComplete(false)}><RotateCcw size={16} /> {t('studio.review')}</Btn>
+          <Btn onClick={actions.onStopAfterSection}><HomeIcon size={16} /> {t('studio.stopHere')}</Btn>
           <Btn tone="green" onClick={actions.onNextSection} autoFocus><PlayCircle size={16} /> {t('studio.nextSection')}</Btn>
         </Overlay>
       )}

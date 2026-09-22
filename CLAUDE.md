@@ -16,6 +16,7 @@ npx tsc --noEmit       # 类型检查
 npm run release        # tauri build --bundles app，然后装进 /Applications
 cargo test --manifest-path src-tauri/Cargo.toml   # Rust 侧（import.rs 有单测）
 node test-resegment.mjs   # 切句逻辑自检（bundle 真模块，不是复制逻辑）
+node test-sections.mjs    # 分段逻辑自检（同上）
 ```
 
 `npm run dev` 单跑浏览器会因为缺 Tauri API 报错——**只发 Mac 桌面版**，验收一律在 `npx tauri dev` 里。前端没有测试框架，逻辑自检就是根目录那几个 `node` 脚本（`test-tokenizer.js` / `test-flexible-case.js` 是早期的复制逻辑版，参考价值有限）。

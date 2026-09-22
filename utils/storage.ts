@@ -56,13 +56,17 @@ export const clearStorage = () => {
 
 // --- Practice Config Storage ---
 
+// A practice session should have an end you can see from the start: four
+// minutes of video is already 20-30 minutes of dictation. 0 (the whole video)
+// stays available in Settings, it just is not what you get by default.
+export const DEFAULT_SECTION_LENGTH = 4;
+
 export const getPracticeConfig = (): PracticeConfig => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY_PRACTICE);
-    // Default to 0 (Full Video) if not set
-    return stored ? JSON.parse(stored) : { sectionLength: 0 }; 
+    return stored ? JSON.parse(stored) : { sectionLength: DEFAULT_SECTION_LENGTH };
   } catch (e) {
-    return { sectionLength: 0 };
+    return { sectionLength: DEFAULT_SECTION_LENGTH };
   }
 };
 

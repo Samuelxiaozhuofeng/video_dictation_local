@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { PracticeMode, Subtitle, VideoSection } from '../types';
 import * as Storage from '../utils/storage';
 import { parseSRT } from '../utils/srtParser';
+import { buildSections } from '../utils/sections';
 
 export interface UsePracticeSessionParams {
   videoId: string | null;
@@ -118,54 +119,20 @@ export function usePracticeSession(params: UsePracticeSessionParams): UsePractic
         return null;
       }
 
-      // Setup Sections
-      const computedSections: VideoSection[] = [];
-      const pConfig = Storage.getPracticeConfig();
-
-      if (pConfig.sectionLength > 0) {
-        const sectionDuration = pConfig.sectionLength * 60;
-        const lastTime = parsed[parsed.length - 1].endTime;
-
-        let currentTime = 0;
-        let secId = 1;
-
-        while (currentTime < lastTime) {
-          const endTime = currentTime + sectionDuration;
-          const sectionSubs = parsed.filter(s => s.startTime >= currentTime && s.startTime < endTime);
-
-          // Only add section if it has content or it's the first one
-          if (sectionSubs.length > 0 || secId === 1) {
-            computedSections.push({
-              id: secId,
-              label: `Section ${secId}`,
-              startTime: currentTime,
-              endTime: endTime,
-              subtitleIndices: [],
-              subtitles: sectionSubs
-            });
-          }
-
-          currentTime = endTime;
-          secId++;
-        }
-      } else {
-        // Single Section
-        computedSections.push({
-          id: 1,
-          label: "Full Video",
-          startTime: 0,
-          endTime: parsed[parsed.length - 1].endTime + 10,
-          subtitleIndices: [],
-          subtitles: parsed
-        });
-      }
+      const computedSections = buildSections(parsed, Storage.getPracticeConfig().sectionLength);
 
       // Set state
       setFullSubtitles(parsed);
       setSections(computedSections);
 
-      const initialSectionIndex = startSectionIndex ?? 0;
-      const initialSubtitleIndex = startIndex ?? 0;
+      // A record saved under a different section length — most often the old
+      // "full video" default — can name a position that no longer exists, so
+      // clamp instead of dropping the user on an undefined line.
+      const initialSectionIndex = Math.min(Math.max(startSectionIndex ?? 0, 0), computedSections.length - 1);
+      const initialSubtitleIndex = Math.min(
+        Math.max(startIndex ?? 0, 0),
+        Math.max(computedSections[initialSectionIndex].subtitles.length - 1, 0),
+      );
 
       setCurrentSectionIndex(initialSectionIndex);
       setSubtitles(computedSections[initialSectionIndex].subtitles);

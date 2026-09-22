@@ -17,6 +17,7 @@
 | `components/Studio.tsx` + `Transport.tsx` + `DictationLine.tsx` / `BlurLine.tsx` | 练习页：视频、字幕条、遥控条 |
 | `components/Settings*.tsx` | 通用 / AI 查词 / Anki 设置 |
 | `hooks/` | 播放控制、练习会话、收藏、Anki 集成、快捷键 |
+| `utils/sections.ts` | 按分钟把字幕切成段。**首页和练习页必须用同一个函数**，否则卡片上的「第几段」会和实际练的对不上 |
 | `utils/desktop.ts` | **所有 Tauri 调用的唯一入口**：系统对话框、读字幕、路径是否存在、asset URL、拖放监听 |
 | `utils/videoStorage.ts` + `fileSystemAccess.ts` | 练习记录（IndexedDB） |
 | `utils/anki.ts` | AnkiConnect 请求（经 Tauri http 插件代发） |

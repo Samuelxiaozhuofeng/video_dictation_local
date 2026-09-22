@@ -37,7 +37,7 @@ const Settings: React.FC = () => {
   const [aiBaseUrl, setAiBaseUrl] = useState('');
   const [aiSegmentModel, setAiSegmentModel] = useState('');
 
-  const [sectionLength, setSectionLength] = useState(0);
+  const [sectionLength, setSectionLength] = useState(Storage.DEFAULT_SECTION_LENGTH);
   const [audioPadding, setAudioPadding] = useState<AudioPaddingConfig>({ startPadding: 100, endPadding: 200 });
 
   const [savedFlash, setSavedFlash] = useState(false);

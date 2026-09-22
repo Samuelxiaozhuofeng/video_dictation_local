@@ -49,6 +49,7 @@ export interface PracticeContextActions {
   onAddToAnki: () => void;
   onWordToAnki: (word: string, definition: string, includeAudio?: boolean) => void | Promise<void>;
   onNextSection: () => void;
+  onStopAfterSection: () => void;
   onSetShowSectionComplete: (show: boolean) => void;
   onSetVolume: (volume: number) => void;
   onSetPlaybackSpeed: (speed: number) => void;

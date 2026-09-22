@@ -1,7 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FileVideo, FileText, Pencil, EyeOff, Trash2, Clock, Loader2, Upload, KeyRound, RotateCw } from 'lucide-react';
 import { LearningMode, VideoRecord } from '../types';
 import * as VideoStorage from '../utils/videoStorage';
+import { getPracticeConfig } from '../utils/storage';
+import { parseSRT } from '../utils/srtParser';
+import { buildSections } from '../utils/sections';
 import {
   fileNameFromPath, listenDragDrop, pickSubtitlePath, pickVideoPath, readSubtitleFile,
 } from '../utils/desktop';
@@ -182,6 +185,30 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
 
+  // Where each record sits in sections rather than in percent: "part 3 of 12"
+  // is something you can finish, where "24%" of a long video never moves.
+  // Computed the same way the practice page cuts the video, so the two agree.
+  const sectionLength = getPracticeConfig().sectionLength;
+  const shelfPosition = useMemo(() => {
+    const byId = new Map<string, { part: number; parts: number; line: number; lines: number }>();
+    for (const v of videos ?? []) {
+      if (v.importJob || !v.subtitleText) continue;
+      try {
+        const sections = buildSections(parseSRT(v.subtitleText), sectionLength);
+        if (sections.length === 0) continue;
+        const part = Math.min(Math.max(v.currentSectionIndex, 0), sections.length - 1);
+        const lines = sections[part].subtitles.length;
+        byId.set(v.id, {
+          part,
+          parts: sections.length,
+          line: Math.min(Math.max(v.currentSubtitleIndex, 0), lines),
+          lines,
+        });
+      } catch { /* a record we cannot parse just falls back to percent */ }
+    }
+    return byId;
+  }, [videos, sectionLength]);
+
   useEffect(() => {
     const load = () => {
       VideoStorage.getAllVideoRecords().then(setVideos).catch(() => setVideos([]));
@@ -268,12 +295,16 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {videos.map(v => {
               const job = v.importJob;
+              const pos = shelfPosition.get(v.id);
+              const inParts = !!pos && pos.parts > 1;
               return (
                 <Card key={v.id} className="p-5 flex flex-col gap-4">
                   <div className="flex items-start justify-between gap-3">
                     <h3 className="font-serif text-lg font-semibold leading-tight break-words min-w-0">{v.displayName}</h3>
                     {!job && (
-                      <Stamp tone={v.completionRate >= 100 ? 'green-soft' : 'white'} className="shrink-0">{v.completionRate}%</Stamp>
+                      <Stamp tone={v.completionRate >= 100 ? 'green-soft' : 'white'} className="shrink-0">
+                        {inParts ? t('home.partOf', { current: pos!.part + 1, total: pos!.parts }) : `${v.completionRate}%`}
+                      </Stamp>
                     )}
                   </div>
                   {job && !job.error && (
@@ -301,9 +332,9 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
                   )}
                   {!job && (
                     <>
-                      <Progress pct={v.completionRate} />
+                      <Progress pct={inParts ? (pos!.lines ? (pos!.line / pos!.lines) * 100 : 0) : v.completionRate} />
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-mute">
-                        <span>{t('home.linesCount', { current: v.currentSubtitleIndex, total: v.totalSubtitles })}</span>
+                        <span>{t('home.linesCount', { current: pos?.line ?? v.currentSubtitleIndex, total: pos?.lines ?? v.totalSubtitles })}</span>
                         <span className="inline-flex items-center gap-1"><Clock size={12} /> {formatRelativeTime(v.lastPracticed)}</span>
                       </div>
                     </>
