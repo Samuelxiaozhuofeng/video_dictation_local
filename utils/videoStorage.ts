@@ -114,7 +114,8 @@ export const deleteVideoRecord = async (id: string): Promise<void> => {
 export const updateProgress = async (
   videoId: string,
   currentSubtitleIndex: number,
-  currentSectionIndex: number
+  currentSectionIndex: number,
+  absoluteIndex: number = currentSubtitleIndex // index across the whole video (sections restart at 0)
 ): Promise<void> => {
   try {
     const record = await getVideoRecord(videoId);
@@ -127,7 +128,7 @@ export const updateProgress = async (
     
     // Calculate completion rate
     if (record.totalSubtitles > 0) {
-      record.completionRate = Math.round((currentSubtitleIndex / record.totalSubtitles) * 100);
+      record.completionRate = Math.min(100, Math.round((absoluteIndex / record.totalSubtitles) * 100));
     }
 
     await updateVideoRecord(record);
@@ -212,4 +213,20 @@ export const formatLastPracticed = (timestamp: number): string => {
   if (days < 7) return `${days} days ago`;
   
   return new Date(timestamp).toLocaleDateString();
+};
+
+/**
+ * Remember the mode the user picked for this video (last-used wins).
+ */
+export const updateVideoMode = async (
+  videoId: string,
+  patch: { learningMode?: LearningMode; blurPlaybackMode?: BlurPlaybackMode }
+): Promise<void> => {
+  try {
+    const record = await getVideoRecord(videoId);
+    if (!record) return;
+    await updateVideoRecord({ ...record, ...patch });
+  } catch (error) {
+    console.error('Failed to update video mode:', error);
+  }
 };

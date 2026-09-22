@@ -86,21 +86,9 @@ export const getWordDefinition = async (word: string, context: string): Promise<
         throw new Error("No response text from AI");
     } catch (error) {
         console.error("AI Definition Error:", error);
-
-        // Check if it's an API key error
-        if (error instanceof Error && error.message.includes("API Key")) {
-            return {
-                word: word,
-                definition: "Please enter your Gemini API Key in Settings to use AI features.",
-                partOfSpeech: "Error"
-            };
-        }
-
-        // Fallback
-        return {
-            word: word,
-            definition: "Could not retrieve definition.",
-            partOfSpeech: "Unknown"
-        };
+        const noKey = error instanceof Error && error.message.includes("API Key");
+        throw new Error(noKey
+            ? "Add your Gemini API key in Settings → AI to look up words."
+            : "Couldn't get a definition. Check your key and connection, then try again.");
     }
 };

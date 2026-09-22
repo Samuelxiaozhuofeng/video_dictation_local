@@ -1,0 +1,65 @@
+/* LinguaClip — notebook / paper base. Tailwind CDN provides utilities; this file holds
+   the few things utilities can't: tokens, form-control skins, paper patterns. */
+:root {
+  --paper: #F6F1E6;
+  --page: #FFFDF7;
+  --line: #DED5C2;
+  --ink: #2B2521;
+  --mute: #7A7066;
+  --green: #2F6B4F;
+  --ochre: #B8702A;
+  --highlight: #FBEFB4;
+  --rose: #B94A3A;
+}
+
+* { box-sizing: border-box; }
+html, body { background: var(--paper); color: var(--ink); }
+::selection { background: var(--highlight); color: var(--ink); }
+
+/* A sheet of paper: hairline edge, soft shadow. */
+.card { background: var(--page); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 1px 2px rgba(43,37,33,.05), 0 6px 16px rgba(43,37,33,.06); }
+.flat { background: var(--page); border: 1px solid var(--line); border-radius: 6px; }
+
+/* Pressable: a touch darker on hover, sinks a pixel on press. */
+.press { transition: background-color 150ms ease, border-color 150ms ease, transform 100ms ease, box-shadow 150ms ease; }
+.press:hover:not(:disabled) { filter: brightness(0.96); }
+.press:active:not(:disabled) { transform: translateY(1px); }
+.press:disabled { opacity: 0.45; cursor: not-allowed; }
+
+:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline-offset: 0; border-color: var(--green); }
+
+/* Ruled paper: faint horizontal lines every 32px, like a notebook page. */
+.ruled {
+  background-image: repeating-linear-gradient(to bottom, transparent 0 31px, rgba(43,37,33,.09) 31px 32px);
+  background-attachment: local;
+}
+/* Notebook margin: a thin rose rule down the left. */
+.margin-rule { box-shadow: inset 44px 0 0 -43px rgba(185,74,58,.55); }
+
+/* Highlighter marks: a slightly skewed, translucent band behind text. */
+.mark-green { background: linear-gradient(transparent 12%, rgba(47,107,79,.22) 12% 88%, transparent 88%); }
+.mark-rose { background: linear-gradient(transparent 12%, rgba(185,74,58,.22) 12% 88%, transparent 88%); }
+.mark-yellow { background: linear-gradient(transparent 12%, rgba(251,239,180,.95) 12% 88%, transparent 88%); }
+
+/* Range sliders: thin line track, round ink thumb. */
+input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 28px; background: transparent; cursor: pointer; }
+input[type="range"]::-webkit-slider-runnable-track { height: 2px; background: var(--line); }
+input[type="range"]::-moz-range-track { height: 2px; background: var(--line); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; margin-top: -8px; border-radius: 50%; background: var(--page); border: 2px solid var(--green); box-shadow: 0 1px 3px rgba(43,37,33,.2); }
+input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--page); border: 2px solid var(--green); }
+
+select { border-radius: 6px; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 5px; border: 2px solid var(--paper); }
+
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+.blink { animation: blink 1.2s ease-in-out infinite; }
+
+@keyframes slide-in { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.slide-in { animation: slide-in 180ms ease-out; }
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.fade-in { animation: fade-in 150ms ease-out; }

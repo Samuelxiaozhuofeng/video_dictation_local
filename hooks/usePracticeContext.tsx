@@ -9,8 +9,10 @@ export interface PracticeContextPractice {
   currentSubtitleIndex: number;
   mode: PracticeMode;
   showSectionComplete: boolean;
+  showComplete: boolean;
   learningMode: LearningMode;
   blurPlaybackMode: BlurPlaybackMode;
+  videoName: string;
 }
 
 export interface PracticeContextVideo {
@@ -36,6 +38,7 @@ export interface PracticeContextAnki {
 
 export interface PracticeContextActions {
   onExit: () => void;
+  onRestart: () => void;
   onSwitchSection: (index: number) => void;
   onToggleSavedList: (show: boolean) => void;
   onTogglePlay: () => void;
@@ -53,7 +56,7 @@ export interface PracticeContextActions {
   onContinue: () => void;
   onDeleteSavedItem: (id: number, e: React.MouseEvent) => void;
   onJumpToSaved: (id: number) => void;
-  onSetBlurPlaybackMode?: (mode: BlurPlaybackMode) => void;
+  onSetBlurPlaybackMode: (mode: BlurPlaybackMode) => void;
 }
 
 export interface PracticeContextValue {

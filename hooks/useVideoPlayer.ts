@@ -58,7 +58,8 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
     userPausedRef.current = false;
   }, [currentSubtitleIndex, learningMode, blurPlaybackMode]);
 
-  // Video Loop for pausing at end of subtitle
+  // Checks whether the current line has ended; runs every frame and on `timeupdate`
+  // (rAF is throttled in background tabs, timeupdate keeps firing).
   const checkVideoTime = useCallback(() => {
     if (!videoRef.current || subtitles.length === 0) return;
     
@@ -98,8 +99,6 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
     if (video.duration) {
       setProgress((video.currentTime / video.duration) * 100);
     }
-
-    requestRef.current = requestAnimationFrame(checkVideoTime);
   }, [
     subtitles,
     currentSubtitleIndex,
@@ -115,11 +114,15 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
   ]);
 
   useEffect(() => {
-    requestRef.current = requestAnimationFrame(checkVideoTime);
+    const loop = () => { checkVideoTime(); requestRef.current = requestAnimationFrame(loop); };
+    requestRef.current = requestAnimationFrame(loop);
+    const video = videoRef.current;
+    video?.addEventListener('timeupdate', checkVideoTime);
     return () => {
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      video?.removeEventListener('timeupdate', checkVideoTime);
     };
-  }, [checkVideoTime]);
+  }, [checkVideoTime, videoRef]);
 
   // Handle Volume/Speed changes directly on ref
   useEffect(() => {
@@ -129,46 +132,36 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
     }
   }, [volume, playbackSpeed, videoRef]);
 
-  // Initial Seek when index changes (Subtitle Change)
+  // Seek + autoplay when the line changes. Deliberately not keyed on isPlaying:
+  // otherwise the end-of-line pause flips isPlaying and this would restart the video.
+  const isPlayingRef = useRef(isPlaying);
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+
   useEffect(() => {
-    if (videoRef.current && subtitles.length > 0 && mode === PracticeMode.LISTENING && subtitles[currentSubtitleIndex]) {
-      const currentSub = subtitles[currentSubtitleIndex];
-      const isBlurContinuous = learningMode === LearningMode.BLUR && blurPlaybackMode === BlurPlaybackMode.CONTINUOUS;
+    const video = videoRef.current;
+    const currentSub = subtitles[currentSubtitleIndex];
+    if (!video || !currentSub || mode !== PracticeMode.LISTENING) return;
+    const isBlurContinuous = learningMode === LearningMode.BLUR && blurPlaybackMode === BlurPlaybackMode.CONTINUOUS;
+    const playing = isPlayingRef.current;
 
-      const tolerance = 0.5;
-      const shouldForceSeek = !(isBlurContinuous && isPlaying);
-      if (
-        shouldForceSeek &&
-        (videoRef.current.currentTime < currentSub.startTime - tolerance ||
-          videoRef.current.currentTime > currentSub.endTime)
-      ) {
-        videoRef.current.currentTime = currentSub.startTime;
-      }
-
-      // Auto-play logic:
-      // - In continuous mode: only auto-play if user hasn't manually paused
-      // - In other modes: always auto-play when subtitle changes
-      if (!isPlaying) {
-        if (isBlurContinuous) {
-          // In continuous mode, respect user's pause preference
-          if (!userPausedRef.current) {
-            videoRef.current.play().catch(e => console.error("Autoplay blocked", e));
-            setIsPlaying(true);
-          }
-        } else {
-          // In other modes, always auto-play
-          videoRef.current.play().catch(e => console.error("Autoplay blocked", e));
-          setIsPlaying(true);
-        }
-      }
+    const tolerance = 0.5;
+    const shouldForceSeek = !(isBlurContinuous && playing);
+    if (shouldForceSeek && (video.currentTime < currentSub.startTime - tolerance || video.currentTime > currentSub.endTime)) {
+      video.currentTime = currentSub.startTime;
     }
-  }, [currentSubtitleIndex, subtitles, mode, videoRef, isPlaying, learningMode, blurPlaybackMode]);
+
+    if (playing) return;
+    // Continuous mode respects a manual pause; every other mode plays the new line.
+    if (isBlurContinuous && userPausedRef.current) return;
+    setIsPlaying(true);
+    video.play().catch(e => { console.error("Autoplay blocked", e); setIsPlaying(false); });
+  }, [currentSubtitleIndex, subtitles, mode, videoRef, learningMode, blurPlaybackMode]);
 
   const handleReplayCurrent = useCallback((autoAdvanceAfter: boolean = false) => {
     if (videoRef.current && subtitles[currentSubtitleIndex]) {
       videoRef.current.currentTime = subtitles[currentSubtitleIndex].startTime;
-      videoRef.current.play();
       setIsPlaying(true);
+      videoRef.current.play().catch(e => { console.error("Play blocked", e); setIsPlaying(false); });
       onShouldAutoAdvanceChange?.(autoAdvanceAfter);
     }
   }, [subtitles, currentSubtitleIndex, videoRef, onShouldAutoAdvanceChange]);
@@ -186,18 +179,20 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
         userPausedRef.current = true;
       }
     } else {
-      if (mode === PracticeMode.INPUT || mode === PracticeMode.FEEDBACK) {
+      const sub = subtitles[currentSubtitleIndex];
+      const atLineEnd = !!sub && videoRef.current.currentTime >= sub.endTime - 0.05;
+      if (mode === PracticeMode.INPUT || mode === PracticeMode.FEEDBACK || atLineEnd) {
         handleReplayCurrent();
       } else {
-        videoRef.current.play().catch(e => console.error("Play failed", e));
         setIsPlaying(true);
+        videoRef.current.play().catch(e => { console.error("Play failed", e); setIsPlaying(false); });
         // Clear user pause flag when resuming
         if (isBlurContinuous) {
           userPausedRef.current = false;
         }
       }
     }
-  }, [isPlaying, mode, videoRef, handleReplayCurrent, learningMode, blurPlaybackMode]);
+  }, [isPlaying, mode, videoRef, handleReplayCurrent, learningMode, blurPlaybackMode, subtitles, currentSubtitleIndex]);
 
   const handleProgressSeek = useCallback((
     e: React.ChangeEvent<HTMLInputElement>,

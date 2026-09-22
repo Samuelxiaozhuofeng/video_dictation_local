@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { Subtitle, AnkiConfig, AnkiCardTemplateConfig } from '../types';
 import * as Anki from '../utils/anki';
 import * as Storage from '../utils/storage';
+import { dialog } from '../components/Dialog';
 
 export type AnkiStatus = 'idle' | 'recording' | 'adding' | 'success' | 'error';
 
@@ -154,7 +155,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
   // Add current subtitle to Anki
   const handleAddToAnki = useCallback(async (subtitle: Subtitle) => {
     if (!ankiConfig) {
-      alert("Please configure Anki settings first.");
+      dialog.alert('Anki is not connected', 'Open Settings → Anki, enter your AnkiConnect address and press Connect.');
       return;
     }
     if (ankiStatus !== 'idle') return;
@@ -164,7 +165,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
       ankiConfig.audioCard || ankiConfig.wordCard || null;
 
     if (!template) {
-      alert("Please configure Anki card templates in Settings.");
+      dialog.alert('No Anki card set up', 'Open Settings → Anki and pick a deck and note type for the Word or Audio card.');
       return;
     }
 
@@ -188,7 +189,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
     } catch (e: any) {
         console.error(e);
         setAnkiStatus('error');
-        alert("Failed to add to Anki: " + e.message);
+        dialog.alert('Anki refused the card', e.message);
         setTimeout(() => setAnkiStatus('idle'), 3000);
     }
   }, [ankiConfig, ankiStatus, captureMedia, videoFileName]);
@@ -196,8 +197,8 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
   // Add word with definition to Anki
   const handleWordToAnki = useCallback(async (word: string, definition: string, subtitle: Subtitle, includeAudio: boolean = true) => {
       if (!ankiConfig) {
-        alert("Please configure Anki settings first.");
-        return;
+        dialog.alert('Anki is not connected', 'Open Settings → Anki, enter your AnkiConnect address and press Connect.');
+        throw new Error('Anki not configured');
       }
 
       // 只有 Only Word（includeAudio === false）使用 Word 卡片模板；
@@ -210,8 +211,8 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
       }
 
       if (!template) {
-        alert("Please configure Anki card templates in Settings.");
-        return;
+        dialog.alert('No Anki card set up', 'Open Settings → Anki and pick a deck and note type for the Word or Audio card.');
+        throw new Error('Anki card not configured');
       }
 
       const { screenshotBase64, audioBase64 } = await captureMedia(subtitle, template, includeAudio);

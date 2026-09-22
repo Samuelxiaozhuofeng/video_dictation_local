@@ -36,9 +36,8 @@ export interface UsePracticeActionsParams {
   ) => void;
   handleNextSection: (videoRef?: React.RefObject<HTMLVideoElement>, setIsPlaying?: (value: boolean) => void) => void;
 
-  // App-level dependencies
-  setAppState: (state: any) => void;
-  AppStateEnum: any;
+  // Fired when the last line of the last section is done
+  onPracticeComplete: () => void;
 
   // Video controller dependency
   videoPlayerHandleProgressSeek: (
@@ -72,8 +71,7 @@ export function usePracticeActions(params: UsePracticeActionsParams) {
     ankiHandleWordToAnki,
     practiceHandleContinue,
     handleNextSection,
-    setAppState,
-    AppStateEnum,
+    onPracticeComplete,
     videoPlayerHandleProgressSeek,
   } = params;
 
@@ -178,13 +176,10 @@ export function usePracticeActions(params: UsePracticeActionsParams) {
       () => {
         // section complete already handled by setShowSectionComplete in session hook
       },
-      () => {
-        alert("Practice Complete! You have finished the video.");
-        setAppState(AppStateEnum.UPLOAD);
-      },
+      onPracticeComplete,
       (status: string) => setAnkiStatus(status as any)
     );
-  }, [practiceHandleContinue, setAppState, AppStateEnum, setAnkiStatus]);
+  }, [practiceHandleContinue, onPracticeComplete, setAnkiStatus]);
 
   const handleNextSectionClick = useCallback(() => {
     handleNextSection(videoRef, setIsPlaying);
@@ -192,16 +187,7 @@ export function usePracticeActions(params: UsePracticeActionsParams) {
 
   const handleAddToAnkiShortcut = useCallback((event: KeyboardEvent) => {
     // This handler expects caller to ensure practice mode and app state if needed
-    const activeSubtitle = subtitles[currentSubtitleIndex];
-    if (!activeSubtitle) {
-      alert('No subtitle is currently selected to add.');
-      return;
-    }
-
-    if (ankiStatus !== 'idle') {
-      alert('Please wait for the current Anki action to finish.');
-      return;
-    }
+    if (!subtitles[currentSubtitleIndex] || ankiStatus !== 'idle') return;
 
     event.preventDefault();
     handleAddToAnki();

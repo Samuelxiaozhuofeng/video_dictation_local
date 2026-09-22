@@ -1,39 +1,73 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, RefreshCw, Link, CheckCircle, AlertCircle, Settings as SettingsIcon } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { APP_DATA_FIELDS } from '../types';
 import { AnkiConnectionStatus } from '../hooks/useAnkiConnection';
+import { Btn, Card, Field, inputCls } from './ui';
+
+type Mapping = Record<string, string>;
 
 interface SettingsAnkiProps {
-  // Connection props
   url: string;
   setUrl: (value: string) => void;
   status: AnkiConnectionStatus;
   statusMsg: string;
   onConnect: () => void;
-  
-  // Data from Anki
   decks: string[];
   models: string[];
-  
-  // Word Card props
   wordDeckName: string;
   setWordDeckName: (value: string) => void;
   wordModelName: string;
   setWordModelName: (value: string) => void;
-  wordFieldMapping: Record<string, string>;
-  setWordFieldMapping: (value: Record<string, string>) => void;
-  
-  // Audio Card props
+  wordFieldMapping: Mapping;
+  setWordFieldMapping: React.Dispatch<React.SetStateAction<Mapping>>;
   audioDeckName: string;
   setAudioDeckName: (value: string) => void;
   audioModelName: string;
   setAudioModelName: (value: string) => void;
-  audioFieldMapping: Record<string, string>;
-  setAudioFieldMapping: (value: Record<string, string>) => void;
-  
-  // Field fetching
+  audioFieldMapping: Mapping;
+  setAudioFieldMapping: React.Dispatch<React.SetStateAction<Mapping>>;
   fetchModelFields: (modelName: string) => Promise<string[]>;
+  saveAnki: (patch?: {
+    wordFieldMapping?: Mapping;
+    audioFieldMapping?: Mapping;
+  }) => void;
 }
+
+function pruneMapping(prev: Mapping, fields: string[]): Mapping {
+  const next: Mapping = {};
+  fields.forEach((f) => {
+    if (prev[f]) next[f] = prev[f];
+  });
+  const prevKeys = Object.keys(prev);
+  const nextKeys = Object.keys(next);
+  if (prevKeys.length === nextKeys.length && nextKeys.every((k) => prev[k] === next[k])) return prev;
+  return next;
+}
+
+const FieldMap: React.FC<{
+  fields: string[];
+  mapping: Mapping;
+  onChange: (ankiField: string, appDataKey: string) => void;
+}> = ({ fields, mapping, onChange }) => (
+  <div className="space-y-3">
+    <p className="text-[13px] font-medium">Field mapping</p>
+    {fields.map((field) => (
+      <div key={field} className="flex items-center gap-3">
+        <span className="w-1/3 font-mono text-sm truncate" title={field}>{field}</span>
+        <select
+          value={mapping[field] || ''}
+          onChange={(e) => onChange(field, e.target.value)}
+          className={`flex-1 ${inputCls}`}
+        >
+          <option value="">(Leave Empty)</option>
+          {APP_DATA_FIELDS.map((opt) => (
+            <option key={opt.key} value={opt.key}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+    ))}
+  </div>
+);
 
 const SettingsAnki: React.FC<SettingsAnkiProps> = ({
   url,
@@ -56,221 +90,113 @@ const SettingsAnki: React.FC<SettingsAnkiProps> = ({
   audioFieldMapping,
   setAudioFieldMapping,
   fetchModelFields,
+  saveAnki,
 }) => {
   const [wordModelFields, setWordModelFields] = useState<string[]>([]);
   const [audioModelFields, setAudioModelFields] = useState<string[]>([]);
 
-  // Fetch word model fields when model changes
   useEffect(() => {
     if (wordModelName && status === 'success') {
-      fetchModelFields(wordModelName).then(fields => {
+      fetchModelFields(wordModelName).then((fields) => {
         setWordModelFields(fields);
-        // Preserve existing mapping where possible
-        setWordFieldMapping(prev => {
-          const newMapping: Record<string, string> = {};
-          fields.forEach(f => {
-            if (prev[f]) newMapping[f] = prev[f];
-          });
-          return newMapping;
-        });
+        setWordFieldMapping((prev) => pruneMapping(prev, fields));
       });
     }
-  }, [wordModelName, status, fetchModelFields]);
+  }, [wordModelName, status, fetchModelFields, setWordFieldMapping]);
 
-  // Fetch audio model fields when model changes
   useEffect(() => {
     if (audioModelName && status === 'success') {
-      fetchModelFields(audioModelName).then(fields => {
+      fetchModelFields(audioModelName).then((fields) => {
         setAudioModelFields(fields);
-        // Preserve existing mapping where possible
-        setAudioFieldMapping(prev => {
-          const newMapping: Record<string, string> = {};
-          fields.forEach(f => {
-            if (prev[f]) newMapping[f] = prev[f];
-          });
-          return newMapping;
-        });
+        setAudioFieldMapping((prev) => pruneMapping(prev, fields));
       });
     }
-  }, [audioModelName, status, fetchModelFields]);
+  }, [audioModelName, status, fetchModelFields, setAudioFieldMapping]);
 
   const updateWordMapping = (ankiField: string, appDataKey: string) => {
-    setWordFieldMapping(prev => ({
-      ...prev,
-      [ankiField]: appDataKey
-    }));
+    const next = { ...wordFieldMapping, [ankiField]: appDataKey };
+    setWordFieldMapping(next);
+    saveAnki({ wordFieldMapping: next });
   };
 
   const updateAudioMapping = (ankiField: string, appDataKey: string) => {
-    setAudioFieldMapping(prev => ({
-      ...prev,
-      [ankiField]: appDataKey
-    }));
+    const next = { ...audioFieldMapping, [ankiField]: appDataKey };
+    setAudioFieldMapping(next);
+    saveAnki({ audioFieldMapping: next });
   };
 
   return (
-    <>
-      {/* Anki Connection Section */}
-      <section className="bg-neutral-900/50 border border-neutral-800/50 rounded-2xl p-7 shadow-soft">
-        <h2 className="text-lg font-semibold text-white mb-5 flex items-center gap-3">
-          <div className="p-2 bg-brand-500/10 rounded-xl border border-brand-500/20">
-            <Link className="w-5 h-5 text-brand-400" />
-          </div>
-          AnkiConnect Setup
-        </h2>
-        <div className="flex flex-col md:flex-row gap-4 items-end">
-          <div className="flex-1 w-full">
-            <label className="block text-sm text-neutral-300 mb-2 font-medium">AnkiConnect URL</label>
-            <input
-              type="text"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              className="w-full bg-neutral-800/50 border border-neutral-700/50 rounded-xl px-4 py-3 text-neutral-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 outline-none transition-all"
-              placeholder="http://127.0.0.1:8765"
-            />
-          </div>
-          <button
-            onClick={onConnect}
-            disabled={status === 'loading'}
-            className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 shrink-0"
-          >
-            {status === 'loading' ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            {status === 'success' ? 'Reconnect' : 'Connect'}
-          </button>
-        </div>
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row gap-4 md:items-end">
+        <Field label="AnkiConnect URL" className="flex-1">
+          <input
+            type="text"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            className={inputCls}
+            placeholder="http://127.0.0.1:8765"
+          />
+        </Field>
+        <Btn type="button" tone="green" onClick={onConnect} disabled={status === 'loading'}>
+          {status === 'loading' ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+          {status === 'success' ? 'Reconnect' : 'Connect'}
+        </Btn>
+      </div>
 
-        {status === 'error' && (
-          <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-400 text-sm">
-            <AlertCircle className="w-4 h-4" />
-            {statusMsg}
-          </div>
-        )}
-        {status === 'success' && (
-          <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg flex items-center gap-2 text-green-400 text-sm">
-            <CheckCircle className="w-4 h-4" />
-            {statusMsg}
-          </div>
-        )}
-      </section>
-
-      {/* Anki Configuration Section (Only visible if connected) */}
-      {status === 'success' && (
-        <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 animate-in fade-in slide-in-from-bottom-4 shadow-md">
-          <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-            <SettingsIcon className="w-5 h-5 text-brand-400" />
-            Card Configuration
-          </h2>
-
-          {/* Word Card Configuration */}
-          <div className="mb-8">
-            <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3">Word Card</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-              <div>
-                <label className="block text-sm text-slate-400 mb-2">Target Deck</label>
-                <select
-                  value={wordDeckName}
-                  onChange={(e) => setWordDeckName(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-brand-500 outline-none"
-                >
-                  <option value="">Select a Deck...</option>
-                  {decks.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-2">Note Type</label>
-                <select
-                  value={wordModelName}
-                  onChange={(e) => setWordModelName(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-brand-500 outline-none"
-                >
-                  <option value="">Select a Note Type...</option>
-                  {models.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {wordModelName && wordModelFields.length > 0 && (
-              <div className="border-t border-slate-800 pt-4">
-                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Field Mapping</h4>
-                <div className="space-y-4">
-                  {wordModelFields.map(field => (
-                    <div key={field} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                      <div className="w-full sm:w-1/3 text-sm font-medium text-slate-400 truncate" title={field}>{field}</div>
-                      <ArrowLeft className="hidden sm:block w-4 h-4 text-slate-600" />
-                      <select
-                        value={wordFieldMapping[field] || ''}
-                        onChange={(e) => updateWordMapping(field, e.target.value)}
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:border-brand-500 outline-none w-full"
-                      >
-                        <option value="">(Leave Empty)</option>
-                        {APP_DATA_FIELDS.map(opt => (
-                          <option key={opt.key} value={opt.key}>{opt.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Audio Card Configuration */}
-          <div>
-            <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3">Audio Card</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
-              <div>
-                <label className="block text-sm text-slate-400 mb-2">Target Deck</label>
-                <select
-                  value={audioDeckName}
-                  onChange={(e) => setAudioDeckName(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-brand-500 outline-none"
-                >
-                  <option value="">Select a Deck...</option>
-                  {decks.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-2">Note Type</label>
-                <select
-                  value={audioModelName}
-                  onChange={(e) => setAudioModelName(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-200 focus:border-brand-500 outline-none"
-                >
-                  <option value="">Select a Note Type...</option>
-                  {models.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {audioModelName && audioModelFields.length > 0 && (
-              <div className="border-t border-slate-800 pt-4">
-                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Field Mapping</h4>
-                <div className="space-y-4">
-                  {audioModelFields.map(field => (
-                    <div key={field} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                      <div className="w-full sm:w-1/3 text-sm font-medium text-slate-400 truncate" title={field}>{field}</div>
-                      <ArrowLeft className="hidden sm:block w-4 h-4 text-slate-600" />
-                      <select
-                        value={audioFieldMapping[field] || ''}
-                        onChange={(e) => updateAudioMapping(field, e.target.value)}
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:border-brand-500 outline-none w-full"
-                      >
-                        <option value="">(Leave Empty)</option>
-                        {APP_DATA_FIELDS.map(opt => (
-                          <option key={opt.key} value={opt.key}>{opt.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
+      {status === 'error' && (
+        <Card flat tone="rose-soft" className="px-4 py-3 text-sm">{statusMsg}</Card>
       )}
-    </>
+      {status === 'success' && (
+        <Card flat tone="green-soft" className="px-4 py-3 text-sm">{statusMsg}</Card>
+      )}
+
+      {status === 'success' && (
+        <div className="space-y-8">
+          <div>
+            <h3 className="font-serif text-lg font-semibold mb-4">Word card</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <Field label="Target deck">
+                <select value={wordDeckName} onChange={(e) => setWordDeckName(e.target.value)} className={inputCls}>
+                  <option value="">Select a Deck...</option>
+                  {decks.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </Field>
+              <Field label="Note type">
+                <select value={wordModelName} onChange={(e) => setWordModelName(e.target.value)} className={inputCls}>
+                  <option value="">Select a Note Type...</option>
+                  {models.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </Field>
+            </div>
+            {wordModelName && wordModelFields.length > 0 && (
+              <FieldMap fields={wordModelFields} mapping={wordFieldMapping} onChange={updateWordMapping} />
+            )}
+          </div>
+
+          <div className="border-t border-line pt-6">
+            <h3 className="font-serif text-lg font-semibold mb-4">Audio card</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <Field label="Target deck">
+                <select value={audioDeckName} onChange={(e) => setAudioDeckName(e.target.value)} className={inputCls}>
+                  <option value="">Select a Deck...</option>
+                  {decks.map((d) => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </Field>
+              <Field label="Note type">
+                <select value={audioModelName} onChange={(e) => setAudioModelName(e.target.value)} className={inputCls}>
+                  <option value="">Select a Note Type...</option>
+                  {models.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </Field>
+            </div>
+            {audioModelName && audioModelFields.length > 0 && (
+              <FieldMap fields={audioModelFields} mapping={audioFieldMapping} onChange={updateAudioMapping} />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
 export default SettingsAnki;
-

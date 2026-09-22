@@ -3,88 +3,47 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LinguaClip Practice</title>
+    <title>LinguaClip</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
         theme: {
           extend: {
             colors: {
-              brand: {
-                50: '#f0f7ff',
-                100: '#e0efff',
-                200: '#baddff',
-                300: '#7db8ff',
-                400: '#3d8fff',
-                500: '#007aff',
-                600: '#0066d6',
-                700: '#0051ad',
-                800: '#003d84',
-                900: '#002a5c',
-              },
-              neutral: {
-                50: '#fafafa',
-                100: '#f5f5f5',
-                200: '#e5e5e5',
-                300: '#d4d4d4',
-                400: '#a3a3a3',
-                500: '#737373',
-                600: '#525252',
-                700: '#404040',
-                800: '#262626',
-                850: '#1c1c1e',
-                900: '#171717',
-                950: '#0a0a0a',
-              }
+              paper: '#F6F1E6',
+              page: '#FFFDF7',
+              line: '#DED5C2',
+              ink: '#2B2521',
+              mute: '#7A7066',
+              green: '#2F6B4F',
+              'green-soft': '#DCEBDF',
+              ochre: '#B8702A',
+              'ochre-soft': '#F5E3C6',
+              highlight: '#FBEFB4',
+              rose: '#B94A3A',
+              'rose-soft': '#F5D9D2',
+              shade: '#E8E1D2',
             },
-            animation: {
-              'bounce-slight': 'bounce-slight 0.3s infinite alternate',
-              'scale-in': 'scale-in 0.2s ease-out',
-              'fade-in': 'fade-in 0.3s ease-out',
-            },
-            keyframes: {
-              'bounce-slight': {
-                '0%': { transform: 'translateY(0)' },
-                '100%': { transform: 'translateY(-2px)' },
-              },
-              'scale-in': {
-                '0%': { transform: 'scale(0.95)', opacity: '0' },
-                '100%': { transform: 'scale(1)', opacity: '1' },
-              },
-              'fade-in': {
-                '0%': { opacity: '0' },
-                '100%': { opacity: '1' },
-              }
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+              serif: ['Fraunces', 'Georgia', 'serif'],
+              mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
             },
             boxShadow: {
-              'soft': '0 2px 8px rgba(0, 0, 0, 0.08)',
-              'soft-lg': '0 4px 16px rgba(0, 0, 0, 0.12)',
-              'soft-xl': '0 8px 32px rgba(0, 0, 0, 0.16)',
+              card: '0 1px 2px rgba(43,37,33,.05), 0 6px 16px rgba(43,37,33,.06)',
+              lift: '0 2px 4px rgba(43,37,33,.08), 0 16px 40px rgba(43,37,33,.14)',
             },
-            borderRadius: {
-              'xl': '1rem',
-              '2xl': '1.25rem',
-              '3xl': '1.5rem',
-            }
           }
         }
       }
     </script>
-  <script type="importmap">
-{
-  "imports": {
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
-</head>
-  <body class="bg-neutral-950 text-neutral-100 antialiased h-screen overflow-hidden">
+    <link rel="stylesheet" href="/index.css" />
+  </head>
+  <body class="bg-paper text-ink font-sans h-screen overflow-hidden antialiased">
     <div id="root" class="h-full"></div>
-  <script type="module" src="/index.tsx"></script>
-</body>
+    <script type="module" src="/index.tsx"></script>
+  </body>
 </html>

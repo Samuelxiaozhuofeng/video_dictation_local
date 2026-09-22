@@ -151,9 +151,11 @@ export const getFileHandle = async (id: string): Promise<FileSystemFileHandle | 
  */
 export const getFileFromHandle = async (handle: FileSystemFileHandle): Promise<File | null> => {
   try {
-    // Request permission if needed
-    const permission = await handle.queryPermission({ mode: 'read' });
-    if (permission === 'denied') {
+    // Stored handles come back as 'prompt' after a reload; ask (needs a user gesture, which Resume is).
+    const h = handle as any;
+    let permission = await h.queryPermission({ mode: 'read' });
+    if (permission === 'prompt') permission = await h.requestPermission({ mode: 'read' });
+    if (permission !== 'granted') {
       return null;
     }
 
