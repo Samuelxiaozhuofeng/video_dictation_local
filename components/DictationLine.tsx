@@ -17,9 +17,10 @@ interface Props {
   onReplay: (autoAdvanceAfter?: boolean) => void;
   onLookup: (word: string) => void;
   blanks?: number[]; // word indices the user types; omit = every word
+  nextLabel?: string; // feedback's forward button; defaults to "next line"
 }
 
-const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay, onLookup, blanks }) => {
+const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay, onLookup, blanks, nextLabel }) => {
   const t = useT();
   const tokens = useMemo(() => tokenizeText(targetText), [targetText]);
   const wordTokens = useMemo(() => getWordTokens(tokens), [tokens]);
@@ -157,7 +158,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
 
         <div className="flex gap-3">
           <Btn onClick={() => onReplay(false)}><RefreshCw size={16} /> {t('dictation.hearAgain')}</Btn>
-          <Btn tone="green" onClick={() => onComplete(true)}>{t('common.nextLine')} <ArrowRight size={16} /></Btn>
+          <Btn tone="green" onClick={() => onComplete(true)}>{nextLabel ?? t('common.nextLine')} <ArrowRight size={16} /></Btn>
         </div>
       </div>
     );

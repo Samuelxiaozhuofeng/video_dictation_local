@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { AppState, PracticeMode, VideoRecord, LearningMode, BlurPlaybackMode } from './types';
 import SavedLibrary from './components/SavedLibrary';
 import Settings from './components/Settings';
@@ -199,6 +199,30 @@ export default function App() {
     videoPlayerHandleProgressSeek,
   });
 
+  // Plays from `start` to the current line's own end (the end-of-line check
+  // pauses there); used by "break it down" to play the tail of a line.
+  const playFrom = useCallback((start: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    setShouldAutoAdvance(false);
+    video.currentTime = start;
+    setIsPlaying(true);
+    video.play().catch(e => { console.error('Play blocked', e); setIsPlaying(false); });
+  }, [videoRef, setIsPlaying, setShouldAutoAdvance]);
+
+  // While "break it down" is on, every way of replaying (Shift+Space, Space,
+  // the transport's replay button) replays the current step, not the whole line.
+  const stepStartRef = useRef<number | null>(null);
+  const setStepStart = useCallback((start: number | null) => { stepStartRef.current = start; }, []);
+  const replayCurrent = useCallback((autoAdvanceAfter?: boolean) => {
+    if (stepStartRef.current !== null) playFrom(stepStartRef.current);
+    else handleReplayCurrent(autoAdvanceAfter);
+  }, [playFrom, handleReplayCurrent]);
+  const togglePlayOrStep = useCallback(() => {
+    if (stepStartRef.current !== null && !isPlaying) playFrom(stepStartRef.current);
+    else togglePlay();
+  }, [playFrom, togglePlay, isPlaying]);
+
   const exitPractice = () => { setShowComplete(false); setAppState(AppState.UPLOAD); };
 
   // "That's enough for today" from the section-done overlay. The autosave has
@@ -225,13 +249,13 @@ export default function App() {
   const blurStepPaused = learningMode === LearningMode.BLUR && blurPlaybackMode === BlurPlaybackMode.SENTENCE_BY_SENTENCE && !isPlaying;
 
   const keyboardShortcuts = useMemo(() => ([
-    { code: 'Space', shiftKey: true, preventDefault: true, condition: () => inPractice, handler: () => handleReplayCurrent() },
-    { code: 'Space', shiftKey: false, preventDefault: true, allowInEditable: false, condition: () => inPractice, handler: () => togglePlay() },
+    { code: 'Space', shiftKey: true, preventDefault: true, condition: () => inPractice, handler: () => replayCurrent() },
+    { code: 'Space', shiftKey: false, preventDefault: true, allowInEditable: false, condition: () => inPractice, handler: () => togglePlayOrStep() },
     { code: 'Enter', preventDefault: true, allowInEditable: false, condition: () => inPractice && (mode === PracticeMode.FEEDBACK || blurStepPaused), handler: () => handleContinue() },
     { code: 'ArrowUp', ctrlOrMeta: true, preventDefault: true, condition: () => inPractice, handler: () => handleSkip('prev') },
     { code: 'ArrowDown', ctrlOrMeta: true, preventDefault: true, condition: () => inPractice, handler: () => handleSkip('next') },
     { code: 'KeyN', metaKey: true, shiftKey: true, condition: () => inPractice, handler: (e: KeyboardEvent) => handleAddToAnkiShortcut(e) },
-  ]), [inPractice, mode, blurStepPaused, handleReplayCurrent, togglePlay, handleContinue, handleSkip, handleAddToAnkiShortcut]);
+  ]), [inPractice, mode, blurStepPaused, replayCurrent, togglePlayOrStep, handleContinue, handleSkip, handleAddToAnkiShortcut]);
 
   useKeyboardShortcuts(keyboardShortcuts);
 
@@ -261,8 +285,10 @@ export default function App() {
         onRestart: restartPractice,
         onSwitchSection: (index: number) => switchSection(index, videoRef, setIsPlaying),
         onToggleSavedList: setShowSavedList,
-        onTogglePlay: togglePlay,
-        onReplayCurrent: handleReplayCurrent,
+        onTogglePlay: togglePlayOrStep,
+        onReplayCurrent: replayCurrent,
+        onPlayFrom: playFrom,
+        onSetStepStart: setStepStart,
         onSkip: handleSkip,
         onProgressSeek: handleProgressSeek,
         onToggleSaveCurrent: toggleSaveCurrent,

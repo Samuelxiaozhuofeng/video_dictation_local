@@ -222,3 +222,70 @@ export async function loadOrBuildCloze(opts: {
   }
   return generated;
 }
+
+// --- Break it down: split one line into 2–3 chunks ---
+// The model returns chunk START indices into the line's word list plus one
+// note per chunk. The notes are the only free text it writes and are never
+// used to locate anything; any rule broken below throws the whole answer out.
+
+// One short line, and the user is sitting there waiting on it.
+const BREAKDOWN_TIMEOUT_MS = 30_000;
+
+export type Breakdown = { starts: number[]; notes: string[] };
+
+export function validateBreakdown(value: unknown, wordCount: number): Breakdown | null {
+  const v = value as { starts?: unknown; notes?: unknown } | null;
+  if (!v || !Array.isArray(v.starts) || !Array.isArray(v.notes)) return null;
+  const { starts, notes } = v as { starts: unknown[]; notes: unknown[] };
+  if (starts.length < 2 || starts.length > 3 || notes.length !== starts.length) return null;
+  if (starts[0] !== 0) return null;
+  for (let i = 0; i < starts.length; i++) {
+    const s = starts[i];
+    if (!Number.isInteger(s) || (s as number) < 0 || (s as number) >= wordCount) return null;
+    if (i > 0 && (s as number) <= (starts[i - 1] as number)) return null;
+  }
+  if (notes.some(n => typeof n !== 'string' || !n.trim())) return null;
+  return { starts: starts as number[], notes: (notes as string[]).map(n => n.trim()) };
+}
+
+export function parseBreakdownResponse(content: string, wordCount: number): Breakdown | null {
+  const fence = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const raw = fence ? fence[1] : content;
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try { return validateBreakdown(JSON.parse(match[0]), wordCount); } catch { return null; }
+}
+
+function breakdownPrompt(words: string[], lang: 'zh' | 'en'): string {
+  const listing = words.map((w, i) => `${i}\t${w}`).join('\n');
+  const noteLang = lang === 'zh' ? '简体中文' : 'English';
+  const example = lang === 'zh' ? '"looking for = 寻找"' : '"looking for = searching for"';
+  return `下面是一句口语转录，按「序号<TAB>词」列出，共 ${words.length} 个词。
+
+把它切成 2 到 3 块，切在意群的自然边界（从句、介词短语、停顿处），不要劈开固定搭配（如 tengo que、looking for）。
+只输出 JSON，格式：{"starts":[0,6,9],"notes":["…","…","…"]}
+- starts：每块第一个词的序号。第一个必须是 0，严格递增，都小于 ${words.length}。
+- notes：与 starts 一一对应，每条用一句简短的${noteLang}说明这一块的意思或用法，例如 ${example}。
+- JSON 以外不要输出任何文字。
+
+${listing}`;
+}
+
+export async function askBreakdown(words: string[], lang: 'zh' | 'en'): Promise<Breakdown | null> {
+  const router = clozeRouter();
+  if (!router || words.length === 0) return null;
+  const once = async (): Promise<Breakdown | null> => {
+    const res = await fetch(`${router.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${router.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: router.model, messages: [{ role: 'user', content: breakdownPrompt(words, lang) }] }),
+      signal: AbortSignal.timeout(BREAKDOWN_TIMEOUT_MS),
+    });
+    if (!res.ok) throw new Error(`router ${res.status}`);
+    const body = await readJsonBody<{ choices?: { message?: { content?: string } }[] }>(res);
+    const content = body?.choices?.[0]?.message?.content;
+    return typeof content === 'string' ? parseBreakdownResponse(content, words.length) : null;
+  };
+  // A network hiccup gets one retry; an answer that fails the checks does not.
+  try { return await once(); } catch { try { return await once(); } catch { return null; } }
+}

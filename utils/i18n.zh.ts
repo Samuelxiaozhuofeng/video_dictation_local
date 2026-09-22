@@ -226,6 +226,15 @@ export const zh: Record<keyof typeof en, string> = {
   'studio.clozeFullTitle': '每个词都要打',
   'studio.clozePreparing': '正在准备挖空 {done}/{total}',
   'studio.clozeNeedKey': '去设置里配 AI key 后可用轻松 / 适中',
+  'studio.breakdown': '拆开教我',
+  'studio.breakdownTitle': '把这句拆成 2–3 块，从句尾往前一块块练',
+  'studio.breakdownLoading': '正在拆…',
+  'studio.breakdownFailed': '这句拆不开',
+  'studio.breakdownNeedKey': '去设置里配 AI key 后可用拆开教我',
+  'studio.breakdownTooShort': '这句太短，不用拆',
+  'studio.breakdownStep': '拆开练 · 第 {current} / {total} 步',
+  'studio.breakdownQuit': '算了',
+  'studio.breakdownQuitTitle': '回到这一句的普通听写',
 
   // --- Transport.tsx ---
   'transport.rec': '录制',
@@ -249,6 +258,7 @@ export const zh: Record<keyof typeof en, string> = {
   'dictation.youTyped': '你打的',
   'dictation.expected': '应为：{word}',
   'dictation.hearAgain': '再听一遍',
+  'dictation.nextStep': '下一步',
   'dictation.checkTitle': '检查（最后一个词按 Enter）',
   'dictation.keyHint': 'Space 跳到下一个词 · ⌘X 偷看 · Shift+Space 重播',
 

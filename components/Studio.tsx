@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Play, Bookmark, Check, RotateCcw, PlayCircle, Home as HomeIcon, Pencil, EyeOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, Bookmark, Check, RotateCcw, PlayCircle, Home as HomeIcon, Pencil, EyeOff, Scissors } from 'lucide-react';
 import { PracticeMode, LearningMode, BlurPlaybackMode, ClozeLevel } from '../types';
 import * as AI from '../utils/ai';
 import * as Storage from '../utils/storage';
 import { usePracticeContext } from '../hooks/usePracticeContext';
+import { useBreakdown } from '../hooks/useBreakdown';
 import { Btn, Card, Stamp, Seg } from './ui';
 import DictationLine from './DictationLine';
 import BlurLine from './BlurLine';
@@ -78,6 +79,38 @@ const Studio: React.FC = () => {
     });
     return () => { cancelled = true; };
   }, [isBlur, effectiveLevel, rankedLines, lineTexts, clozeKey]);
+
+  // --- Break it down: practise the line's tail first, growing back to the whole line ---
+  // Only while typing a dictation line: leaving INPUT (feedback, a seek, a new
+  // line) drops any breakdown, so a late AI answer cannot start one elsewhere.
+  const bd = useBreakdown(videoId, fullSubtitles, !isBlur && mode === PracticeMode.INPUT ? currentSub : undefined);
+  const bdActive = bd.state.status === 'active' ? bd.state : null;
+  const bdStep = bdActive ? bdActive.steps[bdActive.step] : null;
+  const bdLast = !!bdActive && bdActive.step === bdActive.steps.length - 1;
+  // The last step is the whole line: finishing it moves on like a normal line.
+  const bdNext = () => { if (!bd.next()) { bd.cancel(); actions.onContinue(); } };
+
+  useEffect(() => {
+    actions.onSetStepStart(bdStep ? bdStep.startSec : null);
+    if (bdStep) actions.onPlayFrom(bdStep.startSec);
+  }, [bdStep]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => actions.onSetStepStart(null), []); // eslint-disable-line react-hooks/exhaustive-deps
+  // A correct line is replaying on its way to the next one; stop it so that
+  // auto-advance does not swallow the breakdown the user just asked for.
+  const startBreakdown = () => { if (isPlaying) actions.onTogglePlay(); bd.start(); };
+
+  // The global Enter shortcut only knows the app-wide FEEDBACK mode; a step's
+  // review needs its own.
+  useEffect(() => {
+    if (!bdActive?.reviewing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      e.preventDefault();
+      bdNext();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [bdActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setLevel = (level: ClozeLevel) => {
     if (level !== 'full' && !hasClozeAi) return;
@@ -193,17 +226,52 @@ const Studio: React.FC = () => {
                   <Btn tone="green" onClick={actions.onContinue}>{t('common.nextLine')} <ChevronRight size={16} /></Btn>
                 )}
               </div>
+            ) : bdActive && bdStep ? (
+              <div className="w-full flex flex-col items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Stamp tone="green-soft"><Scissors size={12} /> {t('studio.breakdownStep', { current: bdActive.step + 1, total: bdActive.steps.length })}</Stamp>
+                  <Btn size="sm" flat onClick={bd.cancel} title={t('studio.breakdownQuitTitle')}>{t('studio.breakdownQuit')}</Btn>
+                </div>
+                <DictationLine
+                  key={`${bdActive.lineId}-${bdActive.step}`}
+                  targetText={bdStep.text}
+                  mode={bdActive.reviewing ? PracticeMode.FEEDBACK : PracticeMode.INPUT}
+                  onComplete={() => (bdActive.reviewing ? bdNext() : bd.review())}
+                  onReplay={allRight => { if (allRight) bd.review(); actions.onPlayFrom(bdStep.startSec); }}
+                  onLookup={lookup}
+                  nextLabel={bdLast ? undefined : t('dictation.nextStep')}
+                />
+                {bdActive.reviewing && (
+                  <p className="max-w-2xl text-center text-sm sm:text-base text-ink/80 bg-paper border border-line rounded-md px-3 py-1.5 fade-in">{bdActive.notes[bdStep.chunk]}</p>
+                )}
+              </div>
             ) : mode === PracticeMode.LISTENING ? (
               <ListeningGhost text={currentSub.text} blanks={blanks} />
             ) : (
-              <DictationLine
-                targetText={currentSub.text}
-                mode={mode}
-                blanks={blanks}
-                onComplete={correct => (correct ? actions.onContinue() : actions.onInputComplete(correct))}
-                onReplay={actions.onReplayCurrent}
-                onLookup={lookup}
-              />
+              <div className="w-full">
+                <DictationLine
+                  targetText={currentSub.text}
+                  mode={mode}
+                  blanks={blanks}
+                  onComplete={correct => (correct ? actions.onContinue() : actions.onInputComplete(correct))}
+                  onReplay={actions.onReplayCurrent}
+                  onLookup={lookup}
+                />
+                {bd.available && mode === PracticeMode.INPUT && (
+                  <div className="mt-1 flex justify-center items-center gap-2 text-[11px] text-mute">
+                    <Btn
+                      size="sm" flat className="!text-mute disabled:opacity-40"
+                      disabled={!hasClozeAi || bd.tooShort || bd.state.status === 'loading'}
+                      onClick={startBreakdown}
+                      title={!hasClozeAi ? t('studio.breakdownNeedKey') : bd.tooShort ? t('studio.breakdownTooShort') : t('studio.breakdownTitle')}
+                    >
+                      <Scissors size={13} /> {bd.state.status === 'loading' ? t('studio.breakdownLoading') : t('studio.breakdown')}
+                    </Btn>
+                    {!hasClozeAi && <span>{t('studio.breakdownNeedKey')}</span>}
+                    {bd.state.status === 'failed' && <span>{t('studio.breakdownFailed')}</span>}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </Card>

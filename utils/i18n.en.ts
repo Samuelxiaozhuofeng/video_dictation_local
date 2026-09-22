@@ -225,6 +225,15 @@ export const en = {
   'studio.clozeFullTitle': 'Type every word',
   'studio.clozePreparing': 'Preparing blanks {done}/{total}',
   'studio.clozeNeedKey': 'Add an AI key in Settings to use Easy / Medium',
+  'studio.breakdown': 'Break it down',
+  'studio.breakdownTitle': 'Split this line into 2–3 chunks and build it up from the end',
+  'studio.breakdownLoading': 'Breaking it down…',
+  'studio.breakdownFailed': "Couldn't break this line down",
+  'studio.breakdownNeedKey': 'Add an AI key in Settings to break lines down',
+  'studio.breakdownTooShort': 'This line is too short to break down',
+  'studio.breakdownStep': 'Breaking down · step {current} / {total}',
+  'studio.breakdownQuit': 'Never mind',
+  'studio.breakdownQuitTitle': 'Back to normal dictation for this line',
 
   // --- Transport.tsx ---
   'transport.rec': 'Rec',
@@ -248,6 +257,7 @@ export const en = {
   'dictation.youTyped': 'You typed',
   'dictation.expected': 'Expected: {word}',
   'dictation.hearAgain': 'Hear again',
+  'dictation.nextStep': 'Next step',
   'dictation.checkTitle': 'Check (Enter on last word)',
   'dictation.keyHint': 'Space moves to the next word · ⌘X peeks · Shift+Space replays',
 

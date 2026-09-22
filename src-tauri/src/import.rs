@@ -655,6 +655,18 @@ fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str, quality: u32)
   // whisper's own line breaks, so a failure here must not fail the import.
   let words = read_words(&json).ok().filter(|w: &Vec<Word>| !w.is_empty());
   let _ = std::fs::remove_file(&json);
+  // Only whisper can produce these, so keep them for "break it down" before
+  // `done` lets the front end open the record. Named by record id, never by
+  // video file name: two lesson.mp4 files would overwrite each other. A failed
+  // write just means this video has no word timings; the import still succeeds.
+  if let Some(w) = &words {
+    let saved = serde_json::to_string(w)
+      .map_err(|e| e.to_string())
+      .and_then(|text| crate::cache::write_cache(id.to_string(), "words".into(), text));
+    if let Err(e) = saved {
+      log::error!("write words cache for {id}: {e}");
+    }
+  }
   let video_path = video.to_string_lossy().into_owned();
   emit(
     app,
