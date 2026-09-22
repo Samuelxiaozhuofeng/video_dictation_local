@@ -217,6 +217,14 @@ export const en = {
   'studio.startOver': 'Start over',
   'studio.backToVideosBtn': 'Back to videos',
   'studio.listening': 'Listening',
+  'studio.clozeEasy': 'Easy',
+  'studio.clozeMedium': 'Medium',
+  'studio.clozeFull': 'Full',
+  'studio.clozeEasyTitle': 'Type 2–3 words; the rest are shown',
+  'studio.clozeMediumTitle': 'Type about half the words',
+  'studio.clozeFullTitle': 'Type every word',
+  'studio.clozePreparing': 'Preparing blanks {done}/{total}',
+  'studio.clozeNeedKey': 'Add an AI key in Settings to use Easy / Medium',
 
   // --- Transport.tsx ---
   'transport.rec': 'Rec',

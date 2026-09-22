@@ -248,6 +248,7 @@ export default function App() {
   ) : (
     <PracticeProvider
       practice={{
+        videoId: currentVideoId,
         subtitles, fullSubtitles, sections, currentSectionIndex, currentSubtitleIndex, mode,
         showSectionComplete, showComplete, learningMode, blurPlaybackMode,
         videoName: videoFileName || 'Video',

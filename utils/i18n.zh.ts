@@ -218,6 +218,14 @@ export const zh: Record<keyof typeof en, string> = {
   'studio.startOver': '重新开始',
   'studio.backToVideosBtn': '回到视频列表',
   'studio.listening': '播放中',
+  'studio.clozeEasy': '轻松',
+  'studio.clozeMedium': '适中',
+  'studio.clozeFull': '全写',
+  'studio.clozeEasyTitle': '只打 2–3 个词，其余直接给出',
+  'studio.clozeMediumTitle': '大约一半的词要打',
+  'studio.clozeFullTitle': '每个词都要打',
+  'studio.clozePreparing': '正在准备挖空 {done}/{total}',
+  'studio.clozeNeedKey': '去设置里配 AI key 后可用轻松 / 适中',
 
   // --- Transport.tsx ---
   'transport.rec': '录制',

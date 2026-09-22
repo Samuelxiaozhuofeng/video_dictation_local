@@ -44,11 +44,15 @@ export interface SavedLine {
   timeDisplay: string; // e.g. "01:23"
 }
 
+// How many words the user types in dictation. Global (all videos share one).
+export type ClozeLevel = 'easy' | 'medium' | 'full';
+
 // Practice Configuration
 export interface PracticeConfig {
   sectionLength: number; // in minutes. 0 means "Full Video" (no sections)
   learningMode?: LearningMode; // Default learning mode for new videos
   blurPlaybackMode?: BlurPlaybackMode; // Default playback mode for blur mode
+  clozeLevel?: ClozeLevel; // Dictation blank density; default 'full'
 }
 
 export interface VideoSection {

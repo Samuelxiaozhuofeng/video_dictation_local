@@ -1,4 +1,4 @@
-import { SavedLine, Subtitle, PracticeConfig, AudioPaddingConfig } from '../types';
+import { SavedLine, Subtitle, PracticeConfig, AudioPaddingConfig, ClozeLevel } from '../types';
 
 const STORAGE_KEY = 'linguaclip_saved_lines';
 const STORAGE_KEY_PRACTICE = 'linguaclip_practice_config';
@@ -61,12 +61,21 @@ export const clearStorage = () => {
 // stays available in Settings, it just is not what you get by default.
 export const DEFAULT_SECTION_LENGTH = 4;
 
+const parseClozeLevel = (value: unknown): ClozeLevel =>
+  value === 'easy' || value === 'medium' || value === 'full' ? value : 'full';
+
 export const getPracticeConfig = (): PracticeConfig => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY_PRACTICE);
-    return stored ? JSON.parse(stored) : { sectionLength: DEFAULT_SECTION_LENGTH };
+    if (!stored) return { sectionLength: DEFAULT_SECTION_LENGTH, clozeLevel: 'full' };
+    const parsed = JSON.parse(stored);
+    return {
+      ...parsed,
+      sectionLength: parsed.sectionLength ?? DEFAULT_SECTION_LENGTH,
+      clozeLevel: parseClozeLevel(parsed.clozeLevel),
+    };
   } catch (e) {
-    return { sectionLength: DEFAULT_SECTION_LENGTH };
+    return { sectionLength: DEFAULT_SECTION_LENGTH, clozeLevel: 'full' };
   }
 };
 

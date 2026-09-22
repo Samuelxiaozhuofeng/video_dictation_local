@@ -2,6 +2,7 @@ import React, { createContext, useContext } from 'react';
 import { PracticeMode, Subtitle, VideoSection, AnkiConfig, LearningMode, BlurPlaybackMode } from '../types';
 
 export interface PracticeContextPractice {
+  videoId: string | null;
   subtitles: Subtitle[];
   fullSubtitles: Subtitle[];
   sections: VideoSection[];

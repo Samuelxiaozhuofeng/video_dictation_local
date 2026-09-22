@@ -16,12 +16,25 @@ interface Props {
   onComplete: (wasCorrect: boolean) => void;
   onReplay: (autoAdvanceAfter?: boolean) => void;
   onLookup: (word: string) => void;
+  blanks?: number[]; // word indices the user types; omit = every word
 }
 
-const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay, onLookup }) => {
+const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay, onLookup, blanks }) => {
   const t = useT();
   const tokens = useMemo(() => tokenizeText(targetText), [targetText]);
   const wordTokens = useMemo(() => getWordTokens(tokens), [tokens]);
+  const blankSet = useMemo(() => blanks ? new Set(blanks) : null, [blanks]);
+  const isBlank = (i: number) => blankSet === null || blankSet.has(i);
+  const stepBlank = (from: number, dir: number) => {
+    for (let i = from + dir; i >= 0 && i < wordTokens.length; i += dir) {
+      if (isBlank(i)) return i;
+    }
+    return -1;
+  };
+  const firstBlank = () => {
+    for (let i = 0; i < wordTokens.length; i++) if (isBlank(i)) return i;
+    return 0;
+  };
 
   const [inputs, setInputs] = useState<string[]>([]);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
@@ -31,11 +44,11 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
 
   useEffect(() => {
     if (mode === PracticeMode.INPUT) {
-      setInputs(new Array(wordTokens.length).fill(''));
+      setInputs(wordTokens.map((w, i) => isBlank(i) ? '' : w.value));
       refs.current = refs.current.slice(0, wordTokens.length);
-      setTimeout(() => refs.current[0]?.focus(), 50);
+      setTimeout(() => refs.current[firstBlank()]?.focus(), 50);
     }
-  }, [mode, targetText, wordTokens.length]);
+  }, [mode, targetText, wordTokens, blankSet]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const clearPeek = () => {
     if (peekTimer.current) window.clearTimeout(peekTimer.current);
@@ -58,8 +71,9 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
     next[i] = value;
     setInputs(next);
     if (!isInputCorrectFlexibleCase(value, wordTokens[i].value)) return;
-    if (i < wordTokens.length - 1) {
-      setTimeout(() => refs.current[i + 1]?.focus(), 100);
+    const nxt = stepBlank(i, 1);
+    if (nxt >= 0) {
+      setTimeout(() => refs.current[nxt]?.focus(), 100);
     } else if (areAllWordsCorrectFlexibleCase(tokens, next)) {
       clearReplay();
       replayTimer.current = window.setTimeout(() => onReplay(true), 200); // all right: replay once, then auto-advance
@@ -78,13 +92,17 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x') { e.preventDefault(); showPeek(i); return; }
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
-      if (i < wordTokens.length - 1) refs.current[i + 1]?.focus(); else submit();
-    } else if (e.key === 'Backspace' && inputs[i] === '' && i > 0) {
-      e.preventDefault(); refs.current[i - 1]?.focus();
-    } else if (e.key === 'ArrowLeft' && i > 0 && e.currentTarget.selectionStart === 0) {
-      e.preventDefault(); refs.current[i - 1]?.focus();
-    } else if (e.key === 'ArrowRight' && i < wordTokens.length - 1 && e.currentTarget.selectionStart === e.currentTarget.value.length) {
-      e.preventDefault(); refs.current[i + 1]?.focus();
+      const nxt = stepBlank(i, 1);
+      if (nxt >= 0) refs.current[nxt]?.focus(); else submit();
+    } else if (e.key === 'Backspace' && inputs[i] === '') {
+      const prev = stepBlank(i, -1);
+      if (prev >= 0) { e.preventDefault(); refs.current[prev]?.focus(); }
+    } else if (e.key === 'ArrowLeft' && e.currentTarget.selectionStart === 0) {
+      const prev = stepBlank(i, -1);
+      if (prev >= 0) { e.preventDefault(); refs.current[prev]?.focus(); }
+    } else if (e.key === 'ArrowRight' && e.currentTarget.selectionStart === e.currentTarget.value.length) {
+      const nxt = stepBlank(i, 1);
+      if (nxt >= 0) { e.preventDefault(); refs.current[nxt]?.focus(); }
     }
   };
 
@@ -92,10 +110,11 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
     e.preventDefault();
     const words = e.clipboardData.getData('text').trim().split(/\s+/);
     const next = [...inputs];
-    const limit = Math.min(words.length, wordTokens.length);
-    for (let i = 0; i < limit; i++) next[i] = words[i];
+    const slots = wordTokens.map((_, i) => i).filter(i => isBlank(i));
+    const limit = Math.min(words.length, slots.length);
+    for (let k = 0; k < limit; k++) next[slots[k]] = words[k];
     setInputs(next);
-    refs.current[Math.min(limit, wordTokens.length - 1)]?.focus();
+    refs.current[slots[Math.min(limit, slots.length - 1)] ?? firstBlank()]?.focus();
   };
 
   const lookup = (raw: string) => {
@@ -120,6 +139,8 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
           <span className="text-[11px] font-sans text-mute mr-2">{t('dictation.youTyped')}</span>
           {tokens.map((tk, i) => {
             if (tk.type === TokenType.WORD) {
+              const wi = wordTokens.findIndex(w => w.index === tk.index);
+              if (wi >= 0 && !isBlank(wi)) return null;
               const r = results.find(x => x.tokenIndex === tk.index);
               if (!r) return null;
               return (
@@ -150,6 +171,9 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
         {tokens.map((tk: Token, ti: number) => {
           if (tk.type === TokenType.WORD) {
             const i = wi++;
+            if (!isBlank(i)) {
+              return <span key={ti} className="font-mono text-xl sm:text-2xl text-ink/70 select-none px-0.5">{tk.value}</span>;
+            }
             const ok = !!inputs[i] && isInputCorrectFlexibleCase(inputs[i], tk.value);
             return (
               <div key={ti} className="relative inline-flex">
@@ -175,7 +199,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
           if (tk.type === TokenType.PUNCTUATION) return <span key={ti} className="font-mono text-xl sm:text-2xl text-mute select-none">{tk.value}</span>;
           return null;
         })}
-        <Btn type="submit" tone="green" square disabled={inputs.every(w => w === '')} className="ml-2" title={t('dictation.checkTitle')}>
+        <Btn type="submit" tone="green" square disabled={wordTokens.every((_, i) => !isBlank(i) || !(inputs[i] || '').trim())} className="ml-2" title={t('dictation.checkTitle')}>
           <Send size={18} />
         </Btn>
       </form>

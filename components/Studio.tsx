@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Play, Bookmark, Check, RotateCcw, PlayCircle, Home as HomeIcon, Pencil, EyeOff } from 'lucide-react';
-import { PracticeMode, LearningMode, BlurPlaybackMode } from '../types';
+import { PracticeMode, LearningMode, BlurPlaybackMode, ClozeLevel } from '../types';
 import * as AI from '../utils/ai';
 import * as Storage from '../utils/storage';
 import { usePracticeContext } from '../hooks/usePracticeContext';
@@ -12,12 +12,14 @@ import SavedDrawer from './SavedDrawer';
 import DefinitionPanel, { DefinitionState, emptyDefinition } from './DefinitionPanel';
 import { tokenizeText, getWordTokens } from '../utils/textTokenizer';
 import { useT } from '../utils/i18n';
+import { canCloze, loadOrBuildCloze, pickBlanks } from '../utils/aiDrills';
+import { readCacheText, writeCacheText } from '../utils/desktop';
 
 // The practice room: a TV (video) over a chyron (the line you work on) over a remote (Transport).
 const Studio: React.FC = () => {
   const t = useT();
   const { practice, video, saved, anki, actions } = usePracticeContext();
-  const { subtitles, fullSubtitles, sections, currentSectionIndex, currentSubtitleIndex, mode, showSectionComplete, showComplete, learningMode, blurPlaybackMode, videoName } = practice;
+  const { videoId, subtitles, fullSubtitles, sections, currentSectionIndex, currentSubtitleIndex, mode, showSectionComplete, showComplete, learningMode, blurPlaybackMode, videoName } = practice;
   const { videoRef, videoSrc, isPlaying } = video;
   const { savedIds, showSavedList } = saved;
   const { ankiStatus } = anki;
@@ -25,6 +27,63 @@ const Studio: React.FC = () => {
   const currentSub = subtitles[currentSubtitleIndex];
   const isBlur = learningMode === LearningMode.BLUR;
   const isStep = blurPlaybackMode === BlurPlaybackMode.SENTENCE_BY_SENTENCE;
+  const hasClozeAi = canCloze();
+  const [clozeLevel, setClozeLevel] = useState<ClozeLevel>(() => Storage.getPracticeConfig().clozeLevel ?? 'full');
+  const [rankedLines, setRankedLines] = useState<(number[] | null)[] | null>(null);
+  const [clozeProgress, setClozeProgress] = useState<{ done: number; total: number } | null>(null);
+  const effectiveLevel: ClozeLevel = hasClozeAi ? clozeLevel : 'full';
+  const lineTexts = useMemo(() => fullSubtitles.map(s => s.text), [fullSubtitles]);
+  // The record id alone keys the cache; the line texts ride along in the hash
+  // inside the cache file, so a re-cut subtitle invalidates it there, not here.
+  const clozeKey = videoId ?? '';
+  const lineIndex = currentSub ? fullSubtitles.findIndex(s => s.id === currentSub.id) : -1;
+  const wordN = currentSub ? getWordTokens(tokenizeText(currentSub.text)).length : 0;
+  const blanks = useMemo(
+    () => pickBlanks(rankedLines?.[lineIndex] ?? null, wordN, effectiveLevel),
+    [rankedLines, lineIndex, wordN, effectiveLevel],
+  );
+  const clozeJob = useRef<{ key: string; promise: Promise<(number[] | null)[]> } | null>(null);
+
+  useEffect(() => {
+    setRankedLines(null);
+    setClozeProgress(null);
+    clozeJob.current = null;
+  }, [clozeKey]);
+
+  useEffect(() => {
+    if (isBlur || effectiveLevel === 'full' || rankedLines || lineTexts.length === 0) return;
+    let cancelled = false;
+    const jobKey = clozeKey;
+    if (!clozeJob.current || clozeJob.current.key !== jobKey) {
+      clozeJob.current = {
+        key: jobKey,
+        promise: (async () => {
+          return loadOrBuildCloze({
+            lineTexts,
+            recordId: videoId,
+            subtitleText: lineTexts.join('\n'),
+            readText: id => readCacheText(id, 'cloze'),
+            writeText: (id, text) => writeCacheText(id, 'cloze', text),
+            onProgress: (done, total) => { if (clozeJob.current?.key === jobKey) setClozeProgress({ done, total }); },
+          });
+        })(),
+      };
+    }
+    clozeJob.current.promise.then(ranked => {
+      if (cancelled) return;
+      setRankedLines(ranked);
+      setClozeProgress(null);
+    }).catch(() => {
+      if (!cancelled) setClozeProgress(null);
+    });
+    return () => { cancelled = true; };
+  }, [isBlur, effectiveLevel, rankedLines, lineTexts, clozeKey]);
+
+  const setLevel = (level: ClozeLevel) => {
+    if (level !== 'full' && !hasClozeAi) return;
+    setClozeLevel(level);
+    Storage.savePracticeConfig({ ...Storage.getPracticeConfig(), clozeLevel: level });
+  };
 
   // --- Word lookup (shared by both modes) ---
   const [def, setDef] = useState<DefinitionState>(emptyDefinition);
@@ -106,11 +165,21 @@ const Studio: React.FC = () => {
               <Stamp tone="ochre-soft">{t('studio.lineCount', { current: currentSubtitleIndex + 1, total: subtitles.length })}</Stamp>
               {currentSub && <span className="text-mute">{Storage.formatTimeCode(currentSub.startTime)} – {Storage.formatTimeCode(currentSub.endTime)}</span>}
             </div>
-            {isBlur && (
+            {isBlur ? (
               <Seg size="sm" value={blurPlaybackMode} onChange={actions.onSetBlurPlaybackMode} options={[
                 { value: BlurPlaybackMode.SENTENCE_BY_SENTENCE, label: t('studio.stepLabel'), title: t('studio.stepTitle') },
                 { value: BlurPlaybackMode.CONTINUOUS, label: t('studio.flowLabel'), title: t('studio.flowTitle') },
               ]} />
+            ) : (
+              <div className="flex items-center gap-2">
+                <Seg size="sm" value={effectiveLevel} onChange={setLevel} options={[
+                  { value: 'easy', label: hasClozeAi ? t('studio.clozeEasy') : <span className="opacity-40">{t('studio.clozeEasy')}</span>, title: hasClozeAi ? t('studio.clozeEasyTitle') : t('studio.clozeNeedKey') },
+                  { value: 'medium', label: hasClozeAi ? t('studio.clozeMedium') : <span className="opacity-40">{t('studio.clozeMedium')}</span>, title: hasClozeAi ? t('studio.clozeMediumTitle') : t('studio.clozeNeedKey') },
+                  { value: 'full', label: t('studio.clozeFull'), title: t('studio.clozeFullTitle') },
+                ]} />
+                {!hasClozeAi && <span className="text-[11px] text-mute max-w-[12rem] leading-tight">{t('studio.clozeNeedKey')}</span>}
+                {clozeProgress && effectiveLevel !== 'full' && <span className="text-[11px] text-mute">{t('studio.clozePreparing', clozeProgress)}</span>}
+              </div>
             )}
           </div>
 
@@ -125,11 +194,12 @@ const Studio: React.FC = () => {
                 )}
               </div>
             ) : mode === PracticeMode.LISTENING ? (
-              <ListeningGhost text={currentSub.text} />
+              <ListeningGhost text={currentSub.text} blanks={blanks} />
             ) : (
               <DictationLine
                 targetText={currentSub.text}
                 mode={mode}
+                blanks={blanks}
                 onComplete={correct => (correct ? actions.onContinue() : actions.onInputComplete(correct))}
                 onReplay={actions.onReplayCurrent}
                 onLookup={lookup}
@@ -167,15 +237,18 @@ const Studio: React.FC = () => {
   );
 };
 
-// One covered block per word while the line plays: shows how much is coming, not what.
-const ListeningGhost: React.FC<{ text: string }> = ({ text }) => {
+// One covered block per word while the line plays: given words show as text, blanks as dashes.
+const ListeningGhost: React.FC<{ text: string; blanks: number[] }> = ({ text, blanks }) => {
   const t = useT();
   const words = getWordTokens(tokenizeText(text));
+  const set = new Set(blanks);
   return (
     <div className="flex flex-col items-center gap-3">
       <div className="flex flex-wrap justify-center gap-x-3 gap-y-2 font-mono text-xl sm:text-2xl">
-        {words.map((w, i) => (
+        {words.map((w, i) => set.has(i) ? (
           <span key={i} className="inline-block h-8 border-b-2 border-dashed border-line" style={{ width: `${Math.max(3, w.value.length + 1)}ch` }} />
+        ) : (
+          <span key={i} className="inline-block h-8 text-ink/70 leading-8">{w.value}</span>
         ))}
       </div>
       <Stamp tone="green-soft"><span className="blink">●</span> {t('studio.listening')}</Stamp>

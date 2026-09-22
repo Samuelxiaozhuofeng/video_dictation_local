@@ -1,3 +1,4 @@
+mod cache;
 mod import;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -20,7 +21,8 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       import::start_import,
       import::open_youtube_login,
-      import::probe_import_sizes
+      import::probe_import_sizes,
+      cache::write_cache
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
