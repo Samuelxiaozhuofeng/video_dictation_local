@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FileVideo, Link2 } from 'lucide-react';
 import { pickVideoPath } from '../utils/desktop';
-import { isYouTubeUrl, startLocalImport, startUrlImport } from '../utils/importJob';
+import {
+  IMPORT_QUALITIES,
+  ImportQuality,
+  isYouTubeUrl,
+  probeImportSizes,
+  startLocalImport,
+  startUrlImport,
+} from '../utils/importJob';
 import { useT } from '../utils/i18n';
 import { dialog } from './Dialog';
 import { Btn, Card, inputCls } from './ui';
@@ -14,13 +21,67 @@ const LANGS = [
   { value: 'auto', key: 'import.langAuto' },
 ] as const;
 
+const QUALITY_KEYS = {
+  1080: 'import.quality1080',
+  720: 'import.quality720',
+  480: 'import.quality480',
+} as const;
+
+function formatMb(bytes: number): number {
+  return Math.max(1, Math.round(bytes / 1_000_000));
+}
+
 const ImportBox: React.FC = () => {
   const t = useT();
   const [url, setUrl] = useState('');
   const [lang, setLang] = useState('en');
+  const [quality, setQuality] = useState<ImportQuality>(1080);
   const [busy, setBusy] = useState(false);
+  const [sizes, setSizes] = useState<Partial<Record<ImportQuality, number>>>({});
+  const [sizesState, setSizesState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const trimmed = url.trim();
   const valid = isYouTubeUrl(trimmed);
+
+  useEffect(() => {
+    if (!valid) {
+      setSizes({});
+      setSizesState('idle');
+      return;
+    }
+    setSizes({});
+    setSizesState('loading');
+    let cancelled = false;
+    const handle = window.setTimeout(() => {
+      probeImportSizes(trimmed)
+        .then(result => {
+          if (cancelled) return;
+          const next: Partial<Record<ImportQuality, number>> = {};
+          for (const q of IMPORT_QUALITIES) {
+            const n = result[q];
+            if (typeof n === 'number' && n > 0) next[q] = n;
+          }
+          setSizes(next);
+          setSizesState('ready');
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setSizes({});
+          setSizesState('error');
+        });
+    }, 600);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [trimmed, valid]);
+
+  const qualityLabel = (q: ImportQuality): string => {
+    const label = t(QUALITY_KEYS[q]);
+    if (sizesState === 'loading') return `${label} · ${t('import.qualityQuerying')}`;
+    const bytes = sizes[q];
+    if (bytes) return t('import.qualityWithSize', { label, size: formatMb(bytes) });
+    return label;
+  };
 
   const fail = (err: unknown) => {
     console.error(err);
@@ -31,7 +92,7 @@ const ImportBox: React.FC = () => {
     if (!valid || busy) return;
     setBusy(true);
     try {
-      await startUrlImport(trimmed, lang);
+      await startUrlImport(trimmed, lang, quality);
       setUrl('');
     } catch (err) {
       fail(err);
@@ -85,12 +146,24 @@ const ImportBox: React.FC = () => {
                 <option key={opt.value} value={opt.value}>{t(opt.key)}</option>
               ))}
             </select>
+            <select
+              value={quality}
+              onChange={e => setQuality(Number(e.target.value) as ImportQuality)}
+              className={`sm:w-52 ${inputCls}`}
+            >
+              {IMPORT_QUALITIES.map(q => (
+                <option key={q} value={q}>{qualityLabel(q)}</option>
+              ))}
+            </select>
             <Btn tone="green" disabled={!valid || busy} onClick={runUrl}>
               {t('import.download')}
             </Btn>
           </div>
           {trimmed && !valid && (
             <p className="text-xs text-mute">{t('import.invalidUrl')}</p>
+          )}
+          {valid && sizesState === 'error' && (
+            <p className="text-xs text-mute">{t('import.qualitySizeFail')}</p>
           )}
           <div>
             <Btn tone="white" disabled={busy} onClick={runLocal}>

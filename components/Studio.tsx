@@ -62,7 +62,7 @@ const Studio: React.FC = () => {
   return (
     <div className="relative h-full flex flex-col bg-paper">
       {/* --- Top strip --- */}
-      <header className="shrink-0 h-14 border-b border-line bg-page pl-[80px] pr-3 sm:pr-4 flex items-center justify-between gap-3" data-tauri-drag-region>
+      <header className="shrink-0 h-14 border-b border-line bg-page pl-[80px] pr-3 sm:pr-4 flex items-center justify-between gap-3" data-tauri-drag-region="deep">
         <div className="flex items-center gap-3 min-w-0">
           <Btn size="sm" flat onClick={actions.onExit} title={t('studio.backToVideos')}><HomeIcon size={14} /> <span className="hidden sm:inline">{t('nav.videos')}</span></Btn>
           <span className="font-serif font-semibold truncate min-w-0" title={videoName}>{videoName}</span>

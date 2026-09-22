@@ -17,7 +17,11 @@ pub fn run() {
       }
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![import::start_import])
+    .invoke_handler(tauri::generate_handler![
+      import::start_import,
+      import::open_youtube_login,
+      import::probe_import_sizes
+    ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }

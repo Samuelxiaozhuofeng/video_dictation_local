@@ -1,0 +1,182 @@
+import { fetch } from '@tauri-apps/plugin-http';
+
+// Whisper breaks a transcript wherever its decoder happened to stop, which
+// regularly lands you a 12-second, 30-word line. Dictation on a line that long
+// stops testing listening and starts testing memory. So we hand the word list
+// to a model, ask only for cut points (never for text — it cannot mangle words
+// it is not allowed to rewrite), and rebuild the SRT around those cuts.
+
+export type Word = { w: string; from: number; to: number };
+
+const MODEL = 'cpa/gemini-3.8-flash-high';
+const TARGET_WORDS = 10;   // what we ask each line to be
+const MAX_WORDS = 16;      // hard ceiling we enforce ourselves
+const BATCH_WORDS = 250;   // one model call; keeps it counting reliably
+const TAIL_MS = 400;       // whisper's end times run a touch early
+const REQUEST_TIMEOUT_MS = 90_000;
+
+const BASE_URL = process.env.ROUTER9_BASE_URL || '';
+const BASE_KEY = process.env.ROUTER9_BASE_KEY || '';
+
+export function canResegment(): boolean {
+  return !!BASE_URL && !!BASE_KEY;
+}
+
+const ENDS_SENTENCE = /[.!?。！？…]["')\]]?$/;
+
+// Split into model-sized batches, preferring a sentence end so a batch boundary
+// is never also a bad cut point.
+function batches(words: Word[]): Word[][] {
+  const out: Word[][] = [];
+  let start = 0;
+  while (start < words.length) {
+    let end = Math.min(start + BATCH_WORDS, words.length);
+    if (end < words.length) {
+      for (let i = end; i > start + BATCH_WORDS / 2; i--) {
+        if (ENDS_SENTENCE.test(words[i - 1].w)) { end = i; break; }
+      }
+    }
+    out.push(words.slice(start, end));
+    start = end;
+  }
+  return out;
+}
+
+function prompt(words: Word[]): string {
+  const listing = words.map((w, i) => `${i}\t${w.w}`).join('\n');
+  return `下面是一段口语转录的逐词清单，每行是「序号<TAB>词」。
+
+请把它切成一系列短句，供听写练习使用。要求：
+- 每段目标 ${TARGET_WORDS} 个词左右（6-14 之间浮动），不得出现超过 ${MAX_WORDS} 个词的段。
+- 切点必须落在语义自然的地方：句末、从句边界、连词前、意群之间。绝不能把一个固定搭配或介词短语劈开。
+- 必须覆盖全部词，不重不漏。
+
+只输出 JSON，格式为每段起始词的序号数组，第一个必须是 0：
+{"starts":[0,11,23,...]}
+
+逐词清单：
+${listing}`;
+}
+
+// The router answers with a JSON body that sometimes has a trailing SSE
+// "data: [DONE]" glued to it.
+function readBody(raw: string): string {
+  const cleaned = raw.replace(/\s*data:\s*\[DONE\]\s*$/, '').trim();
+  const parsed = JSON.parse(cleaned);
+  const content = parsed?.choices?.[0]?.message?.content;
+  if (typeof content !== 'string') throw new Error('no content in response');
+  return content;
+}
+
+function readStarts(content: string, count: number): number[] {
+  const match = content.match(/\{[^{}]*"starts"[^{}]*\}/s);
+  if (!match) throw new Error('no starts array');
+  const starts = JSON.parse(match[0]).starts;
+  if (!Array.isArray(starts) || starts.length === 0) throw new Error('starts not an array');
+  if (starts[0] !== 0) throw new Error('starts must begin at 0');
+  for (let i = 0; i < starts.length; i++) {
+    const n = starts[i];
+    if (!Number.isInteger(n) || n < 0 || n >= count) throw new Error('start out of range');
+    if (i > 0 && n <= starts[i - 1]) throw new Error('starts not increasing');
+  }
+  return starts;
+}
+
+// A line the model left too long gets chopped evenly; better a clumsy cut than
+// a 30-word line, and this keeps the ceiling a promise rather than a request.
+function enforceCeiling(starts: number[], count: number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < starts.length; i++) {
+    const a = starts[i];
+    const b = i + 1 < starts.length ? starts[i + 1] : count;
+    out.push(a);
+    const len = b - a;
+    if (len > MAX_WORDS) {
+      const pieces = Math.ceil(len / MAX_WORDS);
+      const size = Math.ceil(len / pieces);
+      for (let p = a + size; p < b; p += size) out.push(p);
+    }
+  }
+  return out;
+}
+
+async function askOnce(words: Word[]): Promise<number[]> {
+  // Without a deadline a router that accepts the connection and then goes quiet
+  // leaves the import stuck on "shaping lines" with no way out.
+  const res = await fetch(`${BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${BASE_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: MODEL, messages: [{ role: 'user', content: prompt(words) }] }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`router ${res.status}`);
+  return readStarts(readBody(await res.text()), words.length);
+}
+
+async function ask(words: Word[]): Promise<number[]> {
+  try {
+    return await askOnce(words);
+  } catch {
+    return await askOnce(words); // one retry: the router 500s now and then
+  }
+}
+
+const stamp = (ms: number): string => {
+  const clamped = Math.max(0, Math.round(ms));
+  const h = Math.floor(clamped / 3600000);
+  const m = Math.floor(clamped / 60000) % 60;
+  const s = Math.floor(clamped / 1000) % 60;
+  const milli = clamped % 1000;
+  const pad = (n: number, w = 2) => String(n).padStart(w, '0');
+  return `${pad(h)}:${pad(m)}:${pad(s)},${pad(milli, 3)}`;
+};
+
+// Whisper's word times carry roughly a word of slop, so each line runs on until
+// the next one begins (capped, so a genuine pause is not dead air). Nothing
+// spoken falls between two lines that way.
+export function buildSrt(words: Word[], starts: number[]): string {
+  const blocks: string[] = [];
+  for (let i = 0; i < starts.length; i++) {
+    const a = starts[i];
+    const b = i + 1 < starts.length ? starts[i + 1] : words.length;
+    const slice = words.slice(a, b);
+    if (slice.length === 0) continue;
+    const text = slice.map(w => w.w).join(' ').trim();
+    if (!text) continue;
+    const from = slice[0].from;
+    const ownEnd = slice[slice.length - 1].to;
+    const nextStart = b < words.length ? words[b].from : Infinity;
+    const to = Math.max(from + 1, Math.min(nextStart, ownEnd + TAIL_MS));
+    blocks.push(`${blocks.length + 1}\n${stamp(from)} --> ${stamp(to)}\n${text}\n`);
+  }
+  return blocks.join('\n');
+}
+
+// Returns null whenever anything at all goes wrong; the caller then keeps
+// whisper's own line breaks, which are usable, just longer.
+export async function resegment(words: Word[]): Promise<string | null> {
+  if (!canResegment() || words.length === 0) return null;
+  try {
+    const groups = batches(words);
+    // An hour of speech is a dozen-odd calls at ~12s each; run a few at a time
+    // so a long video is not stuck on this step for minutes.
+    const offsets: number[] = [];
+    let running = 0;
+    for (const group of groups) { offsets.push(running); running += group.length; }
+    const results: number[][] = new Array(groups.length);
+    let next = 0;
+    await Promise.all(Array.from({ length: Math.min(4, groups.length) }, async () => {
+      while (next < groups.length) {
+        const i = next++;
+        results[i] = await ask(groups[i]);
+      }
+    }));
+    const starts: number[] = [];
+    results.forEach((local, i) => { for (const n of local) starts.push(offsets[i] + n); });
+    const srt = buildSrt(words, enforceCeiling(starts, words.length));
+    return srt.trim() ? srt : null;
+  } catch (err) {
+    console.error('resegment failed, keeping whisper line breaks:', err);
+    return null;
+  }
+}

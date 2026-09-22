@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AppState, PracticeMode, VideoRecord, LearningMode, BlurPlaybackMode } from './types';
 import SavedLibrary from './components/SavedLibrary';
 import Settings from './components/Settings';
-import Home, { NewPair } from './components/Home';
+import Home from './components/Home';
 import Shell from './components/Shell';
 import Studio from './components/Studio';
 import { DialogHost, dialog } from './components/Dialog';
@@ -155,9 +155,6 @@ export default function App() {
     setAppState(AppState.PRACTICE);
   };
 
-  const handleStartNew = (pair: NewPair, lm: LearningMode) =>
-    startPractice(fileNameFromPath(pair.videoPath), pair.videoPath, pair.srt, lm, BlurPlaybackMode.SENTENCE_BY_SENTENCE);
-
   const handleResume = async (record: VideoRecord, lm: LearningMode) => {
     if (record.importJob) return;
     try {
@@ -232,7 +229,7 @@ export default function App() {
     <Shell active={appState} onNav={setAppState}>
       {appState === AppState.SETTINGS ? <Settings /> :
        appState === AppState.LIBRARY ? <SavedLibrary /> :
-       <Home onStartNew={handleStartNew} onResume={handleResume} />}
+       <Home onResume={handleResume} />}
     </Shell>
   ) : (
     <PracticeProvider

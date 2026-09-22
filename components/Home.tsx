@@ -1,22 +1,27 @@
 import React, { useEffect, useState } from 'react';
-import { FileVideo, FileText, Pencil, EyeOff, Trash2, Clock, Loader2, Upload } from 'lucide-react';
+import { FileVideo, FileText, Pencil, EyeOff, Trash2, Clock, Loader2, Upload, KeyRound } from 'lucide-react';
 import { LearningMode, VideoRecord } from '../types';
 import * as VideoStorage from '../utils/videoStorage';
 import {
   fileNameFromPath, listenDragDrop, pickSubtitlePath, pickVideoPath, readSubtitleFile,
 } from '../utils/desktop';
-import { subscribeImportJobs } from '../utils/importJob';
-import { Btn, Card, Stamp, H } from './ui';
+import { formatImportError, isCookieError, openYouTubeLogin, startLocalImport, subscribeImportJobs } from '../utils/importJob';
+import { Btn, Card, Stamp, H, inputCls } from './ui';
 import { dialog } from './Dialog';
 import { useT, useLang } from '../utils/i18n';
 import ImportBox from './ImportBox';
 
-export interface NewPair { videoPath: string; srt: File }
-
 interface HomeProps {
-  onStartNew: (pair: NewPair, mode: LearningMode) => void | Promise<void>;
   onResume: (record: VideoRecord, mode: LearningMode) => void | Promise<void>;
 }
+
+const LANGS = [
+  { value: 'en', key: 'import.langEn' },
+  { value: 'es', key: 'import.langEs' },
+  { value: 'ja', key: 'import.langJa' },
+  { value: 'zh', key: 'import.langZh' },
+  { value: 'auto', key: 'import.langAuto' },
+] as const;
 
 const VIDEO_EXT = /\.(mp4|mov|m4v)$/i;
 const SRT_EXT = /\.(srt|txt|vtt)$/i;
@@ -39,11 +44,15 @@ const ModeButtons: React.FC<{ last?: LearningMode; onPick: (m: LearningMode) => 
   );
 };
 
-// One drop zone takes both files; each slot can also be browsed on its own.
-const DropZone: React.FC<{ onStart: (pair: NewPair, mode: LearningMode) => void }> = ({ onStart }) => {
+// Drop a video and the app writes its own subtitles: whisper transcribes it,
+// then the lines get re-cut into short ones. A subtitle file may still be
+// dropped alongside, but it is not what you practise against.
+const DropZone: React.FC = () => {
   const t = useT();
   const [videoPath, setVideoPath] = useState<string | null>(null);
   const [srt, setSrt] = useState<File | null>(null);
+  const [lang, setLang] = useState('en');
+  const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
   const videoName = videoPath ? fileNameFromPath(videoPath) : null;
 
@@ -92,7 +101,22 @@ const DropZone: React.FC<{ onStart: (pair: NewPair, mode: LearningMode) => void 
     }
   };
 
-  const ready = !!videoPath && !!srt;
+  const ready = !!videoPath;
+
+  const start = async () => {
+    if (!videoPath || busy) return;
+    setBusy(true);
+    try {
+      await startLocalImport(videoPath, lang);
+      setVideoPath(null);
+      setSrt(null);
+    } catch (err) {
+      console.error(err);
+      dialog.alert(t('import.startFailTitle'), t('import.startFailBody'));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Card
@@ -125,11 +149,19 @@ const DropZone: React.FC<{ onStart: (pair: NewPair, mode: LearningMode) => void 
           </button>
         </div>
 
-        <div className="lg:pl-5 lg:border-l lg:border-line shrink-0">
+        <div className="lg:pl-5 lg:border-l lg:border-line shrink-0 flex flex-col gap-2">
           {ready ? (
-            <ModeButtons size="lg" onPick={m => onStart({ videoPath: videoPath!, srt: srt! }, m)} />
+            <>
+              <div className="flex gap-2">
+                <select value={lang} onChange={e => setLang(e.target.value)} className={`w-32 ${inputCls}`}>
+                  {LANGS.map(opt => <option key={opt.value} value={opt.value}>{t(opt.key)}</option>)}
+                </select>
+                <Btn tone="green" size="lg" disabled={busy} onClick={start}>{t('home.makeSubtitles')}</Btn>
+              </div>
+              {srt && <span className="text-xs text-mute">{t('home.subtitlesIgnored')}</span>}
+            </>
           ) : (
-            <span className="text-sm text-mute">{t('home.thenPickMode')}</span>
+            <span className="text-sm text-mute">{t('home.thenPickVideo')}</span>
           )}
         </div>
       </div>
@@ -143,7 +175,7 @@ const Progress: React.FC<{ pct: number }> = ({ pct }) => (
   </div>
 );
 
-const Home: React.FC<HomeProps> = ({ onStartNew, onResume }) => {
+const Home: React.FC<HomeProps> = ({ onResume }) => {
   const t = useT();
   const lang = useLang();
   const [videos, setVideos] = useState<VideoRecord[] | null>(null);
@@ -172,6 +204,16 @@ const Home: React.FC<HomeProps> = ({ onStartNew, onResume }) => {
     return new Date(timestamp).toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US');
   };
 
+  const handleYouTubeLogin = async () => {
+    try {
+      await openYouTubeLogin();
+      dialog.alert(t('home.ytLoginTitle'), t('home.ytLoginBody'));
+    } catch (e) {
+      const missing = String(e).includes('missing:');
+      dialog.alert(t('home.ytLoginFailTitle'), missing ? t('home.ytLoginNoChrome') : t('home.ytLoginFailBody'));
+    }
+  };
+
   const handleDelete = async (v: VideoRecord) => {
     const ok = await dialog.confirm(t('home.deleteTitle'), t('home.deleteBody', { name: v.displayName }), { ok: t('home.deleteOk'), danger: true });
     if (!ok) return;
@@ -190,12 +232,13 @@ const Home: React.FC<HomeProps> = ({ onStartNew, onResume }) => {
     const pct = job.percent ?? 0;
     if (job.stage === 'download') return t('import.stageDownload', { pct });
     if (job.stage === 'transcribe') return t('import.stageTranscribe', { pct });
+    if (job.stage === 'segment') return t('import.stageSegment');
     return t('import.stageExtract');
   };
 
   return (
     <div className="space-y-10">
-      <DropZone onStart={onStartNew} />
+      <DropZone />
       <ImportBox />
 
       <section>
@@ -226,7 +269,16 @@ const Home: React.FC<HomeProps> = ({ onStartNew, onResume }) => {
                       <Progress pct={job.percent ?? 0} />
                     </>
                   )}
-                  {job?.error && <p className="text-sm text-rose">{job.error}</p>}
+                  {job?.error && (
+                    <div className="flex flex-col items-start gap-2">
+                      <p className="text-sm text-rose">{formatImportError(job.error)}</p>
+                      {isCookieError(job.error) && (
+                        <Btn flat tone="white" onClick={handleYouTubeLogin}>
+                          <KeyRound size={14} /> {t('home.ytLogin')}
+                        </Btn>
+                      )}
+                    </div>
+                  )}
                   {!job && (
                     <>
                       <Progress pct={v.completionRate} />

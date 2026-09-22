@@ -4,6 +4,7 @@ import { VideoRecord } from '../types';
 import { fileNameFromPath } from './desktop';
 import { t } from './i18n';
 import { parseSRT } from './srtParser';
+import { resegment, Word } from './resegment';
 import * as VideoStorage from './videoStorage';
 
 type ImportProgressPayload = {
@@ -13,6 +14,7 @@ type ImportProgressPayload = {
   error?: string;
   videoPath?: string;
   subtitleText?: string;
+  words?: Word[];
 };
 
 const listeners = new Set<() => void>();
@@ -28,6 +30,11 @@ function notify(): void {
   listeners.forEach(fn => fn());
 }
 
+export const IMPORT_QUALITIES = [1080, 720, 480] as const;
+export type ImportQuality = (typeof IMPORT_QUALITIES)[number];
+
+export type QualitySizes = Record<ImportQuality, number | null>;
+
 export function isYouTubeUrl(input: string): boolean {
   try {
     const u = new URL(input.trim());
@@ -39,8 +46,20 @@ export function isYouTubeUrl(input: string): boolean {
   }
 }
 
+// YouTube's bot gate has several wordings; they all mean "cookies missing or stale".
+export function isCookieError(raw: string): boolean {
+  return /Sign in to confirm|needs to be reloaded|confirm you.re not a bot|not a bot/i.test(raw);
+}
+
+export async function openYouTubeLogin(): Promise<void> {
+  await invoke('open_youtube_login');
+}
+
+// Records store the RAW error and translate here at render time, so switching
+// language re-translates it. Pre-existing records already hold a translated
+// sentence; it matches nothing below and falls through unchanged.
 export function formatImportError(raw: string): string {
-  if (raw.includes('Sign in to confirm')) return t('import.needCookies');
+  if (isCookieError(raw)) return t('import.needCookies');
   if (raw.startsWith('missing-model:')) {
     return t('import.missingModel', { name: raw.slice('missing-model:'.length) });
   }
@@ -83,13 +102,18 @@ function pendingRecord(id: string, source: string, fromUrl: boolean): VideoRecor
   };
 }
 
-async function startImport(source: string, lang: string, fromUrl: boolean): Promise<void> {
+async function startImport(
+  source: string,
+  lang: string,
+  fromUrl: boolean,
+  quality: ImportQuality,
+): Promise<void> {
   const id = crypto.randomUUID();
   const record = pendingRecord(id, source, fromUrl);
   await VideoStorage.updateVideoRecord(record);
   notify();
   try {
-    await invoke('start_import', { id, source, lang });
+    await invoke('start_import', { id, source, lang, quality });
   } catch (err) {
     const rec = await VideoStorage.getVideoRecord(id);
     if (!rec?.importJob) return;
@@ -102,12 +126,16 @@ async function startImport(source: string, lang: string, fromUrl: boolean): Prom
   }
 }
 
-export function startUrlImport(url: string, lang: string): Promise<void> {
-  return startImport(url.trim(), lang, true);
+export function startUrlImport(url: string, lang: string, quality: ImportQuality = 1080): Promise<void> {
+  return startImport(url.trim(), lang, true, quality);
 }
 
 export function startLocalImport(path: string, lang: string): Promise<void> {
-  return startImport(path, lang, false);
+  return startImport(path, lang, false, 1080);
+}
+
+export async function probeImportSizes(url: string): Promise<QualitySizes> {
+  return invoke('probe_import_sizes', { url: url.trim() });
 }
 
 function srtNameFromVideo(videoPath: string): string {
@@ -124,8 +152,16 @@ async function applyProgress(payload: ImportProgressPayload): Promise<void> {
 
   if (payload.stage === 'done') {
     const videoPath = payload.videoPath;
-    const subtitleText = payload.subtitleText ?? '';
     if (!videoPath) return;
+    // Last step of an import: re-cut whisper's lines into short, sensible ones.
+    // It can fail (no router, model hiccup); then we keep what whisper gave us.
+    await VideoStorage.updateVideoRecord({
+      ...rec,
+      importJob: { ...rec.importJob, stage: 'segment', percent: undefined },
+    });
+    notify();
+    const recut = payload.words ? await resegment(payload.words) : null;
+    const subtitleText = recut ?? payload.subtitleText ?? '';
     const name = fileNameFromPath(videoPath);
     const rest = { ...rec };
     delete rest.importJob;
@@ -147,7 +183,7 @@ async function applyProgress(payload: ImportProgressPayload): Promise<void> {
       ...rec,
       importJob: {
         ...rec.importJob,
-        error: formatImportError(payload.error ?? ''),
+        error: payload.error ?? '',
       },
     });
     return;
@@ -164,10 +200,14 @@ async function applyProgress(payload: ImportProgressPayload): Promise<void> {
 }
 
 function enqueueProgress(payload: ImportProgressPayload): void {
-  applyChain = applyChain
+  const run = applyChain
     .then(() => applyProgress(payload))
     .then(() => notify())
     .catch(err => console.error(err));
+  // Finishing an import waits on the re-cut, which can take a minute. It still
+  // runs after everything already queued, but a second import's progress must
+  // not queue up behind it.
+  if (payload.stage !== 'done') applyChain = run;
 }
 
 export async function startImportListener(): Promise<() => void> {

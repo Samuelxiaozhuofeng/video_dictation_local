@@ -7,6 +7,15 @@ use tauri::{AppHandle, Emitter};
 
 const EVENT: &str = "import-progress";
 
+// One spoken word with its own start/end, merged back together from whisper's
+// sub-word tokens. This is what lets the front end re-cut long lines by meaning.
+#[derive(Clone, serde::Serialize)]
+struct Word {
+  w: String,
+  from: u32,
+  to: u32,
+}
+
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ImportProgress {
@@ -20,6 +29,8 @@ struct ImportProgress {
   video_path: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   subtitle_text: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  words: Option<Vec<Word>>,
 }
 
 impl ImportProgress {
@@ -31,6 +42,7 @@ impl ImportProgress {
       error: None,
       video_path: None,
       subtitle_text: None,
+      words: None,
     }
   }
 }
@@ -57,6 +69,48 @@ fn home_dir() -> Result<PathBuf, String> {
 
 fn movies_dir() -> Result<PathBuf, String> {
   Ok(home_dir()?.join("Movies").join("LinguaClip"))
+}
+
+// A Chrome profile we own. Chrome's real profile dir is shielded by macOS app-data
+// protection (yt-dlp just reports "could not find cookies database"), but a dir of
+// ours is readable, so the user signs in once here and yt-dlp reads it directly.
+fn yt_login_dir() -> Result<PathBuf, String> {
+  Ok(movies_dir()?.join(".yt-login"))
+}
+
+// Chrome creates the cookie DB the moment it launches, so "file exists" would wrongly
+// claim a sign-in and make us drop a working cookies.txt. Cookie *names* sit in the
+// sqlite file as plain bytes (only values are encrypted), and LOGIN_INFO only appears
+// once a Google account is signed in — so scan for that name.
+// ponytail: byte scan, not sqlite; switch to a real sqlite read only if this misfires.
+fn db_shows_login(bytes: &[u8]) -> bool {
+  bytes.windows(10).any(|w| w == b"LOGIN_INFO")
+}
+
+fn yt_login_ready() -> bool {
+  let Ok(db) = yt_login_dir().map(|d| d.join("Default").join("Cookies")) else {
+    return false;
+  };
+  std::fs::read(&db).map(|b| db_shows_login(&b)).unwrap_or(false)
+}
+
+// Signed-in session first; a hand-exported cookies.txt stays as the fallback so
+// an existing working setup keeps working. Shared by download and size probe.
+fn yt_cookie_args(dir: &Path) -> Result<Vec<String>, String> {
+  if yt_login_ready() {
+    return Ok(vec![
+      "--cookies-from-browser".into(),
+      format!("chrome:{}", yt_login_dir()?.to_string_lossy()),
+    ]);
+  }
+  let cookies = dir.join("cookies.txt");
+  if cookies.is_file() {
+    return Ok(vec![
+      "--cookies".into(),
+      cookies.to_string_lossy().into_owned(),
+    ]);
+  }
+  Ok(Vec::new())
 }
 
 // Finder-launched apps get a bare PATH; yt-dlp needs node (YouTube's n-challenge)
@@ -140,6 +194,103 @@ fn looks_like_video_path(line: &str) -> bool {
   ok_ext && t.starts_with('/')
 }
 
+#[derive(Debug, PartialEq, Eq, serde::Serialize)]
+pub struct QualitySizes {
+  #[serde(rename = "1080")]
+  h1080: Option<u64>,
+  #[serde(rename = "720")]
+  h720: Option<u64>,
+  #[serde(rename = "480")]
+  h480: Option<u64>,
+}
+
+fn json_u64(v: &serde_json::Value) -> Option<u64> {
+  v.as_u64()
+    .or_else(|| v.as_i64().and_then(|n| u64::try_from(n).ok()))
+    .or_else(|| {
+      v.as_f64().and_then(|n| {
+        if n.is_finite() && n > 0.0 {
+          Some(n.round() as u64)
+        } else {
+          None
+        }
+      })
+    })
+}
+
+fn format_height(fmt: &serde_json::Value) -> Option<u32> {
+  fmt.get("height").and_then(json_u64).and_then(|n| u32::try_from(n).ok())
+}
+
+fn format_bytes(fmt: &serde_json::Value) -> Option<u64> {
+  fmt
+    .get("filesize")
+    .and_then(json_u64)
+    .or_else(|| fmt.get("filesize_approx").and_then(json_u64))
+    .filter(|&n| n > 0)
+}
+
+fn is_h264(fmt: &serde_json::Value) -> bool {
+  let c = fmt
+    .get("vcodec")
+    .and_then(|v| v.as_str())
+    .unwrap_or("")
+    .to_ascii_lowercase();
+  c.contains("avc1") || c.contains("h264")
+}
+
+fn is_m4a_audio(fmt: &serde_json::Value) -> bool {
+  let vcodec = fmt.get("vcodec").and_then(|v| v.as_str()).unwrap_or("none");
+  if vcodec != "none" && !vcodec.is_empty() {
+    return false;
+  }
+  let ext = fmt.get("ext").and_then(|v| v.as_str()).unwrap_or("");
+  let acodec = fmt
+    .get("acodec")
+    .and_then(|v| v.as_str())
+    .unwrap_or("")
+    .to_ascii_lowercase();
+  ext.eq_ignore_ascii_case("m4a") || acodec.starts_with("mp4a")
+}
+
+fn best_m4a_bytes(formats: &[serde_json::Value]) -> Option<u64> {
+  formats
+    .iter()
+    .filter(|f| is_m4a_audio(f))
+    .max_by_key(|f| {
+      let abr = f.get("abr").and_then(json_u64).unwrap_or(0);
+      let tbr = f.get("tbr").and_then(json_u64).unwrap_or(0);
+      (abr.max(tbr), format_bytes(f).unwrap_or(0))
+    })
+    .and_then(format_bytes)
+}
+
+fn video_bytes_for_cap(formats: &[serde_json::Value], cap: u32) -> Option<u64> {
+  formats
+    .iter()
+    .filter(|f| is_h264(f) && format_height(f).is_some_and(|h| h <= cap))
+    .max_by_key(|f| (format_height(f).unwrap_or(0), format_bytes(f).unwrap_or(0)))
+    .and_then(format_bytes)
+}
+
+fn parse_quality_sizes(json: &serde_json::Value) -> QualitySizes {
+  let empty: Vec<serde_json::Value> = Vec::new();
+  let formats = json
+    .get("formats")
+    .and_then(|v| v.as_array())
+    .unwrap_or(&empty);
+  let audio = best_m4a_bytes(formats);
+  let pair = |cap: u32| match (video_bytes_for_cap(formats, cap), audio) {
+    (Some(v), Some(a)) => Some(v.saturating_add(a)),
+    _ => None,
+  };
+  QualitySizes {
+    h1080: pair(1080),
+    h720: pair(720),
+    h480: pair(480),
+  }
+}
+
 fn run_streaming(mut cmd: Command, mut on_line: impl FnMut(&str)) -> Result<(i32, String), String> {
   cmd.stdout(Stdio::piped());
   cmd.stderr(Stdio::piped());
@@ -183,14 +334,21 @@ fn download_video(
   url: &str,
   yt_dlp: &Path,
   dir: &Path,
+  quality: u32,
 ) -> Result<PathBuf, String> {
   let template = dir.join("%(title).80s [%(id)s].%(ext)s");
-  let cookies = dir.join("cookies.txt");
-  let mut args: Vec<String> = Vec::new();
-  if cookies.is_file() {
-    args.push("--cookies".into());
-    args.push(cookies.to_string_lossy().into_owned());
-  }
+  let mut args: Vec<String> = yt_cookie_args(dir)?;
+  // The codec belongs in the filter, not only in `-S`: `-S` merely sorts, so a clip
+  // with no H.264 at this height would still download as VP9/AV1, which this Mac's
+  // player cannot show — and the file then sits on disk with no way to delete it from
+  // the app. Restricting the selector makes that case a visible error instead.
+  args.push("-f".into());
+  args.push(format!(
+    "bv*[height<={quality}][vcodec^=avc1]+ba[acodec^=mp4a]/b[height<={quality}][vcodec^=avc1]"
+  ));
+  // A watch URL copied out of a playlist carries `list=`; without this yt-dlp would
+  // fetch the whole playlist while the size we showed was for one video.
+  args.push("--no-playlist".into());
   args.push("-S".into());
   args.push("vcodec:h264,res:1080,acodec:m4a".into());
   args.push("--merge-output-format".into());
@@ -201,6 +359,9 @@ fn download_video(
   args.push("after_move:filepath".into());
   args.push("--no-simulate".into());
   args.push("--newline".into());
+  // `--print` puts yt-dlp in quiet mode, which swallows the `[download] xx%` lines;
+  // `--progress` brings them back without losing the filepath line we parse below.
+  args.push("--progress".into());
   args.push(url.trim().into());
 
   let mut cmd = Command::new(yt_dlp);
@@ -209,14 +370,19 @@ fn download_video(
   cmd.env("PATH", augmented_path());
 
   let mut last_path: Option<String> = None;
-  let mut last_pct: Option<u32> = None;
+  let mut shown_pct: u32 = 0;
   let (code, err_tail) = run_streaming(cmd, |line| {
     if looks_like_video_path(line) {
       last_path = Some(line.trim().to_string());
     }
     if let Some(pct) = parse_download_pct(line) {
-      if last_pct != Some(pct) {
-        last_pct = Some(pct);
+      // Video and audio are fetched as two passes that each count 0->100, so report a
+      // running max or the bar would snap back to zero partway through. Capped at 99
+      // because "download done" is the stage change, and the audio pass is a rounding
+      // error next to the video one.
+      let pct = pct.min(99);
+      if pct > shown_pct {
+        shown_pct = pct;
         emit(app, ImportProgress::stage(id, "download", Some(pct)));
       }
     }
@@ -296,9 +462,16 @@ fn transcribe(
     "--vad-model",
     vad_s,
     "-pp",
+    // Token-level timestamps via DTW. It only runs with flash attention off,
+    // and the aheads preset has to match the model we pin above.
+    "-nfa",
+    "--dtw",
+    "large.v3.turbo",
     "-f",
     wav_s,
     "-osrt",
+    "-oj",
+    "-ojf",
     "-of",
     stem_s,
   ]);
@@ -318,7 +491,96 @@ fn transcribe(
   Ok(())
 }
 
-fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str) -> Result<(), String> {
+// whisper emits sub-word tokens (" mer" + "cado"); a token that does not start
+// with a space continues the word before it. Punctuation rides along with its word.
+fn read_words(json_path: &Path) -> Result<Vec<Word>, String> {
+  let raw = std::fs::read_to_string(json_path).map_err(|e| format!("transcribe:{e}"))?;
+  let doc: serde_json::Value =
+    serde_json::from_str(&raw).map_err(|e| format!("transcribe:{e}"))?;
+  let segments = doc
+    .get("transcription")
+    .and_then(|v| v.as_array())
+    .ok_or_else(|| "transcribe:no transcription in json".to_string())?;
+
+  let mut words: Vec<Word> = Vec::new();
+  for seg in segments {
+    let Some(tokens) = seg.get("tokens").and_then(|v| v.as_array()) else {
+      return Err("transcribe:segment without tokens".into());
+    };
+    // With VAD on, whisper maps the SEGMENT times back onto the original audio
+    // but leaves the token times on the silence-stripped clock, so they drift
+    // further behind the longer the video runs. The segment's own start and end
+    // are the two points we know on both clocks: stretch the tokens onto them.
+    let seg_from = seg.pointer("/offsets/from").and_then(|v| v.as_i64());
+    let seg_to = seg.pointer("/offsets/to").and_then(|v| v.as_i64());
+    let speech: Vec<&serde_json::Value> = tokens
+      .iter()
+      .filter(|t| {
+        t.get("text")
+          .and_then(|v| v.as_str())
+          .is_some_and(|s| !s.starts_with("[_") && !s.trim().is_empty())
+      })
+      .collect();
+    let span = match (seg_from, seg_to, speech.first(), speech.last()) {
+      (Some(sf), Some(st), Some(first), Some(last)) => {
+        let tf = first.pointer("/offsets/from").and_then(|v| v.as_i64());
+        let tl = last.pointer("/offsets/to").and_then(|v| v.as_i64());
+        match (tf, tl) {
+          (Some(tf), Some(tl)) if tl > tf && st > sf => Some((tf, tl, sf, st)),
+          _ => None,
+        }
+      }
+      _ => None,
+    };
+    let to_audio = |t: i64| -> i64 {
+      match span {
+        Some((tf, tl, sf, st)) => sf + (t - tf) * (st - sf) / (tl - tf),
+        None => t,
+      }
+    };
+    for tok in tokens {
+      let Some(text) = tok.get("text").and_then(|v| v.as_str()) else {
+        return Err("transcribe:token without text".into());
+      };
+      if text.starts_with("[_") {
+        continue; // whisper's own markers, not speech
+      }
+      // A word placed at a guessed time is worse than no word timings at all:
+      // the front end would re-cut the lines around it and the audio would no
+      // longer match what is written. Refuse instead, and keep whisper's lines.
+      let (Some(raw_from), Some(raw_to)) = (
+        tok.pointer("/offsets/from").and_then(|v| v.as_i64()),
+        tok.pointer("/offsets/to").and_then(|v| v.as_i64()),
+      ) else {
+        return Err("transcribe:token without offsets".into());
+      };
+      let from = to_audio(raw_from).max(0) as u32;
+      let to = to_audio(raw_to).max(0) as u32;
+      let trimmed = text.trim();
+      if trimmed.is_empty() {
+        continue;
+      }
+      if text.starts_with(' ') || words.is_empty() {
+        words.push(Word { w: trimmed.to_string(), from, to });
+      } else {
+        let last = words.last_mut().expect("checked non-empty");
+        last.w.push_str(trimmed);
+        last.to = to;
+      }
+    }
+  }
+
+  // Times have to run forward. If they do not, the lines built from them would
+  // jump around the video, so drop the lot and let whisper's own lines stand.
+  if words.iter().any(|w| w.to < w.from)
+    || words.windows(2).any(|pair| pair[1].from < pair[0].from)
+  {
+    return Err("transcribe:word times out of order".into());
+  }
+  Ok(words)
+}
+
+fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str, quality: u32) -> Result<(), String> {
   let dir = movies_dir()?;
   std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
 
@@ -328,7 +590,7 @@ fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str) -> Result<(),
     }
     let yt = find_bin("yt-dlp")?;
     emit(app, ImportProgress::stage(id, "download", Some(0)));
-    download_video(app, id, source, &yt, &dir)?
+    download_video(app, id, source, &yt, &dir, quality)?
   } else {
     let p = PathBuf::from(source.trim());
     if !p.is_file() {
@@ -357,6 +619,7 @@ fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str) -> Result<(),
   let stem = dir.join(file_stem);
   let wav = stem.with_extension("wav");
   let srt = stem.with_extension("srt");
+  let json = stem.with_extension("json");
 
   emit(app, ImportProgress::stage(id, "extract", None));
   extract_wav(&ffmpeg, &video, &wav)?;
@@ -364,9 +627,21 @@ fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str) -> Result<(),
   emit(app, ImportProgress::stage(id, "transcribe", Some(0)));
   let result = transcribe(app, id, &whisper, &model, &vad, lang, &wav, &stem);
   let _ = std::fs::remove_file(&wav);
+  if result.is_err() {
+    // Whisper may have left a half-written json behind; it holds the whole
+    // transcript, so it must not pile up in the user's Movies folder.
+    let _ = std::fs::remove_file(&json);
+  }
   result?;
 
-  let subtitle_text = std::fs::read_to_string(&srt).map_err(|e| format!("transcribe:{e}"))?;
+  let subtitle_text = std::fs::read_to_string(&srt).map_err(|e| {
+    let _ = std::fs::remove_file(&json);
+    format!("transcribe:{e}")
+  })?;
+  // Word timings are a bonus: if they are missing the front end just keeps
+  // whisper's own line breaks, so a failure here must not fail the import.
+  let words = read_words(&json).ok().filter(|w: &Vec<Word>| !w.is_empty());
+  let _ = std::fs::remove_file(&json);
   let video_path = video.to_string_lossy().into_owned();
   emit(
     app,
@@ -377,13 +652,20 @@ fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str) -> Result<(),
       error: None,
       video_path: Some(video_path),
       subtitle_text: Some(subtitle_text),
+      words,
     },
   );
   Ok(())
 }
 
 #[tauri::command]
-pub fn start_import(app: AppHandle, id: String, source: String, lang: String) -> Result<(), String> {
+pub fn start_import(
+  app: AppHandle,
+  id: String,
+  source: String,
+  lang: String,
+  quality: u32,
+) -> Result<(), String> {
   if id.trim().is_empty() || source.trim().is_empty() {
     return Err("missing id or source".into());
   }
@@ -391,8 +673,11 @@ pub fn start_import(app: AppHandle, id: String, source: String, lang: String) ->
   if !matches!(lang.as_str(), "en" | "es" | "ja" | "zh" | "auto") {
     return Err("bad-lang".into());
   }
+  if !matches!(quality, 1080 | 720 | 480) {
+    return Err("bad-quality".into());
+  }
   thread::spawn(move || {
-    if let Err(e) = run_import(&app, &id, &source, &lang) {
+    if let Err(e) = run_import(&app, &id, &source, &lang, quality) {
       emit(
         &app,
         ImportProgress {
@@ -402,9 +687,204 @@ pub fn start_import(app: AppHandle, id: String, source: String, lang: String) ->
           error: Some(e),
           video_path: None,
           subtitle_text: None,
+          words: None,
         },
       );
     }
   });
   Ok(())
+}
+
+#[tauri::command]
+pub fn open_youtube_login() -> Result<(), String> {
+  const CHROME: &str = "Google Chrome";
+  if !Path::new("/Applications/Google Chrome.app").is_dir() {
+    return Err("missing:Google Chrome".into());
+  }
+  let dir = yt_login_dir()?;
+  std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+  // `-n` forces a second Chrome instance, so the user's own windows and session
+  // are untouched; the sign-in lands in our profile dir only.
+  let status = Command::new("open")
+    .args(["-na", CHROME, "--args"])
+    .arg(format!("--user-data-dir={}", dir.to_string_lossy()))
+    .args([
+      "--no-first-run",
+      "--no-default-browser-check",
+      "https://accounts.google.com/ServiceLogin?service=youtube&continue=https://www.youtube.com/",
+    ])
+    .status()
+    .map_err(|e| format!("login:{e}"))?;
+  if !status.success() {
+    return Err("login:could not launch Google Chrome".into());
+  }
+  Ok(())
+}
+
+// Asking YouTube takes a few seconds. A plain (non-async) command runs inline on
+// the main thread, which would freeze the window — including dragging it — for the
+// whole query, so hand the blocking work to a worker thread.
+#[tauri::command]
+pub async fn probe_import_sizes(url: String) -> Result<QualitySizes, String> {
+  tauri::async_runtime::spawn_blocking(move || probe_sizes_blocking(url))
+    .await
+    .map_err(|e| format!("probe:{e}"))?
+}
+
+fn probe_sizes_blocking(url: String) -> Result<QualitySizes, String> {
+  let url = url.trim().to_string();
+  if !is_youtube_url(&url) {
+    return Err("download:not a YouTube URL".into());
+  }
+  let yt = find_bin("yt-dlp")?;
+  let dir = movies_dir()?;
+  let mut cmd = Command::new(&yt);
+  cmd.env("PATH", augmented_path());
+  cmd.args(yt_cookie_args(&dir)?);
+  // Without a socket timeout a stalled connection leaves the dropdown on "checking…"
+  // for good, and every re-typed URL would start another yt-dlp that never exits.
+  cmd.args(["--socket-timeout", "15", "-J", "--no-playlist", &url]);
+  let output = cmd.output().map_err(|e| format!("probe:{e}"))?;
+  if !output.status.success() {
+    let err = String::from_utf8_lossy(&output.stderr);
+    return Err(format!("probe:{}", tail_chars(&err, 300)));
+  }
+  let json: serde_json::Value =
+    serde_json::from_slice(&output.stdout).map_err(|e| format!("probe:{e}"))?;
+  Ok(parse_quality_sizes(&json))
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  // With VAD on, whisper reports segment times on the original audio clock but
+  // leaves token times on the silence-stripped one. Unmapped, the gap grows all
+  // through a video (measured: 2.8s adrift by the one-minute mark), and every
+  // re-cut line would then play the wrong stretch of audio.
+  #[test]
+  fn maps_token_times_back_onto_the_original_audio_clock() {
+    let json = serde_json::json!({
+      "transcription": [{
+        "offsets": { "from": 10000, "to": 14000 },
+        "tokens": [
+          { "text": " uno",  "offsets": { "from": 7000, "to": 8000 } },
+          { "text": " dos",  "offsets": { "from": 8000, "to": 9000 } },
+          { "text": " tres", "offsets": { "from": 9000, "to": 11000 } }
+        ]
+      }]
+    });
+    let dir = std::env::temp_dir().join(format!("vadmap-test-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("t.json");
+    std::fs::write(&path, serde_json::to_string(&json).unwrap()).unwrap();
+
+    let words = read_words(&path).unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    // Tokens span 7000..11000 and the segment really runs 10000..14000, so the
+    // whole run shifts forward and the ends land on the segment's own edges.
+    assert_eq!(words[0].from, 10000, "first word starts where the segment does");
+    assert_eq!(words[2].to, 14000, "last word ends where the segment does");
+    assert_eq!(words[1].from, 11000);
+  }
+
+  // Times that run backwards would build lines that jump around the video, so
+  // the whole set is refused and whisper's own lines stand instead.
+  #[test]
+  fn refuses_word_times_that_run_backwards() {
+    let json = serde_json::json!({
+      "transcription": [
+        { "offsets": { "from": 5000, "to": 6000 },
+          "tokens": [{ "text": " tarde", "offsets": { "from": 5000, "to": 6000 } }] },
+        { "offsets": { "from": 1000, "to": 2000 },
+          "tokens": [{ "text": " pronto", "offsets": { "from": 1000, "to": 2000 } }] }
+      ]
+    });
+    let dir = std::env::temp_dir().join(format!("order-test-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("t.json");
+    std::fs::write(&path, serde_json::to_string(&json).unwrap()).unwrap();
+    let out = read_words(&path);
+    std::fs::remove_dir_all(&dir).ok();
+    assert!(out.is_err(), "backwards times must be refused, not passed on");
+  }
+
+
+  // whisper splits rare words across tokens and hands punctuation its own
+  // token; a line we hand the model has to read as whole words again.
+  #[test]
+  fn merges_sub_word_tokens_back_into_words() {
+    let json = serde_json::json!({
+      "transcription": [{
+        "tokens": [
+          { "text": "[_BEG_]", "offsets": { "from": 0, "to": 0 } },
+          { "text": " mer",    "offsets": { "from": 100, "to": 200 } },
+          { "text": "cado",    "offsets": { "from": 200, "to": 400 } },
+          { "text": ",",       "offsets": { "from": 400, "to": 430 } },
+          { "text": " está",   "offsets": { "from": 500, "to": 700 } }
+        ]
+      }]
+    });
+    let dir = std::env::temp_dir().join(format!("words-test-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("t.json");
+    std::fs::write(&path, serde_json::to_string(&json).unwrap()).unwrap();
+
+    let words = read_words(&path).unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+
+    assert_eq!(words.len(), 2);
+    assert_eq!(words[0].w, "mercado,");
+    assert_eq!(words[0].from, 100);
+    assert_eq!(words[0].to, 430, "punctuation extends the word it belongs to");
+    assert_eq!(words[1].w, "está");
+    assert_eq!(words[1].from, 500);
+  }
+
+  #[test]
+  fn login_marker_needs_a_real_sign_in() {
+    // A just-launched Chrome profile has a cookie DB but no account cookies.
+    assert!(!db_shows_login(b""));
+    assert!(!db_shows_login(b"SQLite format 3\0cookiesVISITOR_INFO1_LIVEYSCPREF"));
+    // Signing in adds LOGIN_INFO; names are plain bytes even though values are not.
+    assert!(db_shows_login(b"SQLite format 3\0cookies\x01LOGIN_INFO\x7f\x80junk"));
+    assert!(db_shows_login(b"LOGIN_INFO"));
+  }
+
+  #[test]
+  fn download_pct_parses_real_yt_dlp_progress_lines() {
+    // Captured from `yt-dlp --newline --progress` with the flags download_video uses.
+    assert_eq!(parse_download_pct("[download]   0.0% of  461.80MiB at    3.95KiB/s ETA 33:15:06"), Some(0));
+    assert_eq!(parse_download_pct("[download]   5.9% of  461.80MiB at    8.01MiB/s ETA 00:54"), Some(6));
+    assert_eq!(parse_download_pct("[download]  83.2% of  614.43KiB at    1.01MiB/s ETA 00:00"), Some(83));
+    assert_eq!(parse_download_pct("[download] 100% of  614.43KiB in 00:00:01 at 595.76KiB/s"), Some(100));
+    // The filepath line yt-dlp prints last must not look like progress.
+    assert_eq!(parse_download_pct("/Users/me/Movies/LinguaClip/Clip [abc].mp4"), None);
+  }
+
+  #[test]
+  fn yt_dlp_error_tail_keeps_the_head_of_the_last_error_line() {
+    assert_eq!(tail_chars("abcdef", 3), "def");
+    assert_eq!(tail_chars("ab", 5), "ab");
+  }
+
+  #[test]
+  fn quality_size_uses_h264_m4a_filesize_approx_and_missing() {
+    let json = serde_json::json!({
+      "formats": [
+        { "format_id": "137", "vcodec": "avc1.640028", "acodec": "none", "height": 1080 },
+        { "format_id": "136", "vcodec": "avc1.4d401f", "acodec": "none", "height": 720, "filesize": 200000000 },
+        { "format_id": "135", "vcodec": "avc1.4d401e", "acodec": "none", "height": 480, "filesize_approx": 100000000 },
+        { "format_id": "248", "vcodec": "vp9", "acodec": "none", "height": 1080, "filesize": 999999999 },
+        { "format_id": "140", "vcodec": "none", "acodec": "mp4a.40.2", "ext": "m4a", "abr": 128, "filesize": 10000000 },
+        { "format_id": "139", "vcodec": "none", "acodec": "mp4a.40.5", "ext": "m4a", "abr": 48, "filesize": 5000000 },
+        { "format_id": "251", "vcodec": "none", "acodec": "opus", "ext": "webm", "abr": 160, "filesize": 8000000 }
+      ]
+    });
+    let sizes = parse_quality_sizes(&json);
+    assert_eq!(sizes.h1080, None, "1080 avc1 has no filesize so the tier is missing");
+    assert_eq!(sizes.h720, Some(210000000));
+    assert_eq!(sizes.h480, Some(110000000));
+  }
 }

@@ -13,7 +13,11 @@ export default defineConfig(({ mode }) => {
       define: {
         // API Key is now optional - users can input their own in Settings
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || '')
+        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
+        // Re-cutting long subtitle lines goes through the local router; without
+        // these the app just keeps whisper's own line breaks.
+        'process.env.ROUTER9_BASE_URL': JSON.stringify(env.ROUTER9_BASE_URL || ''),
+        'process.env.ROUTER9_BASE_KEY': JSON.stringify(env.ROUTER9_BASE_KEY || '')
       },
       resolve: {
         alias: {
