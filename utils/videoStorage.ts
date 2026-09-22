@@ -187,15 +187,16 @@ export const formatLastPracticed = (timestamp: number): string => {
 /**
  * Remember the mode the user picked for this video (last-used wins).
  */
-export const updateVideoMode = async (
+// Re-reads the record before writing so a caller holding a stale copy can't roll back progress.
+export const patchVideoRecord = async (
   videoId: string,
-  patch: { learningMode?: LearningMode; blurPlaybackMode?: BlurPlaybackMode }
+  patch: Partial<Pick<VideoRecord, 'learningMode' | 'blurPlaybackMode' | 'videoPath'>>
 ): Promise<void> => {
   try {
     const record = await getVideoRecord(videoId);
     if (!record) return;
     await updateVideoRecord({ ...record, ...patch });
   } catch (error) {
-    console.error('Failed to update video mode:', error);
+    console.error('Failed to patch video record:', error);
   }
 };

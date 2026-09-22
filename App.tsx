@@ -143,10 +143,10 @@ export default function App() {
         const picked = await pickVideoPath();
         if (!picked) return;
         videoPath = picked;
-        await VideoStorage.updateVideoRecord({ ...record, videoPath });
+        await VideoStorage.patchVideoRecord(record.id, { videoPath });
       }
 
-      if (record.learningMode !== lm) await VideoStorage.updateVideoMode(record.id, { learningMode: lm });
+      if (record.learningMode !== lm) await VideoStorage.patchVideoRecord(record.id, { learningMode: lm });
       const finished = record.completionRate >= 100;
       await startPractice(
         record.videoFileName, videoPath, getSubtitleFileFromRecord(record), lm,
@@ -161,7 +161,7 @@ export default function App() {
 
   const setBlurPlaybackMode = (bpm: BlurPlaybackMode) => {
     setBlurPlaybackModeState(bpm);
-    if (currentVideoId) VideoStorage.updateVideoMode(currentVideoId, { blurPlaybackMode: bpm });
+    if (currentVideoId) VideoStorage.patchVideoRecord(currentVideoId, { blurPlaybackMode: bpm });
   };
 
   const {

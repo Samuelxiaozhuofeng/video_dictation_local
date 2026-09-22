@@ -117,17 +117,18 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
             const reader = new FileReader();
             reader.readAsDataURL(blob);
             reader.onloadend = () => {
-                const result = reader.result as string;
-                const base64 = result.includes(',') ? result.split(',')[1] : result;
-
                 // Restore state
                 video.currentTime = originalTime;
                 if (!wasPlaying) video.pause();
 
-                if (!done) {
-                    done = true;
-                    resolve({ base64, ext });
+                if (done) return;
+                done = true;
+                const result = reader.result;
+                if (typeof result !== 'string' || !result) {
+                    reject(reader.error ?? new Error('Audio encode failed'));
+                    return;
                 }
+                resolve({ base64: result.includes(',') ? result.split(',')[1] : result, ext });
             }
         };
 
