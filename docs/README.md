@@ -1,6 +1,6 @@
 # LinguaClip 技术速览（给 agent 看的）
 
-视频听写 / 遮字跟读练习工具。**只发 Mac 桌面版**（Tauri 2 + WKWebView），网页版已停维护，`npm run dev` 单独跑在浏览器里会因为 Tauri API 缺失而报错。
+视频听写 / 遮字跟读练习工具。**只发 Mac 桌面版**（Tauri 2 + WKWebView），网页版已停维护，`npm run dev` 单独跑在浏览器里时由 `dev/browserMock.ts` 冒充 Tauri 外壳，仅供开发验证（见 CLAUDE.md）。
 
 - 开发运行：`npx tauri dev`（自己拉起 vite:3000）
 - 打包：`npx tauri build` → `src-tauri/target/release/bundle/macos/LinguaClip.app`

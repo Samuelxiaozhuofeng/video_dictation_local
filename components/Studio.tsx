@@ -56,19 +56,19 @@ const Studio: React.FC = () => {
     let cancelled = false;
     const jobKey = clozeKey;
     if (!clozeJob.current || clozeJob.current.key !== jobKey) {
-      clozeJob.current = {
-        key: jobKey,
-        promise: (async () => {
-          return loadOrBuildCloze({
-            lineTexts,
-            recordId: videoId,
-            subtitleText: lineTexts.join('\n'),
-            readText: id => readCacheText(id, 'cloze'),
-            writeText: (id, text) => writeCacheText(id, 'cloze', text),
-            onProgress: (done, total) => { if (clozeJob.current?.key === jobKey) setClozeProgress({ done, total }); },
-          });
-        })(),
-      };
+      // Progress is gated on this exact job, not its key: a replaced job for the
+      // same video (StrictMode re-run, switching away and back) can report after
+      // the live one finished and leave "preparing 1/1" stuck on screen.
+      const job = { key: jobKey, promise: Promise.resolve<(number[] | null)[]>([]) };
+      clozeJob.current = job;
+      job.promise = loadOrBuildCloze({
+        lineTexts,
+        recordId: videoId,
+        subtitleText: lineTexts.join('\n'),
+        readText: id => readCacheText(id, 'cloze'),
+        writeText: (id, text) => writeCacheText(id, 'cloze', text),
+        onProgress: (done, total) => { if (clozeJob.current === job) setClozeProgress({ done, total }); },
+      });
     }
     clozeJob.current.promise.then(ranked => {
       if (cancelled) return;

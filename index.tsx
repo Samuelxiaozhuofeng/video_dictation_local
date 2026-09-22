@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import '@fontsource-variable/fraunces/opsz.css';
 import '@fontsource-variable/fraunces/opsz-italic.css';
 import '@fontsource/inter/400.css';
@@ -15,8 +16,15 @@ if (!rootElement) {
 }
 
 const root = ReactDOM.createRoot(rootElement);
-root.render(
+const render = () => root.render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
 );
+
+// Plain-browser `npm run dev`: fake the Tauri shell (dev/browserMock.ts).
+if (import.meta.env.DEV && !('__TAURI_INTERNALS__' in window)) {
+  import('./dev/browserMock').then(render);
+} else {
+  render();
+}

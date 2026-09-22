@@ -24,7 +24,7 @@ node test-resegment.mjs
 npm run release
 ```
 
-`npx tauri dev` starts Vite and the macOS desktop shell. `npm run release` builds the app and runs the installer script. `npm run dev` lacks the Tauri APIs required by the application.
+`npx tauri dev` starts Vite and the macOS desktop shell. `npm run release` builds the app and runs the installer script. `npm run dev` in a plain browser runs with `dev/browserMock.ts` faking the Tauri shell (dev-only; used for quick functional checks, see CLAUDE.md "验证流程"). When adding a Rust command or Tauri plugin call, add a matching case to `handle` in `dev/browserMock.ts`.
 
 ## Coding Style & Naming Conventions
 

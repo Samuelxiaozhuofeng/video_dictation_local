@@ -90,7 +90,12 @@ export function parseClozeCache(raw: string, srtHash: string, counts: number[]):
   try { data = JSON.parse(raw); } catch { return null; }
   if (data?.v !== 1 || data.srt !== srtHash || !Array.isArray(data.lines)) return null;
   if (data.lines.length !== counts.length) return null;
-  return data.lines.map((line, i) => validateIndices(line, counts[i]));
+  // null, or [] for a line that has words (older caches saved failed batches
+  // that way), means "not ranked yet" and gets asked again.
+  return data.lines.map((line, i) => {
+    const ranked = validateIndices(line, counts[i]);
+    return ranked && (ranked.length > 0 || counts[i] === 0) ? ranked : null;
+  });
 }
 
 function range(n: number): number[] {
@@ -206,21 +211,25 @@ export async function loadOrBuildCloze(opts: {
 }): Promise<(number[] | null)[]> {
   const counts = opts.lineTexts.map(lineWordCount);
   const srt = hashSrt(opts.subtitleText);
+  let cached: (number[] | null)[] | null = null;
   if (opts.recordId) {
     try {
       const raw = await opts.readText(opts.recordId);
-      if (raw) {
-        const parsed = parseClozeCache(raw, srt, counts);
-        if (parsed) return parsed;
-      }
+      if (raw) cached = parseClozeCache(raw, srt, counts);
     } catch { /* missing cache is fine */ }
   }
-  const generated = await generateCloze(opts.lineTexts, opts.onProgress);
-  if (opts.recordId) {
-    const body = JSON.stringify({ v: 1, srt, lines: generated.map(r => r ?? []) });
+  const result = cached ?? counts.map(() => null);
+  // Only ask about lines not ranked yet: a failed batch retries next time
+  // instead of being cached as "no blanks" for good.
+  const missing = counts.flatMap((n, i) => (n > 0 && !result[i] ? [i] : []));
+  if (missing.length === 0) return result;
+  const generated = await generateCloze(missing.map(i => opts.lineTexts[i]), opts.onProgress);
+  missing.forEach((li, k) => { result[li] = generated[k] ?? null; });
+  if (opts.recordId && generated.some(Boolean)) {
+    const body = JSON.stringify({ v: 1, srt, lines: result });
     try { await opts.writeText(opts.recordId, body); } catch { /* cache must not break practice */ }
   }
-  return generated;
+  return result;
 }
 
 // --- Break it down: split one line into 2–3 chunks ---

@@ -27,6 +27,7 @@ await build({
 });
 const {
   parseClozeResponse, parseClozeCache, pickBlanks, batchLinesByWords, hashSrt, BATCH_WORDS, BATCH_LINES,
+  loadOrBuildCloze,
 } = await import(out);
 
 const nWords = (n, prefix = 'w') => Array.from({ length: n }, (_, i) => `${prefix}${i}`).join(' ');
@@ -103,6 +104,29 @@ const nWords = (n, prefix = 'w') => Array.from({ length: n }, (_, i) => `${prefi
   assert.deepEqual(batches.flatMap(b => Array.from({ length: b.end - b.start }, (_, k) => b.start + k)),
     Array.from({ length: 100 }, (_, i) => i), 'batches cover every line exactly once');
   assert.ok(BATCH_WORDS <= 250 && BATCH_LINES <= 25, 'shipped caps stay within what the model answers reliably');
+}
+
+// 6. A failed AI call must not be cached as "no blanks": older caches stored
+// failed lines as [], which then read back as valid and never retried.
+{
+  const srt = 'a b\nc';
+  const poisoned = JSON.stringify({ v: 1, srt: hashSrt(srt), lines: [[], []] });
+  assert.deepEqual(parseClozeCache(poisoned, hashSrt(srt), [2, 1]), [null, null], '[] on a worded line = not ranked yet');
+  const empty = JSON.stringify({ v: 1, srt: hashSrt(srt), lines: [[1, 0], []] });
+  assert.deepEqual(parseClozeCache(empty, hashSrt(srt), [2, 0]), [[1, 0], []], '[] is fine for a line with no words');
+
+  // No AI configured in node, so generation fails for every line.
+  const writes = [];
+  const run = raw => loadOrBuildCloze({
+    lineTexts: ['a b', 'c'], recordId: 'r1', subtitleText: srt,
+    readText: async () => raw, writeText: async (_id, text) => { writes.push(text); },
+  });
+  assert.deepEqual(await run(null), [null, null], 'failed lines come back unranked');
+  assert.deepEqual(await run(poisoned), [null, null], 'a poisoned cache is retried, not trusted');
+  assert.equal(writes.length, 0, 'nothing is cached when nothing was ranked');
+  const done = JSON.stringify({ v: 1, srt: hashSrt(srt), lines: [[1, 0], [0]] });
+  assert.deepEqual(await run(done), [[1, 0], [0]], 'a complete cache is used as-is');
+  assert.equal(writes.length, 0, 'a complete cache is not rewritten');
 }
 
 console.log('cloze: all checks passed');
