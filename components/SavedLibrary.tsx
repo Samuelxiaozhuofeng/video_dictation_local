@@ -3,10 +3,11 @@ import { Search, Trash2 } from 'lucide-react';
 import { SavedLine } from '../types';
 import * as Storage from '../utils/storage';
 import { Btn, Card, H, Stamp, inputCls } from './ui';
-import { useT } from '../utils/i18n';
+import { useT, useLang } from '../utils/i18n';
 
 const SavedLibrary: React.FC = () => {
   const t = useT();
+  const lang = useLang();
   const [savedLines, setSavedLines] = useState<SavedLine[]>(Storage.getSavedLines());
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -20,7 +21,7 @@ const SavedLibrary: React.FC = () => {
   );
 
   const formatDate = (timestamp: number) =>
-    new Date(timestamp).toLocaleDateString(undefined, {
+    new Date(timestamp).toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', {
       month: 'short', day: 'numeric', year: 'numeric',
     });
 

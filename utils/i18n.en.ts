@@ -102,6 +102,8 @@ export const en = {
   'settingsAnki.leaveEmpty': '(Leave Empty)',
   'settingsAnki.url': 'AnkiConnect URL',
   'settingsAnki.connect': 'Connect',
+  'settingsAnki.connected': 'Connected to Anki!',
+  'settingsAnki.connectFailed': 'Could not connect. Ensure Anki is running with AnkiConnect installed.',
   'settingsAnki.reconnect': 'Reconnect',
   'settingsAnki.wordCard': 'Word card',
   'settingsAnki.audioCard': 'Audio card',
@@ -162,6 +164,7 @@ export const en = {
 
   // --- Transport.tsx ---
   'transport.rec': 'Rec',
+  'transport.seek': 'Seek',
   'transport.adding': 'Adding',
   'transport.previousLine': 'Previous line (Ctrl+←)',
   'transport.replayLine': 'Replay line (Shift+Space)',

@@ -44,7 +44,7 @@ const Transport: React.FC = () => {
               <div className="h-full rounded-full bg-green" style={{ width: `${progress}%` }} />
             </div>
             <input type="range" min="0" max="100" step="0.1" value={progress} onChange={actions.onProgressSeek}
-              className="absolute inset-0 !h-full opacity-0 cursor-pointer" aria-label="Seek" />
+              className="absolute inset-0 !h-full opacity-0 cursor-pointer" aria-label={t('transport.seek')} />
           </div>
           <span className="w-12 text-right">{dur}</span>
         </div>

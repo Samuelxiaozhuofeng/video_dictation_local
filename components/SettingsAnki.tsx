@@ -7,7 +7,7 @@ import { useT, DictKey } from '../utils/i18n';
 
 // APP_DATA_FIELDS lives in types.ts (out of i18n scope) and can't carry translated
 // labels directly; map each field's key to its own dictionary entry instead.
-const FIELD_LABEL_KEYS: Record<string, DictKey> = {
+const FIELD_LABEL_KEYS: Record<(typeof APP_DATA_FIELDS)[number]['key'], DictKey> = {
   sentence: 'settingsAnki.fieldSentence',
   videoName: 'settingsAnki.fieldVideoName',
   timestamp: 'settingsAnki.fieldTimestamp',
@@ -24,7 +24,6 @@ interface SettingsAnkiProps {
   url: string;
   setUrl: (value: string) => void;
   status: AnkiConnectionStatus;
-  statusMsg: string;
   onConnect: () => void;
   decks: string[];
   models: string[];
@@ -90,7 +89,6 @@ const SettingsAnki: React.FC<SettingsAnkiProps> = ({
   url,
   setUrl,
   status,
-  statusMsg,
   onConnect,
   decks,
   models,
@@ -162,10 +160,10 @@ const SettingsAnki: React.FC<SettingsAnkiProps> = ({
       </div>
 
       {status === 'error' && (
-        <Card flat tone="rose-soft" className="px-4 py-3 text-sm">{statusMsg}</Card>
+        <Card flat tone="rose-soft" className="px-4 py-3 text-sm">{t('settingsAnki.connectFailed')}</Card>
       )}
       {status === 'success' && (
-        <Card flat tone="green-soft" className="px-4 py-3 text-sm">{statusMsg}</Card>
+        <Card flat tone="green-soft" className="px-4 py-3 text-sm">{t('settingsAnki.connected')}</Card>
       )}
 
       {status === 'success' && (

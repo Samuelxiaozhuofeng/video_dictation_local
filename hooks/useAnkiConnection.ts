@@ -8,7 +8,6 @@ export interface UseAnkiConnectionReturn {
   url: string;
   setUrl: (url: string) => void;
   status: AnkiConnectionStatus;
-  statusMsg: string;
   
   // Data from Anki
   decks: string[];
@@ -22,7 +21,6 @@ export interface UseAnkiConnectionReturn {
 export const useAnkiConnection = (initialUrl: string = 'http://127.0.0.1:8765'): UseAnkiConnectionReturn => {
   const [url, setUrl] = useState(initialUrl);
   const [status, setStatus] = useState<AnkiConnectionStatus>('idle');
-  const [statusMsg, setStatusMsg] = useState('');
   const [decks, setDecks] = useState<string[]>([]);
   const [models, setModels] = useState<string[]>([]);
 
@@ -36,10 +34,8 @@ export const useAnkiConnection = (initialUrl: string = 'http://127.0.0.1:8765'):
       setDecks(d);
       setModels(m);
       setStatus('success');
-      setStatusMsg('Connected to Anki!');
     } catch (e) {
       setStatus('error');
-      setStatusMsg('Could not connect. Ensure Anki is running with AnkiConnect installed.');
     }
   }, []);
 
@@ -60,7 +56,6 @@ export const useAnkiConnection = (initialUrl: string = 'http://127.0.0.1:8765'):
     url,
     setUrl,
     status,
-    statusMsg,
     decks,
     models,
     connect,

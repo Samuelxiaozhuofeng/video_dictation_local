@@ -96,7 +96,7 @@ export const APP_DATA_FIELDS = [
   { key: 'word', label: 'Selected Word' },
   { key: 'definition', label: 'Word Definition (AI)' },
   { key: 'context', label: 'Context (Sentence)' },
-];
+] as const;
 
 // Video History and Progress Types
 export interface VideoRecord {

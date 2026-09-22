@@ -103,6 +103,8 @@ export const zh: Record<keyof typeof en, string> = {
   'settingsAnki.leaveEmpty': '（留空）',
   'settingsAnki.url': 'AnkiConnect 地址',
   'settingsAnki.connect': '连接',
+  'settingsAnki.connected': '已连接到 Anki！',
+  'settingsAnki.connectFailed': '连接失败。请确认 Anki 正在运行并已安装 AnkiConnect。',
   'settingsAnki.reconnect': '重新连接',
   'settingsAnki.wordCard': '单词卡片',
   'settingsAnki.audioCard': '音频卡片',
@@ -163,6 +165,7 @@ export const zh: Record<keyof typeof en, string> = {
 
   // --- Transport.tsx ---
   'transport.rec': '录制',
+  'transport.seek': '拖动进度',
   'transport.adding': '添加中',
   'transport.previousLine': '上一句（Ctrl+←）',
   'transport.replayLine': '重播这句（Shift+Space）',
