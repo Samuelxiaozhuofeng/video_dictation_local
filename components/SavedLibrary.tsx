@@ -3,8 +3,10 @@ import { Search, Trash2 } from 'lucide-react';
 import { SavedLine } from '../types';
 import * as Storage from '../utils/storage';
 import { Btn, Card, H, Stamp, inputCls } from './ui';
+import { useT } from '../utils/i18n';
 
 const SavedLibrary: React.FC = () => {
+  const t = useT();
   const [savedLines, setSavedLines] = useState<SavedLine[]>(Storage.getSavedLines());
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -25,7 +27,7 @@ const SavedLibrary: React.FC = () => {
   return (
     <div>
       <div className="flex items-end justify-between gap-4 mb-4">
-        <H className="mb-0">{'Saved lines'}</H>
+        <H className="mb-0">{t('common.savedLines')}</H>
         <Stamp>{savedLines.length}</Stamp>
       </div>
 
@@ -35,7 +37,7 @@ const SavedLibrary: React.FC = () => {
         </span>
         <input
           type="text"
-          placeholder="Search your saved lines..."
+          placeholder={t('savedLibrary.searchPlaceholder')}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className={`${inputCls} font-mono pl-10`}
@@ -60,7 +62,7 @@ const SavedLibrary: React.FC = () => {
                   flat
                   className="ml-auto"
                   onClick={() => handleDelete(line.text)}
-                  title="Remove from collection"
+                  title={t('savedLibrary.removeFromCollection')}
                 >
                   <Trash2 size={16} />
                 </Btn>
@@ -71,12 +73,12 @@ const SavedLibrary: React.FC = () => {
       ) : (
         <Card tone="paper" className="p-10 text-center max-w-lg mx-auto">
           <h3 className="font-serif text-2xl font-semibold">
-            {searchTerm ? 'NO MATCH' : 'NOTHING SAVED YET'}
+            {searchTerm ? t('savedLibrary.noMatch') : t('savedLibrary.nothingSavedYet')}
           </h3>
           <p className="mt-2 text-sm text-mute font-medium">
             {searchTerm
-              ? 'Try a different sentence or video name.'
-              : 'Go practice and save some interesting lines!'}
+              ? t('savedLibrary.tryDifferent')
+              : t('savedLibrary.goPractice')}
           </p>
         </Card>
       )}

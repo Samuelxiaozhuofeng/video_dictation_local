@@ -4,6 +4,7 @@ import { LearningMode, VideoRecord } from '../types';
 import * as VideoStorage from '../utils/videoStorage';
 import { Btn, Card, Stamp, H } from './ui';
 import { dialog } from './Dialog';
+import { useT, useLang } from '../utils/i18n';
 
 export interface NewPair { video: File; srt: File; handle?: FileSystemFileHandle }
 
@@ -18,15 +19,16 @@ const SRT_EXT = /\.(srt|txt|vtt)$/i;
 // Two mode buttons used both for a fresh upload and for every shelf card.
 // With `last` set, the last-used mode is the loud one and the other is an outline.
 const ModeButtons: React.FC<{ last?: LearningMode; onPick: (m: LearningMode) => void; size?: 'md' | 'lg' }> = ({ last, onPick, size = 'md' }) => {
+  const t = useT();
   const dLoud = last === undefined || last !== LearningMode.BLUR;
   const bLoud = last === undefined || last === LearningMode.BLUR;
   return (
     <div className="flex gap-3">
-      <Btn tone={dLoud ? 'green' : 'white'} size={size} onClick={() => onPick(LearningMode.DICTATION)} title="Listen, then type every word">
-        <Pencil size={16} /> Dictate
+      <Btn tone={dLoud ? 'green' : 'white'} size={size} onClick={() => onPick(LearningMode.DICTATION)} title={t('home.dictateTitle')}>
+        <Pencil size={16} /> {t('home.dictate')}
       </Btn>
-      <Btn tone={bLoud ? 'ochre' : 'white'} size={size} onClick={() => onPick(LearningMode.BLUR)} title="Subtitles hidden; reveal words as you go">
-        <EyeOff size={16} /> Blur
+      <Btn tone={bLoud ? 'ochre' : 'white'} size={size} onClick={() => onPick(LearningMode.BLUR)} title={t('home.blurTitle')}>
+        <EyeOff size={16} /> {t('home.blur')}
       </Btn>
     </div>
   );
@@ -34,6 +36,7 @@ const ModeButtons: React.FC<{ last?: LearningMode; onPick: (m: LearningMode) => 
 
 // One drop zone takes both files; each slot can also be browsed on its own.
 const DropZone: React.FC<{ onStart: (pair: NewPair, mode: LearningMode) => void }> = ({ onStart }) => {
+  const t = useT();
   const [video, setVideo] = useState<File | null>(null);
   const [srt, setSrt] = useState<File | null>(null);
   const [handle, setHandle] = useState<FileSystemFileHandle | undefined>();
@@ -85,8 +88,8 @@ const DropZone: React.FC<{ onStart: (pair: NewPair, mode: LearningMode) => void 
         <div className="flex items-center gap-4 lg:w-64 shrink-0">
           <div className="w-12 h-12 rounded-full bg-shade/70 text-mute flex items-center justify-center shrink-0"><Upload size={22} /></div>
           <div>
-            <p className="font-serif text-xl font-semibold leading-tight">Drop a video<br />and its subtitles</p>
-            <p className="text-xs text-mute mt-1">Both at once, or one at a time.</p>
+            <p className="font-serif text-xl font-semibold leading-tight">{t('home.dropLine1')}<br />{t('home.dropLine2')}</p>
+            <p className="text-xs text-mute mt-1">{t('home.dropHint')}</p>
           </div>
         </div>
 
@@ -94,14 +97,14 @@ const DropZone: React.FC<{ onStart: (pair: NewPair, mode: LearningMode) => void 
           <button type="button" onClick={browseVideo} className={`flat press p-3 text-left flex items-center gap-3 ${video ? 'bg-green-soft border-green text-green' : 'hover:bg-paper'}`}>
             <FileVideo size={20} className="shrink-0" />
             <span className="min-w-0">
-              <span className="block text-[11px] font-medium opacity-70">{video ? 'Video' : 'Choose a video'}</span>
+              <span className="block text-[11px] font-medium opacity-70">{video ? t('home.videoLabel') : t('home.chooseVideo')}</span>
               <span className="block text-sm font-medium truncate">{video ? video.name : '.mp4 .webm .mkv'}</span>
             </span>
           </button>
           <button type="button" onClick={() => srtInput.current?.click()} className={`flat press p-3 text-left flex items-center gap-3 ${srt ? 'bg-green-soft border-green text-green' : 'hover:bg-paper'}`}>
             <FileText size={20} className="shrink-0" />
             <span className="min-w-0">
-              <span className="block text-[11px] font-medium opacity-70">{srt ? 'Subtitles' : 'Choose subtitles'}</span>
+              <span className="block text-[11px] font-medium opacity-70">{srt ? t('home.subtitlesLabel') : t('home.chooseSubtitles')}</span>
               <span className="block text-sm font-medium truncate">{srt ? srt.name : '.srt'}</span>
             </span>
           </button>
@@ -113,7 +116,7 @@ const DropZone: React.FC<{ onStart: (pair: NewPair, mode: LearningMode) => void 
           {ready ? (
             <ModeButtons size="lg" onPick={m => onStart({ video: video!, srt: srt!, handle }, m)} />
           ) : (
-            <span className="text-sm text-mute">Then pick a mode to start.</span>
+            <span className="text-sm text-mute">{t('home.thenPickMode')}</span>
           )}
         </div>
       </div>
@@ -128,6 +131,8 @@ const Progress: React.FC<{ pct: number }> = ({ pct }) => (
 );
 
 const Home: React.FC<HomeProps> = ({ onStartNew, onResume }) => {
+  const t = useT();
+  const lang = useLang();
   const [videos, setVideos] = useState<VideoRecord[] | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -135,15 +140,30 @@ const Home: React.FC<HomeProps> = ({ onStartNew, onResume }) => {
     VideoStorage.getAllVideoRecords().then(setVideos).catch(() => setVideos([]));
   }, []);
 
+  // Reimplements utils/videoStorage.ts's formatLastPracticed with translated output
+  // (that file is out of i18n scope, so the formatting logic lives here instead).
+  const formatRelativeTime = (timestamp: number): string => {
+    const diff = Date.now() - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    if (minutes < 1) return t('home.timeJustNow');
+    if (minutes < 60) return t(minutes > 1 ? 'home.timeMinutesAgo' : 'home.timeMinuteAgo', { n: minutes });
+    if (hours < 24) return t(hours > 1 ? 'home.timeHoursAgo' : 'home.timeHourAgo', { n: hours });
+    if (days === 1) return t('home.timeYesterday');
+    if (days < 7) return t('home.timeDaysAgo', { n: days });
+    return new Date(timestamp).toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US');
+  };
+
   const handleDelete = async (v: VideoRecord) => {
-    const ok = await dialog.confirm('Delete this video?', `"${v.displayName}" and its progress will be removed. Saved lines stay.`, { ok: 'Delete', danger: true });
+    const ok = await dialog.confirm(t('home.deleteTitle'), t('home.deleteBody', { name: v.displayName }), { ok: t('home.deleteOk'), danger: true });
     if (!ok) return;
     setDeletingId(v.id);
     try {
       await VideoStorage.deleteVideoRecord(v.id);
       setVideos(prev => (prev ? prev.filter(x => x.id !== v.id) : prev));
     } catch {
-      dialog.alert('Could not delete', 'Something went wrong removing this record. Try again.');
+      dialog.alert(t('home.deleteFailTitle'), t('home.deleteFailBody'));
     } finally {
       setDeletingId(null);
     }
@@ -154,14 +174,14 @@ const Home: React.FC<HomeProps> = ({ onStartNew, onResume }) => {
       <DropZone onStart={onStartNew} />
 
       <section>
-        <H sub="Pick a mode to continue where you left off." badge={videos && videos.length > 0 && <Stamp tone="ink">{videos.length}</Stamp>}>Your videos</H>
+        <H sub={t('home.pickModeContinue')} badge={videos && videos.length > 0 && <Stamp tone="ink">{videos.length}</Stamp>}>{t('home.yourVideos')}</H>
 
         {videos === null ? (
-          <div className="flex items-center gap-3 text-mute text-sm"><Loader2 className="animate-spin" size={18} /> Loading</div>
+          <div className="flex items-center gap-3 text-mute text-sm"><Loader2 className="animate-spin" size={18} /> {t('home.loading')}</div>
         ) : videos.length === 0 ? (
           <Card tone="paper" flat className="p-10 text-center border-dashed">
-            <p className="font-serif text-2xl font-semibold">Nothing here yet</p>
-            <p className="text-sm text-mute mt-2">Drop a video and its .srt above. Progress and subtitles are saved in this browser.</p>
+            <p className="font-serif text-2xl font-semibold">{t('home.nothingHereYet')}</p>
+            <p className="text-sm text-mute mt-2">{t('home.nothingHereHint')}</p>
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -173,12 +193,12 @@ const Home: React.FC<HomeProps> = ({ onStartNew, onResume }) => {
                 </div>
                 <Progress pct={v.completionRate} />
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-mute">
-                  <span>{v.currentSubtitleIndex} / {v.totalSubtitles} lines</span>
-                  <span className="inline-flex items-center gap-1"><Clock size={12} /> {VideoStorage.formatLastPracticed(v.lastPracticed)}</span>
+                  <span>{t('home.linesCount', { current: v.currentSubtitleIndex, total: v.totalSubtitles })}</span>
+                  <span className="inline-flex items-center gap-1"><Clock size={12} /> {formatRelativeTime(v.lastPracticed)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3 pt-4 border-t border-line border-dashed">
                   <ModeButtons last={v.learningMode ?? LearningMode.DICTATION} onPick={m => onResume(v, m)} />
-                  <Btn square flat tone="white" onClick={() => handleDelete(v)} disabled={deletingId === v.id} title="Delete record" className="hover:!bg-rose-soft hover:!text-rose">
+                  <Btn square flat tone="white" onClick={() => handleDelete(v)} disabled={deletingId === v.id} title={t('home.deleteRecordTitle')} className="hover:!bg-rose-soft hover:!text-rose">
                     {deletingId === v.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                   </Btn>
                 </div>

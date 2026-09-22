@@ -1,6 +1,7 @@
 import React from 'react';
 import * as AI from '../utils/ai';
 import { Btn, Field, inputCls } from './ui';
+import { useT } from '../utils/i18n';
 
 interface SettingsAIProps {
   aiModel: string;
@@ -23,17 +24,18 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
   aiApiKey,
   setAiApiKey,
 }) => {
+  const t = useT();
   return (
     <div className="space-y-6">
       <Field
-        label="API Key"
+        label={t('settingsAI.apiKey')}
         hint={
           <>
-            Get a key from{' '}
+            {t('settingsAI.apiKeyHintPre')}{' '}
             <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline text-green">
-              Google AI Studio
+              {t('settingsAI.apiKeyHintLink')}
             </a>
-            . Stored locally in this browser.
+            {t('settingsAI.apiKeyHintPost')}
           </>
         }
       >
@@ -42,23 +44,23 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
           value={aiApiKey}
           onChange={(e) => setAiApiKey(e.target.value)}
           className={`${inputCls} font-mono`}
-          placeholder="Enter your Gemini API Key..."
+          placeholder={t('settingsAI.apiKeyPlaceholder')}
         />
       </Field>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Field label="Model" hint="Choose the model balancing speed vs quality of definitions.">
+        <Field label={t('settingsAI.model')} hint={t('settingsAI.modelHint')}>
           <select value={aiModel} onChange={(e) => setAiModel(e.target.value)} className={inputCls}>
-            <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended)</option>
-            <option value="gemini-flash-lite-latest">Gemini Flash Lite (Fastest)</option>
-            <option value="gemini-3-pro-preview">Gemini 3 Pro (Best Quality)</option>
+            <option value="gemini-2.5-flash">{t('settingsAI.modelFlash')}</option>
+            <option value="gemini-flash-lite-latest">{t('settingsAI.modelFlashLite')}</option>
+            <option value="gemini-3-pro-preview">{t('settingsAI.modelPro')}</option>
           </select>
         </Field>
 
         <Field
-          label="Temperature"
+          label={t('settingsAI.temperature')}
           right={String(aiTemperature)}
-          hint="Lower values are more deterministic; higher values are more creative."
+          hint={t('settingsAI.temperatureHint')}
         >
           <input
             type="range"
@@ -72,19 +74,19 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
       </div>
 
       <Field
-        label="Prompt template"
+        label={t('settingsAI.promptTemplate')}
         right={
           <Btn type="button" size="sm" flat onClick={() => setAiPrompt(AI.DEFAULT_PROMPT)}>
-            Reset
+            {t('settingsAI.reset')}
           </Btn>
         }
-        hint="Use {word} and {context} as placeholders. The response must still be compatible with the expected JSON schema (word, definition, partOfSpeech)."
+        hint={t('settingsAI.promptHint')}
       >
         <textarea
           value={aiPrompt}
           onChange={(e) => setAiPrompt(e.target.value)}
           className={`${inputCls} min-h-32 font-mono`}
-          placeholder="Enter prompt..."
+          placeholder={t('settingsAI.promptPlaceholder')}
         />
       </Field>
     </div>

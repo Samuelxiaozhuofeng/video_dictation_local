@@ -3,6 +3,7 @@ import { Subtitle, AnkiConfig, AnkiCardTemplateConfig } from '../types';
 import * as Anki from '../utils/anki';
 import * as Storage from '../utils/storage';
 import { dialog } from '../components/Dialog';
+import { t } from '../utils/i18n';
 
 export type AnkiStatus = 'idle' | 'recording' | 'adding' | 'success' | 'error';
 
@@ -155,7 +156,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
   // Add current subtitle to Anki
   const handleAddToAnki = useCallback(async (subtitle: Subtitle) => {
     if (!ankiConfig) {
-      dialog.alert('Anki is not connected', 'Open Settings → Anki, enter your AnkiConnect address and press Connect.');
+      dialog.alert(t('anki.notConnectedTitle'), t('anki.notConnectedBody'));
       return;
     }
     if (ankiStatus !== 'idle') return;
@@ -165,7 +166,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
       ankiConfig.audioCard || ankiConfig.wordCard || null;
 
     if (!template) {
-      dialog.alert('No Anki card set up', 'Open Settings → Anki and pick a deck and note type for the Word or Audio card.');
+      dialog.alert(t('anki.noCardTitle'), t('anki.noCardBody'));
       return;
     }
 
@@ -189,7 +190,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
     } catch (e: any) {
         console.error(e);
         setAnkiStatus('error');
-        dialog.alert('Anki refused the card', e.message);
+        dialog.alert(t('anki.refusedTitle'), e.message);
         setTimeout(() => setAnkiStatus('idle'), 3000);
     }
   }, [ankiConfig, ankiStatus, captureMedia, videoFileName]);
@@ -197,7 +198,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
   // Add word with definition to Anki
   const handleWordToAnki = useCallback(async (word: string, definition: string, subtitle: Subtitle, includeAudio: boolean = true) => {
       if (!ankiConfig) {
-        dialog.alert('Anki is not connected', 'Open Settings → Anki, enter your AnkiConnect address and press Connect.');
+        dialog.alert(t('anki.notConnectedTitle'), t('anki.notConnectedBody'));
         throw new Error('Anki not configured');
       }
 
@@ -211,7 +212,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
       }
 
       if (!template) {
-        dialog.alert('No Anki card set up', 'Open Settings → Anki and pick a deck and note type for the Word or Audio card.');
+        dialog.alert(t('anki.noCardTitle'), t('anki.noCardBody'));
         throw new Error('Anki card not configured');
       }
 

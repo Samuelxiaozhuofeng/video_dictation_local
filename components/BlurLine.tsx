@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { tokenizeText, TokenType } from '../utils/textTokenizer';
+import { useT } from '../utils/i18n';
 
 // Blur mode line: every word starts as a covered block. First click reveals it,
 // second click looks it up. Lookup itself lives in Studio (DefinitionPanel).
 const BlurLine: React.FC<{ text: string; onLookup: (word: string) => void }> = ({ text, onLookup }) => {
+  const t = useT();
   const tokens = useMemo(() => tokenizeText(text), [text]);
   const [revealed, setRevealed] = useState<Set<number>>(new Set());
   const [picked, setPicked] = useState<number | null>(null);
@@ -26,8 +28,8 @@ const BlurLine: React.FC<{ text: string; onLookup: (word: string) => void }> = (
   let wordIdx = 0;
   return (
     <div className="text-center font-serif text-2xl sm:text-[28px] font-medium leading-[2]">
-      {tokens.map((t, i) => {
-        if (t.type === TokenType.WORD) {
+      {tokens.map((tk, i) => {
+        if (tk.type === TokenType.WORD) {
           const idx = wordIdx++;
           const isRevealed = revealed.has(idx);
           const isPicked = picked === idx;
@@ -35,22 +37,22 @@ const BlurLine: React.FC<{ text: string; onLookup: (word: string) => void }> = (
             <button
               key={i}
               type="button"
-              onClick={e => click(e, idx, t.value)}
-              title={isRevealed ? 'Look up' : 'Reveal'}
-              aria-label={isRevealed ? undefined : 'Hidden word'}
+              onClick={e => click(e, idx, tk.value)}
+              title={isRevealed ? t('common.lookup') : t('blur.reveal')}
+              aria-label={isRevealed ? undefined : t('blur.hiddenWord')}
               className={`press inline-block align-baseline rounded px-1 ${
                 isRevealed
                   ? (isPicked ? 'mark-yellow' : 'hover:mark-yellow')
                   : 'bg-shade text-transparent select-none hover:bg-line'}`}
             >
-              {t.value}
+              {tk.value}
             </button>
           );
         }
-        if (t.type === TokenType.PUNCTUATION) {
-          return <span key={i} className="text-mute">{t.value}</span>;
+        if (tk.type === TokenType.PUNCTUATION) {
+          return <span key={i} className="text-mute">{tk.value}</span>;
         }
-        if (t.type === TokenType.SPACE) return <span key={i}> </span>;
+        if (tk.type === TokenType.SPACE) return <span key={i}> </span>;
         return null;
       })}
     </div>

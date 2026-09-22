@@ -8,6 +8,7 @@ import { Card, H, Stamp } from './ui';
 import SettingsGeneral from './SettingsGeneral';
 import SettingsAI from './SettingsAI';
 import SettingsAnki from './SettingsAnki';
+import { useT, useLang, setLang, Lang } from '../utils/i18n';
 
 type AnkiPatch = {
   url?: string;
@@ -20,6 +21,8 @@ type AnkiPatch = {
 };
 
 const Settings: React.FC = () => {
+  const t = useT();
+  const lang = useLang();
   const [wordDeckName, setWordDeckName] = useState('');
   const [wordModelName, setWordModelName] = useState('');
   const [wordFieldMapping, setWordFieldMapping] = useState<Record<string, string>>({});
@@ -111,8 +114,13 @@ const Settings: React.FC = () => {
   return (
     <div className="space-y-6">
       <Card className="p-6">
-        <H>Practice</H>
+        <H>{t('settings.practice')}</H>
         <SettingsGeneral
+          lang={lang}
+          setLang={(v: Lang) => {
+            setLang(v);
+            flashSaved();
+          }}
           sectionLength={sectionLength}
           setSectionLength={(v) => {
             setSectionLength(v);
@@ -198,7 +206,7 @@ const Settings: React.FC = () => {
 
       {savedFlash && (
         <div className="fixed bottom-6 right-6 z-50">
-          <Stamp tone="green-soft" className="shadow-card">{'Saved ✓'}</Stamp>
+          <Stamp tone="green-soft" className="shadow-card">{t('settings.savedFlash')}</Stamp>
         </div>
       )}
     </div>

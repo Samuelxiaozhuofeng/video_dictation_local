@@ -11,9 +11,11 @@ import Transport from './Transport';
 import SavedDrawer from './SavedDrawer';
 import DefinitionPanel, { DefinitionState, emptyDefinition } from './DefinitionPanel';
 import { tokenizeText, getWordTokens } from '../utils/textTokenizer';
+import { useT } from '../utils/i18n';
 
 // The practice room: a TV (video) over a chyron (the line you work on) over a remote (Transport).
 const Studio: React.FC = () => {
+  const t = useT();
   const { practice, video, saved, anki, actions } = usePracticeContext();
   const { subtitles, fullSubtitles, sections, currentSectionIndex, currentSubtitleIndex, mode, showSectionComplete, showComplete, learningMode, blurPlaybackMode, videoName } = practice;
   const { videoRef, videoSrc, isPlaying } = video;
@@ -62,20 +64,20 @@ const Studio: React.FC = () => {
       {/* --- Top strip --- */}
       <header className="shrink-0 h-14 border-b border-line bg-page px-3 sm:px-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <Btn size="sm" flat onClick={actions.onExit} title="Back to your videos"><HomeIcon size={14} /> <span className="hidden sm:inline">Videos</span></Btn>
+          <Btn size="sm" flat onClick={actions.onExit} title={t('studio.backToVideos')}><HomeIcon size={14} /> <span className="hidden sm:inline">{t('nav.videos')}</span></Btn>
           <span className="font-serif font-semibold truncate min-w-0" title={videoName}>{videoName}</span>
           {sections.length > 1 && (
             <div className="inline-flex items-center gap-1 shrink-0 text-xs text-mute">
-              <Btn square size="sm" flat onClick={() => actions.onSwitchSection(currentSectionIndex - 1)} disabled={currentSectionIndex === 0} title="Previous section"><ChevronLeft size={16} /></Btn>
-              <span className="font-mono">Part {currentSectionIndex + 1}/{sections.length}</span>
-              <Btn square size="sm" flat onClick={() => actions.onSwitchSection(currentSectionIndex + 1)} disabled={currentSectionIndex === sections.length - 1} title="Next section"><ChevronRight size={16} /></Btn>
+              <Btn square size="sm" flat onClick={() => actions.onSwitchSection(currentSectionIndex - 1)} disabled={currentSectionIndex === 0} title={t('studio.previousSection')}><ChevronLeft size={16} /></Btn>
+              <span className="font-mono">{t('studio.part', { current: currentSectionIndex + 1, total: sections.length })}</span>
+              <Btn square size="sm" flat onClick={() => actions.onSwitchSection(currentSectionIndex + 1)} disabled={currentSectionIndex === sections.length - 1} title={t('studio.nextSection')}><ChevronRight size={16} /></Btn>
             </div>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Stamp tone={isBlur ? 'ochre-soft' : 'green-soft'} className="hidden sm:inline-flex">{isBlur ? <><EyeOff size={12} /> Blur</> : <><Pencil size={12} /> Dictation</>}</Stamp>
-          <Btn size="sm" flat onClick={() => actions.onToggleSavedList(!showSavedList)} title="Saved lines from this video" className={showSavedList ? '!bg-ochre-soft !text-ochre' : ''}>
-            <Bookmark size={14} /> <span className="hidden sm:inline">Saved</span>{savedIds.size > 0 && <span className="font-mono">{savedIds.size}</span>}
+          <Stamp tone={isBlur ? 'ochre-soft' : 'green-soft'} className="hidden sm:inline-flex">{isBlur ? <><EyeOff size={12} /> {t('studio.blurBadge')}</> : <><Pencil size={12} /> {t('studio.dictationBadge')}</>}</Stamp>
+          <Btn size="sm" flat onClick={() => actions.onToggleSavedList(!showSavedList)} title={t('studio.savedLinesFromVideo')} className={showSavedList ? '!bg-ochre-soft !text-ochre' : ''}>
+            <Bookmark size={14} /> <span className="hidden sm:inline">{t('nav.saved')}</span>{savedIds.size > 0 && <span className="font-mono">{savedIds.size}</span>}
           </Btn>
         </div>
       </header>
@@ -85,11 +87,11 @@ const Studio: React.FC = () => {
         {videoSrc ? (
           <video ref={videoRef} src={videoSrc} onLoadedMetadata={() => actions.onReplayCurrent()} className="rounded-lg border border-line shadow-card bg-ink block max-h-full max-w-full" />
         ) : (
-          <Card tone="paper" flat className="p-6 text-mute">No video loaded</Card>
+          <Card tone="paper" flat className="p-6 text-mute">{t('studio.noVideoLoaded')}</Card>
         )}
 
         {showCenterPlay && (
-          <button onClick={actions.onTogglePlay} className="absolute inset-0 flex items-center justify-center" aria-label="Play">
+          <button onClick={actions.onTogglePlay} className="absolute inset-0 flex items-center justify-center" aria-label={t('studio.playAriaLabel')}>
             <span className="press rounded-full bg-green text-page shadow-lift w-20 h-20 flex items-center justify-center"><Play size={34} fill="currentColor" className="ml-1" /></span>
           </button>
         )}
@@ -101,25 +103,25 @@ const Studio: React.FC = () => {
         <Card className="max-w-5xl mx-auto ruled margin-rule pl-14 pr-5 sm:pr-6 py-4">
           <div className="flex items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-2 font-mono text-xs">
-              <Stamp tone="ochre-soft">Line {currentSubtitleIndex + 1} / {subtitles.length}</Stamp>
+              <Stamp tone="ochre-soft">{t('studio.lineCount', { current: currentSubtitleIndex + 1, total: subtitles.length })}</Stamp>
               {currentSub && <span className="text-mute">{Storage.formatTimeCode(currentSub.startTime)} – {Storage.formatTimeCode(currentSub.endTime)}</span>}
             </div>
             {isBlur && (
               <Seg size="sm" value={blurPlaybackMode} onChange={actions.onSetBlurPlaybackMode} options={[
-                { value: BlurPlaybackMode.SENTENCE_BY_SENTENCE, label: 'Step', title: 'Pause after every line' },
-                { value: BlurPlaybackMode.CONTINUOUS, label: 'Flow', title: 'Keep playing; pause yourself' },
+                { value: BlurPlaybackMode.SENTENCE_BY_SENTENCE, label: t('studio.stepLabel'), title: t('studio.stepTitle') },
+                { value: BlurPlaybackMode.CONTINUOUS, label: t('studio.flowLabel'), title: t('studio.flowTitle') },
               ]} />
             )}
           </div>
 
           <div className="min-h-[72px] flex items-center justify-center">
             {!currentSub ? (
-              <span className="font-serif italic text-mute">End of this part</span>
+              <span className="font-serif italic text-mute">{t('studio.endOfPart')}</span>
             ) : isBlur ? (
               <div className="w-full flex flex-col items-center gap-4">
                 <BlurLine text={currentSub.text} onLookup={lookup} />
                 {isStep && !isPlaying && (
-                  <Btn tone="green" onClick={actions.onContinue}>Next line <ChevronRight size={16} /></Btn>
+                  <Btn tone="green" onClick={actions.onContinue}>{t('common.nextLine')} <ChevronRight size={16} /></Btn>
                 )}
               </div>
             ) : mode === PracticeMode.LISTENING ? (
@@ -138,19 +140,19 @@ const Studio: React.FC = () => {
       </div>
 
       {showSectionComplete && (
-        <Overlay title={`Section ${currentSectionIndex + 1} done`} body="Nice. Keep the momentum or go back over it.">
-          <Btn onClick={() => actions.onSetShowSectionComplete(false)}><RotateCcw size={16} /> Review</Btn>
-          <Btn tone="green" onClick={actions.onNextSection} autoFocus><PlayCircle size={16} /> Next section</Btn>
+        <Overlay title={t('studio.sectionDoneTitle', { n: currentSectionIndex + 1 })} body={t('studio.sectionDoneBody')}>
+          <Btn onClick={() => actions.onSetShowSectionComplete(false)}><RotateCcw size={16} /> {t('studio.review')}</Btn>
+          <Btn tone="green" onClick={actions.onNextSection} autoFocus><PlayCircle size={16} /> {t('studio.nextSection')}</Btn>
         </Overlay>
       )}
 
       {showComplete && (
-        <Overlay title="Fin" body={`You worked through every line of “${videoName}”.`} stats={[
-          [String(fullSubtitles.length), 'lines'],
-          [String(savedIds.size), 'saved'],
+        <Overlay title={t('studio.finTitle')} body={t('studio.finBody', { name: videoName })} stats={[
+          [String(fullSubtitles.length), t('studio.statLines')],
+          [String(savedIds.size), t('studio.statSaved')],
         ]}>
-          <Btn onClick={actions.onRestart}><RotateCcw size={16} /> Start over</Btn>
-          <Btn tone="green" onClick={actions.onExit} autoFocus><HomeIcon size={16} /> Back to videos</Btn>
+          <Btn onClick={actions.onRestart}><RotateCcw size={16} /> {t('studio.startOver')}</Btn>
+          <Btn tone="green" onClick={actions.onExit} autoFocus><HomeIcon size={16} /> {t('studio.backToVideosBtn')}</Btn>
         </Overlay>
       )}
 
@@ -166,6 +168,7 @@ const Studio: React.FC = () => {
 
 // One covered block per word while the line plays: shows how much is coming, not what.
 const ListeningGhost: React.FC<{ text: string }> = ({ text }) => {
+  const t = useT();
   const words = getWordTokens(tokenizeText(text));
   return (
     <div className="flex flex-col items-center gap-3">
@@ -174,7 +177,7 @@ const ListeningGhost: React.FC<{ text: string }> = ({ text }) => {
           <span key={i} className="inline-block h-8 border-b-2 border-dashed border-line" style={{ width: `${Math.max(3, w.value.length + 1)}ch` }} />
         ))}
       </div>
-      <Stamp tone="green-soft"><span className="blink">●</span> Listening</Stamp>
+      <Stamp tone="green-soft"><span className="blink">●</span> {t('studio.listening')}</Stamp>
     </div>
   );
 };

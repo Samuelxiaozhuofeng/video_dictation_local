@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Loader2, X, Pin, PinOff, Check, PlusCircle, Volume2 } from 'lucide-react';
 import * as AI from '../utils/ai';
 import { Btn, Stamp } from './ui';
+import { useT } from '../utils/i18n';
 
 // Single word-definition surface for both learning modes. Opens on the right when a
 // word is looked up; "pin" keeps it open across lines. Holds the only copy of the
@@ -22,6 +23,7 @@ export const emptyDefinition: DefinitionState = { word: null, data: null, loadin
 type AnkiBtnState = 'idle' | 'busy' | 'done' | 'error';
 
 const AnkiWordButtons: React.FC<{ word: string; data: AI.WordDefinition; onWordToAnki: WordToAnki }> = ({ word, data, onWordToAnki }) => {
+  const t = useT();
   const [state, setState] = useState<{ which: 'word' | 'audio' | null; s: AnkiBtnState }>({ which: null, s: 'idle' });
 
   useEffect(() => { setState({ which: null, s: 'idle' }); }, [word]);
@@ -46,17 +48,17 @@ const AnkiWordButtons: React.FC<{ word: string; data: AI.WordDefinition; onWordT
     return (
       <Btn tone={tone} disabled={state.s === 'busy'} onClick={() => send(which === 'audio')} className="flex-1">
         {mine === 'busy' ? <Loader2 size={16} className="animate-spin" /> : mine === 'done' ? <Check size={16} /> : <Icon size={16} />}
-        {mine === 'done' ? 'Added' : mine === 'error' ? 'Failed' : label}
+        {mine === 'done' ? t('common.added') : mine === 'error' ? t('common.failed') : label}
       </Btn>
     );
   };
 
   return (
     <div className="pt-5 border-t border-line border-dashed">
-      <p className="text-xs text-mute mb-3">Send to Anki</p>
+      <p className="text-xs text-mute mb-3">{t('definition.sendToAnki')}</p>
       <div className="flex gap-3">
-        {face('word', 'Word only', PlusCircle)}
-        {face('audio', 'With audio', Volume2)}
+        {face('word', t('definition.wordOnly'), PlusCircle)}
+        {face('audio', t('definition.withAudio'), Volume2)}
       </div>
     </div>
   );
@@ -68,21 +70,23 @@ const DefinitionPanel: React.FC<{
   onTogglePin: () => void;
   onClose: () => void;
   onWordToAnki?: WordToAnki;
-}> = ({ def, pinned, onTogglePin, onClose, onWordToAnki }) => (
-  <aside className="fixed inset-y-0 right-0 z-40 w-full sm:w-[360px] bg-page border-l border-line shadow-lift flex flex-col slide-in" aria-label="Word definition">
+}> = ({ def, pinned, onTogglePin, onClose, onWordToAnki }) => {
+  const t = useT();
+  return (
+  <aside className="fixed inset-y-0 right-0 z-40 w-full sm:w-[360px] bg-page border-l border-line shadow-lift flex flex-col slide-in" aria-label={t('definition.ariaLabel')}>
     <div className="h-14 px-4 flex items-center justify-between border-b border-line">
-      <span className="font-serif font-semibold text-lg">Definition</span>
+      <span className="font-serif font-semibold text-lg">{t('definition.heading')}</span>
       <div className="flex gap-2">
-        <Btn square size="sm" flat onClick={onTogglePin} className={pinned ? '!bg-green-soft !text-green' : ''} title={pinned ? 'Unpin: clears when the line changes' : 'Pin: keep open across lines'}>
+        <Btn square size="sm" flat onClick={onTogglePin} className={pinned ? '!bg-green-soft !text-green' : ''} title={pinned ? t('definition.unpin') : t('definition.pin')}>
           {pinned ? <PinOff size={16} /> : <Pin size={16} />}
         </Btn>
-        <Btn square size="sm" flat onClick={onClose} title="Close"><X size={16} /></Btn>
+        <Btn square size="sm" flat onClick={onClose} title={t('common.close')}><X size={16} /></Btn>
       </div>
     </div>
 
     <div className="flex-1 overflow-y-auto p-5">
       {def.loading ? (
-        <div className="flex items-center gap-3 text-sm text-mute"><Loader2 size={18} className="animate-spin" /> Asking Gemini…</div>
+        <div className="flex items-center gap-3 text-sm text-mute"><Loader2 size={18} className="animate-spin" /> {t('definition.asking')}</div>
       ) : def.data ? (
         <div className="space-y-4">
           <div>
@@ -98,10 +102,11 @@ const DefinitionPanel: React.FC<{
           <div className="rounded-md bg-rose-soft text-rose p-3 text-sm">{def.error}</div>
         </div>
       ) : (
-        <p className="text-sm text-mute">Click a word in the subtitle to look it up.</p>
+        <p className="text-sm text-mute">{t('definition.emptyHint')}</p>
       )}
     </div>
   </aside>
-);
+  );
+};
 
 export default DefinitionPanel;

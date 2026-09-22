@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Btn, Card } from './ui';
+import { t } from '../utils/i18n';
 
 // In-app replacement for window.alert / window.confirm.
 // Call `dialog.alert(...)` / `dialog.confirm(...)` from anywhere (hooks included);
@@ -24,9 +25,9 @@ function open(p: Omit<Pending, 'resolve'>): Promise<boolean> {
 }
 
 export const dialog = {
-  alert: (title: string, body?: string, ok = 'OK') => open({ kind: 'alert', title, body, ok }),
+  alert: (title: string, body?: string, ok?: string) => open({ kind: 'alert', title, body, ok: ok ?? t('dialog.ok') }),
   confirm: (title: string, body?: string, opts: { ok?: string; cancel?: string; danger?: boolean } = {}) =>
-    open({ kind: 'confirm', title, body, ok: opts.ok ?? 'Confirm', cancel: opts.cancel ?? 'Cancel', tone: opts.danger ? 'rose-soft' : 'green' }),
+    open({ kind: 'confirm', title, body, ok: opts.ok ?? t('dialog.confirm'), cancel: opts.cancel ?? t('dialog.cancel'), tone: opts.danger ? 'rose-soft' : 'green' }),
 };
 
 export const DialogHost: React.FC = () => {

@@ -6,6 +6,7 @@ import {
   isInputCorrectFlexibleCase, areAllWordsCorrectFlexibleCase,
 } from '../utils/textTokenizer';
 import { Btn } from './ui';
+import { useT } from '../utils/i18n';
 
 // Dictation line: one input box per word (INPUT), then a word-by-word comparison (FEEDBACK).
 // Word lookup is delegated to Studio via onLookup.
@@ -18,6 +19,7 @@ interface Props {
 }
 
 const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay, onLookup }) => {
+  const t = useT();
   const tokens = useMemo(() => tokenizeText(targetText), [targetText]);
   const wordTokens = useMemo(() => getWordTokens(tokens), [tokens]);
 
@@ -109,32 +111,32 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
         <p className="text-center font-serif text-2xl sm:text-[28px] font-medium leading-relaxed">
           {targetText.split(/(\s+)/).map((part, i) =>
             part.trim() === '' ? <span key={i}>{part}</span> : (
-              <button key={i} type="button" onClick={e => { e.currentTarget.blur(); lookup(part); }} className="rounded hover:mark-yellow px-0.5 -mx-0.5" title="Look up">{part}</button>
+              <button key={i} type="button" onClick={e => { e.currentTarget.blur(); lookup(part); }} className="rounded hover:mark-yellow px-0.5 -mx-0.5" title={t('common.lookup')}>{part}</button>
             ))}
         </p>
 
         {/* Yours, word by word */}
         <div className="w-full flex flex-wrap justify-center items-center gap-x-2 gap-y-1 font-mono text-lg">
-          <span className="text-[11px] font-sans text-mute mr-2">You typed</span>
-          {tokens.map((t, i) => {
-            if (t.type === TokenType.WORD) {
-              const r = results.find(x => x.tokenIndex === t.index);
+          <span className="text-[11px] font-sans text-mute mr-2">{t('dictation.youTyped')}</span>
+          {tokens.map((tk, i) => {
+            if (tk.type === TokenType.WORD) {
+              const r = results.find(x => x.tokenIndex === tk.index);
               if (!r) return null;
               return (
-                <span key={i} title={r.isCorrect ? '' : `Expected: ${r.targetWord}`}
+                <span key={i} title={r.isCorrect ? '' : t('dictation.expected', { word: r.targetWord })}
                   className={`px-1 ${r.isCorrect ? 'mark-green text-green' : 'mark-rose text-rose line-through decoration-rose decoration-2'}`}>
                   {r.inputWord || '·'}
                 </span>
               );
             }
-            if (t.type === TokenType.PUNCTUATION) return <span key={i} className="text-mute">{t.value}</span>;
+            if (tk.type === TokenType.PUNCTUATION) return <span key={i} className="text-mute">{tk.value}</span>;
             return null;
           })}
         </div>
 
         <div className="flex gap-3">
-          <Btn onClick={() => onReplay(false)}><RefreshCw size={16} /> Hear again</Btn>
-          <Btn tone="green" onClick={() => onComplete(true)}>Next line <ArrowRight size={16} /></Btn>
+          <Btn onClick={() => onReplay(false)}><RefreshCw size={16} /> {t('dictation.hearAgain')}</Btn>
+          <Btn tone="green" onClick={() => onComplete(true)}>{t('common.nextLine')} <ArrowRight size={16} /></Btn>
         </div>
       </div>
     );
@@ -145,10 +147,10 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
   return (
     <div className="w-full">
       <form onSubmit={submit} className="flex flex-wrap justify-center items-center gap-2">
-        {tokens.map((t: Token, ti: number) => {
-          if (t.type === TokenType.WORD) {
+        {tokens.map((tk: Token, ti: number) => {
+          if (tk.type === TokenType.WORD) {
             const i = wi++;
-            const ok = !!inputs[i] && isInputCorrectFlexibleCase(inputs[i], t.value);
+            const ok = !!inputs[i] && isInputCorrectFlexibleCase(inputs[i], tk.value);
             return (
               <div key={ti} className="relative inline-flex">
                 <input
@@ -158,27 +160,27 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
                   onChange={e => change(i, e.target.value)}
                   onKeyDown={e => keyDown(i, e)}
                   onPaste={paste}
-                  style={{ width: `${Math.max(3, t.value.length + 1)}ch` }}
+                  style={{ width: `${Math.max(3, tk.value.length + 1)}ch` }}
                   className={`flat min-w-[3ch] px-2 py-1.5 font-mono text-xl sm:text-2xl font-medium text-center focus:border-green focus:shadow-sm ${ok ? 'bg-green-soft border-green text-green' : ''}`}
                   autoComplete="off" autoCorrect="off" spellCheck={false}
                 />
                 {peek === i && (
                   <div className="absolute -top-11 left-1/2 -translate-x-1/2 card bg-highlight px-3 py-1 font-mono font-medium whitespace-nowrap pointer-events-none z-10 fade-in">
-                    {t.value}
+                    {tk.value}
                   </div>
                 )}
               </div>
             );
           }
-          if (t.type === TokenType.PUNCTUATION) return <span key={ti} className="font-mono text-xl sm:text-2xl text-mute select-none">{t.value}</span>;
+          if (tk.type === TokenType.PUNCTUATION) return <span key={ti} className="font-mono text-xl sm:text-2xl text-mute select-none">{tk.value}</span>;
           return null;
         })}
-        <Btn type="submit" tone="green" square disabled={inputs.every(w => w === '')} className="ml-2" title="Check (Enter on last word)">
+        <Btn type="submit" tone="green" square disabled={inputs.every(w => w === '')} className="ml-2" title={t('dictation.checkTitle')}>
           <Send size={18} />
         </Btn>
       </form>
       <p className="mt-3 text-center text-xs text-mute">
-        Space moves to the next word · Ctrl+X peeks · Shift+Space replays
+        {t('dictation.keyHint')}
       </p>
     </div>
   );

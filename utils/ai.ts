@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AIConfig } from '../types';
+import { t } from './i18n';
 
 const STORAGE_KEY_AI = 'linguaclip_ai_config';
 
@@ -87,8 +88,6 @@ export const getWordDefinition = async (word: string, context: string): Promise<
     } catch (error) {
         console.error("AI Definition Error:", error);
         const noKey = error instanceof Error && error.message.includes("API Key");
-        throw new Error(noKey
-            ? "Add your Gemini API key in Settings → AI to look up words."
-            : "Couldn't get a definition. Check your key and connection, then try again.");
+        throw new Error(noKey ? t('ai.noKeyError') : t('ai.genericError'));
     }
 };

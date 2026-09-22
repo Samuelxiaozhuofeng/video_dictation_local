@@ -15,6 +15,7 @@ import { useVideoController } from './hooks/useVideoController';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { usePracticeActions } from './hooks/usePracticeActions';
 import * as VideoStorage from './utils/videoStorage';
+import { t, useLang } from './utils/i18n';
 
 // Plain <input type="file"> as a promise; used where showOpenFilePicker is unavailable.
 const pickFileWithInput = () => new Promise<File | null>(resolve => {
@@ -27,6 +28,9 @@ const pickFileWithInput = () => new Promise<File | null>(resolve => {
 });
 
 export default function App() {
+  const lang = useLang();
+  useEffect(() => { document.documentElement.lang = lang; }, [lang]);
+
   const [appState, setAppState] = useState<AppState>(AppState.UPLOAD);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [learningMode, setLearningMode] = useState<LearningMode>(LearningMode.DICTATION);
@@ -105,12 +109,12 @@ export default function App() {
     try {
       subText = await sf.text();
     } catch {
-      dialog.alert("Couldn't read the subtitle file", 'Make sure it is a plain-text .srt file.');
+      dialog.alert(t('app.subtitleReadFailTitle'), t('app.subtitleReadFailBody'));
       return;
     }
     const result = initializePractice(subText, startIndex, startSectionIndex);
     if (!result) {
-      dialog.alert('No subtitles found', `“${sf.name}” has no lines we can read. Check that it is a .srt file.`);
+      dialog.alert(t('app.noSubtitlesTitle'), t('app.noSubtitlesBody', { name: sf.name }));
       return;
     }
 
@@ -144,7 +148,7 @@ export default function App() {
       let vf = await getVideoFileFromRecord(record);
 
       if (!vf) {
-        const ok = await dialog.confirm('Pick the video file', `Choose “${record.videoFileName}” again. Your progress and subtitles are already here.`, { ok: 'Choose file' });
+        const ok = await dialog.confirm(t('app.pickVideoTitle'), t('app.pickVideoBody', { name: record.videoFileName }), { ok: t('app.pickVideoOk') });
         if (!ok) return;
         const picker = (window as any).showOpenFilePicker;
         if (picker) {
@@ -170,7 +174,7 @@ export default function App() {
       );
     } catch (error) {
       console.error('Failed to continue from library:', error);
-      dialog.alert("Couldn't open this video", 'Try again, or drop the files in fresh.');
+      dialog.alert(t('app.openVideoFailTitle'), t('app.openVideoFailBody'));
     }
   };
 

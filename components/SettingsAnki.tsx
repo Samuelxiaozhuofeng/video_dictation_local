@@ -3,6 +3,20 @@ import { RefreshCw } from 'lucide-react';
 import { APP_DATA_FIELDS } from '../types';
 import { AnkiConnectionStatus } from '../hooks/useAnkiConnection';
 import { Btn, Card, Field, inputCls } from './ui';
+import { useT, DictKey } from '../utils/i18n';
+
+// APP_DATA_FIELDS lives in types.ts (out of i18n scope) and can't carry translated
+// labels directly; map each field's key to its own dictionary entry instead.
+const FIELD_LABEL_KEYS: Record<string, DictKey> = {
+  sentence: 'settingsAnki.fieldSentence',
+  videoName: 'settingsAnki.fieldVideoName',
+  timestamp: 'settingsAnki.fieldTimestamp',
+  screenshot: 'settingsAnki.fieldScreenshot',
+  audio: 'settingsAnki.fieldAudio',
+  word: 'settingsAnki.fieldWord',
+  definition: 'settingsAnki.fieldDefinition',
+  context: 'settingsAnki.fieldContext',
+};
 
 type Mapping = Record<string, string>;
 
@@ -48,26 +62,29 @@ const FieldMap: React.FC<{
   fields: string[];
   mapping: Mapping;
   onChange: (ankiField: string, appDataKey: string) => void;
-}> = ({ fields, mapping, onChange }) => (
-  <div className="space-y-3">
-    <p className="text-[13px] font-medium">Field mapping</p>
-    {fields.map((field) => (
-      <div key={field} className="flex items-center gap-3">
-        <span className="w-1/3 font-mono text-sm truncate" title={field}>{field}</span>
-        <select
-          value={mapping[field] || ''}
-          onChange={(e) => onChange(field, e.target.value)}
-          className={`flex-1 ${inputCls}`}
-        >
-          <option value="">(Leave Empty)</option>
-          {APP_DATA_FIELDS.map((opt) => (
-            <option key={opt.key} value={opt.key}>{opt.label}</option>
-          ))}
-        </select>
-      </div>
-    ))}
-  </div>
-);
+}> = ({ fields, mapping, onChange }) => {
+  const t = useT();
+  return (
+    <div className="space-y-3">
+      <p className="text-[13px] font-medium">{t('settingsAnki.fieldMapping')}</p>
+      {fields.map((field) => (
+        <div key={field} className="flex items-center gap-3">
+          <span className="w-1/3 font-mono text-sm truncate" title={field}>{field}</span>
+          <select
+            value={mapping[field] || ''}
+            onChange={(e) => onChange(field, e.target.value)}
+            className={`flex-1 ${inputCls}`}
+          >
+            <option value="">{t('settingsAnki.leaveEmpty')}</option>
+            {APP_DATA_FIELDS.map((opt) => (
+              <option key={opt.key} value={opt.key}>{t(FIELD_LABEL_KEYS[opt.key])}</option>
+            ))}
+          </select>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const SettingsAnki: React.FC<SettingsAnkiProps> = ({
   url,
@@ -92,6 +109,7 @@ const SettingsAnki: React.FC<SettingsAnkiProps> = ({
   fetchModelFields,
   saveAnki,
 }) => {
+  const t = useT();
   const [wordModelFields, setWordModelFields] = useState<string[]>([]);
   const [audioModelFields, setAudioModelFields] = useState<string[]>([]);
 
@@ -128,7 +146,7 @@ const SettingsAnki: React.FC<SettingsAnkiProps> = ({
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row gap-4 md:items-end">
-        <Field label="AnkiConnect URL" className="flex-1">
+        <Field label={t('settingsAnki.url')} className="flex-1">
           <input
             type="text"
             value={url}
@@ -139,7 +157,7 @@ const SettingsAnki: React.FC<SettingsAnkiProps> = ({
         </Field>
         <Btn type="button" tone="green" onClick={onConnect} disabled={status === 'loading'}>
           {status === 'loading' ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          {status === 'success' ? 'Reconnect' : 'Connect'}
+          {status === 'success' ? t('settingsAnki.reconnect') : t('settingsAnki.connect')}
         </Btn>
       </div>
 
@@ -153,17 +171,17 @@ const SettingsAnki: React.FC<SettingsAnkiProps> = ({
       {status === 'success' && (
         <div className="space-y-8">
           <div>
-            <h3 className="font-serif text-lg font-semibold mb-4">Word card</h3>
+            <h3 className="font-serif text-lg font-semibold mb-4">{t('settingsAnki.wordCard')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <Field label="Target deck">
+              <Field label={t('settingsAnki.targetDeck')}>
                 <select value={wordDeckName} onChange={(e) => setWordDeckName(e.target.value)} className={inputCls}>
-                  <option value="">Select a Deck...</option>
+                  <option value="">{t('settingsAnki.selectDeck')}</option>
                   {decks.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
               </Field>
-              <Field label="Note type">
+              <Field label={t('settingsAnki.noteType')}>
                 <select value={wordModelName} onChange={(e) => setWordModelName(e.target.value)} className={inputCls}>
-                  <option value="">Select a Note Type...</option>
+                  <option value="">{t('settingsAnki.selectNoteType')}</option>
                   {models.map((m) => <option key={m} value={m}>{m}</option>)}
                 </select>
               </Field>
@@ -174,17 +192,17 @@ const SettingsAnki: React.FC<SettingsAnkiProps> = ({
           </div>
 
           <div className="border-t border-line pt-6">
-            <h3 className="font-serif text-lg font-semibold mb-4">Audio card</h3>
+            <h3 className="font-serif text-lg font-semibold mb-4">{t('settingsAnki.audioCard')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <Field label="Target deck">
+              <Field label={t('settingsAnki.targetDeck')}>
                 <select value={audioDeckName} onChange={(e) => setAudioDeckName(e.target.value)} className={inputCls}>
-                  <option value="">Select a Deck...</option>
+                  <option value="">{t('settingsAnki.selectDeck')}</option>
                   {decks.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
               </Field>
-              <Field label="Note type">
+              <Field label={t('settingsAnki.noteType')}>
                 <select value={audioModelName} onChange={(e) => setAudioModelName(e.target.value)} className={inputCls}>
-                  <option value="">Select a Note Type...</option>
+                  <option value="">{t('settingsAnki.selectNoteType')}</option>
                   {models.map((m) => <option key={m} value={m}>{m}</option>)}
                 </select>
               </Field>

@@ -1,15 +1,17 @@
 import React from 'react';
 import { Film, Bookmark, Settings as SettingsIcon } from 'lucide-react';
 import { AppState } from '../types';
+import { useT } from '../utils/i18n';
 
 // Page frame for the three non-practice screens: wordmark + three tabs + scrolling body.
-const NAV: { state: AppState; label: string; Icon: React.FC<{ size?: number }> }[] = [
-  { state: AppState.UPLOAD, label: 'Videos', Icon: Film },
-  { state: AppState.LIBRARY, label: 'Saved', Icon: Bookmark },
-  { state: AppState.SETTINGS, label: 'Settings', Icon: SettingsIcon },
-];
-
-const Shell: React.FC<{ active: AppState; onNav: (s: AppState) => void; children: React.ReactNode }> = ({ active, onNav, children }) => (
+const Shell: React.FC<{ active: AppState; onNav: (s: AppState) => void; children: React.ReactNode }> = ({ active, onNav, children }) => {
+  const t = useT();
+  const NAV: { state: AppState; label: string; Icon: React.FC<{ size?: number }> }[] = [
+    { state: AppState.UPLOAD, label: t('nav.videos'), Icon: Film },
+    { state: AppState.LIBRARY, label: t('nav.saved'), Icon: Bookmark },
+    { state: AppState.SETTINGS, label: t('nav.settings'), Icon: SettingsIcon },
+  ];
+  return (
   <div className="h-full flex flex-col">
     <header className="shrink-0 border-b border-line bg-page">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
@@ -37,6 +39,7 @@ const Shell: React.FC<{ active: AppState; onNav: (s: AppState) => void; children
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">{children}</div>
     </main>
   </div>
-);
+  );
+};
 
 export default Shell;

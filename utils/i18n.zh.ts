@@ -1,0 +1,211 @@
+import { en } from './i18n.en';
+
+// Chinese dictionary. Typed against the English dictionary's keys so a
+// missing translation fails `tsc`, not just looks wrong at runtime.
+export const zh: Record<keyof typeof en, string> = {
+  // --- Dialog defaults (components/Dialog.tsx) ---
+  'dialog.ok': '好的',
+  'dialog.confirm': '确认',
+  'dialog.cancel': '取消',
+
+  // --- App.tsx ---
+  'app.subtitleReadFailTitle': '无法读取字幕文件',
+  'app.subtitleReadFailBody': '请确认这是一个纯文本的 .srt 文件。',
+  'app.noSubtitlesTitle': '没有找到字幕',
+  'app.noSubtitlesBody': '“{name}”里没有可读的句子，请确认它是 .srt 文件。',
+  'app.pickVideoTitle': '选择视频文件',
+  'app.pickVideoBody': '重新选择“{name}”。你的进度和字幕都还在。',
+  'app.pickVideoOk': '选择文件',
+  'app.openVideoFailTitle': '无法打开这个视频',
+  'app.openVideoFailBody': '再试一次，或者重新拖入文件。',
+
+  // --- Shared across components ---
+  'common.close': '关闭',
+  'common.lookup': '查词',
+  'common.nextLine': '下一句',
+  'common.added': '已添加',
+  'common.failed': '失败',
+  'common.savedLines': '收藏的句子',
+
+  // --- Shell.tsx / Studio.tsx nav labels ---
+  'nav.videos': '视频',
+  'nav.saved': '收藏',
+  'nav.settings': '设置',
+
+  // --- Home.tsx ---
+  'home.dictateTitle': '先听，再逐词打出来',
+  'home.dictate': '听写',
+  'home.blurTitle': '字幕先藏起来，边看边点开',
+  'home.blur': '模糊',
+  'home.dropLine1': '拖入一个视频',
+  'home.dropLine2': '和它的字幕',
+  'home.dropHint': '一起拖进来，或者分开选都行。',
+  'home.videoLabel': '视频',
+  'home.chooseVideo': '选择视频',
+  'home.subtitlesLabel': '字幕',
+  'home.chooseSubtitles': '选择字幕',
+  'home.thenPickMode': '然后选一个模式开始。',
+  'home.yourVideos': '你的视频',
+  'home.pickModeContinue': '选一个模式，接着上次的进度继续。',
+  'home.loading': '加载中',
+  'home.nothingHereYet': '这里还空着',
+  'home.nothingHereHint': '在上面拖入视频和 .srt 字幕。进度和字幕都保存在这个浏览器里。',
+  'home.linesCount': '{current} / {total} 句',
+  'home.timeJustNow': '刚刚',
+  'home.timeMinuteAgo': '{n} 分钟前',
+  'home.timeMinutesAgo': '{n} 分钟前',
+  'home.timeHourAgo': '{n} 小时前',
+  'home.timeHoursAgo': '{n} 小时前',
+  'home.timeYesterday': '昨天',
+  'home.timeDaysAgo': '{n} 天前',
+  'home.deleteTitle': '删除这个视频？',
+  'home.deleteBody': '“{name}”和它的进度都会被删除，收藏的句子会保留。',
+  'home.deleteOk': '删除',
+  'home.deleteFailTitle': '删除失败',
+  'home.deleteFailBody': '删除记录时出了点问题，请重试。',
+  'home.deleteRecordTitle': '删除记录',
+
+  // --- Settings.tsx ---
+  'settings.practice': '练习',
+  'settings.savedFlash': '已保存 ✓',
+
+  // --- SettingsGeneral.tsx ---
+  'settingsGeneral.sectionLength': '分段长度',
+  'settingsGeneral.sectionLengthHintFull': '整个视频会作为一段连续的练习播放。',
+  'settingsGeneral.sectionLengthHint': '视频会自动按每 {n} 分钟分段，减少练习疲劳。',
+  'settingsGeneral.optFull': '完整',
+  'settingsGeneral.opt10min': '10 分钟',
+  'settingsGeneral.startPadding': '起始留白',
+  'settingsGeneral.startPaddingHint': '在字幕时间点之前多留一点时间，避免开头的词被截断。',
+  'settingsGeneral.endPadding': '结尾留白',
+  'settingsGeneral.endPaddingHint': '在字幕时间点之后多留一点时间。建议起始 100ms，结尾 200ms。',
+
+  // --- SettingsAI.tsx ---
+  'settingsAI.apiKey': 'API Key',
+  'settingsAI.apiKeyHintPre': '前往',
+  'settingsAI.apiKeyHintLink': 'Google AI Studio',
+  'settingsAI.apiKeyHintPost': ' 获取密钥，仅保存在本地浏览器中。',
+  'settingsAI.apiKeyPlaceholder': '输入你的 Gemini API Key...',
+  'settingsAI.model': '模型',
+  'settingsAI.modelHint': '在查词速度和释义质量之间选一个平衡点。',
+  'settingsAI.modelFlash': 'Gemini 2.5 Flash（推荐）',
+  'settingsAI.modelFlashLite': 'Gemini Flash Lite（最快）',
+  'settingsAI.modelPro': 'Gemini 3 Pro（质量最好）',
+  'settingsAI.temperature': '随机度',
+  'settingsAI.temperatureHint': '数值越低，结果越稳定；数值越高，结果越有创意。',
+  'settingsAI.promptTemplate': '提示词模板',
+  'settingsAI.reset': '重置',
+  'settingsAI.promptHint': '用 {word} 和 {context} 作为占位符。返回结果仍需符合约定的 JSON 结构（word、definition、partOfSpeech）。',
+  'settingsAI.promptPlaceholder': '输入提示词...',
+
+  // --- SettingsAnki.tsx ---
+  'settingsAnki.fieldMapping': '字段映射',
+  'settingsAnki.leaveEmpty': '（留空）',
+  'settingsAnki.url': 'AnkiConnect 地址',
+  'settingsAnki.connect': '连接',
+  'settingsAnki.reconnect': '重新连接',
+  'settingsAnki.wordCard': '单词卡片',
+  'settingsAnki.audioCard': '音频卡片',
+  'settingsAnki.targetDeck': '目标牌组',
+  'settingsAnki.selectDeck': '选择一个牌组...',
+  'settingsAnki.noteType': '笔记类型',
+  'settingsAnki.selectNoteType': '选择一个笔记类型...',
+  'settingsAnki.fieldSentence': '句子（字幕）',
+  'settingsAnki.fieldVideoName': '视频名称',
+  'settingsAnki.fieldTimestamp': '时间戳（MM:SS）',
+  'settingsAnki.fieldScreenshot': '截图（图片）',
+  'settingsAnki.fieldAudio': '音频（片段）',
+  'settingsAnki.fieldWord': '选中的单词',
+  'settingsAnki.fieldDefinition': '单词释义（AI）',
+  'settingsAnki.fieldContext': '上下文（句子）',
+
+  // --- DefinitionPanel.tsx ---
+  'definition.ariaLabel': '单词释义',
+  'definition.unpin': '取消固定：切换句子后会清空',
+  'definition.pin': '固定：切换句子也保持打开',
+  'definition.heading': '释义',
+  'definition.asking': '正在询问 Gemini…',
+  'definition.sendToAnki': '发送到 Anki',
+  'definition.wordOnly': '仅单词',
+  'definition.withAudio': '带音频',
+  'definition.emptyHint': '点击字幕里的单词即可查词。',
+
+  // --- BlurLine.tsx ---
+  'blur.reveal': '显示',
+  'blur.hiddenWord': '隐藏的单词',
+
+  // --- Studio.tsx ---
+  'studio.backToVideos': '回到你的视频列表',
+  'studio.previousSection': '上一段',
+  'studio.nextSection': '下一段',
+  'studio.part': '第 {current}/{total} 段',
+  'studio.savedLinesFromVideo': '这个视频里收藏的句子',
+  'studio.playAriaLabel': '播放',
+  'studio.noVideoLoaded': '还没有加载视频',
+  'studio.endOfPart': '这一段到这里就结束了',
+  'studio.blurBadge': '模糊',
+  'studio.dictationBadge': '听写',
+  'studio.lineCount': '第 {current} / {total} 句',
+  'studio.stepLabel': '逐句',
+  'studio.stepTitle': '每句播完自动暂停',
+  'studio.flowLabel': '连播',
+  'studio.flowTitle': '连续播放，自己手动暂停',
+  'studio.sectionDoneTitle': '第 {n} 段完成',
+  'studio.sectionDoneBody': '不错，可以乘胜追击，也可以回头再练一遍。',
+  'studio.review': '回顾',
+  'studio.finTitle': '完',
+  'studio.finBody': '你练完了“{name}”的每一句。',
+  'studio.statLines': '句',
+  'studio.statSaved': '收藏',
+  'studio.startOver': '重新开始',
+  'studio.backToVideosBtn': '回到视频列表',
+  'studio.listening': '播放中',
+
+  // --- Transport.tsx ---
+  'transport.rec': '录制',
+  'transport.adding': '添加中',
+  'transport.previousLine': '上一句（Ctrl+←）',
+  'transport.replayLine': '重播这句（Shift+Space）',
+  'transport.pauseSpace': '暂停（Space）',
+  'transport.playSpace': '播放（Space）',
+  'transport.nextLine': '下一句（Ctrl+→）',
+  'transport.unsaveLine': '取消收藏',
+  'transport.saveLine': '收藏这句',
+  'transport.sendToAnki': '把这句发送到 Anki（Alt+N）',
+  'transport.unmute': '取消静音',
+  'transport.mute': '静音',
+  'transport.recordingBanner': '● 正在为 Anki 录制音频片段',
+  'transport.legend': 'Space 播放/暂停 · Shift+Space 重播 · Ctrl+←/→ 切换句子 · Enter 下一句 · Alt+N 发送 Anki',
+  'transport.legendDictation': 'Space 播放/暂停 · Shift+Space 重播 · Ctrl+←/→ 切换句子 · Enter 下一句 · Ctrl+X 偷看 · Alt+N 发送 Anki',
+
+  // --- DictationLine.tsx ---
+  'dictation.youTyped': '你打的',
+  'dictation.expected': '应为：{word}',
+  'dictation.hearAgain': '再听一遍',
+  'dictation.checkTitle': '检查（最后一个词按 Enter）',
+  'dictation.keyHint': 'Space 跳到下一个词 · Ctrl+X 偷看 · Shift+Space 重播',
+
+  // --- SavedDrawer.tsx ---
+  'savedDrawer.emptyHint': '这个视频还没有收藏的句子。播放时点书签图标即可收藏。',
+  'savedDrawer.remove': '移除',
+  'savedDrawer.go': '前往',
+
+  // --- SavedLibrary.tsx ---
+  'savedLibrary.searchPlaceholder': '搜索收藏的句子...',
+  'savedLibrary.removeFromCollection': '从收藏中移除',
+  'savedLibrary.noMatch': '没有匹配结果',
+  'savedLibrary.nothingSavedYet': '还没有收藏',
+  'savedLibrary.tryDifferent': '换个句子或视频名称试试。',
+  'savedLibrary.goPractice': '去练习，收藏几句喜欢的句子吧！',
+
+  // --- hooks/useAnkiIntegration.ts ---
+  'anki.notConnectedTitle': 'Anki 还没有连接',
+  'anki.notConnectedBody': '打开 设置 → Anki，填入 AnkiConnect 地址后点击连接。',
+  'anki.noCardTitle': '还没有配置 Anki 卡片',
+  'anki.noCardBody': '打开 设置 → Anki，为单词卡片或音频卡片选择牌组和笔记类型。',
+  'anki.refusedTitle': 'Anki 拒绝了这张卡片',
+
+  // --- utils/ai.ts ---
+  'ai.noKeyError': '在 设置 → AI 中填入你的 Gemini API Key 才能查词。',
+  'ai.genericError': '没能获取到释义，检查一下密钥和网络后重试。',
+};
