@@ -1,5 +1,9 @@
-/* LinguaClip — notebook / paper base. Tailwind CDN provides utilities; this file holds
-   the few things utilities can't: tokens, form-control skins, paper patterns. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* LinguaClip — notebook / paper base. Tailwind utilities come from the local build;
+   this file holds the few things utilities can't: tokens, form-control skins, paper patterns. */
 :root {
   --paper: #F6F1E6;
   --page: #FFFDF7;

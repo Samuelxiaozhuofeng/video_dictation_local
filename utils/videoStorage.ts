@@ -11,20 +11,20 @@ const STORAGE_KEY_PROGRESS = 'linguaclip_video_progress';
  * Create a new video record
  */
 export interface CreateVideoRecordOptions {
-  videoFileHandle?: FileSystemFileHandle;
+  videoPath?: string;
   learningMode?: LearningMode;
   blurPlaybackMode?: BlurPlaybackMode;
 }
 
 export const createVideoRecord = async (
-  videoFile: File,
+  videoName: string,
   subtitleFile: File,
   subtitleText: string,
   totalSubtitles: number,
   options: CreateVideoRecordOptions = {}
 ): Promise<VideoRecord> => {
   const {
-    videoFileHandle,
+    videoPath,
     learningMode = LearningMode.DICTATION,
     blurPlaybackMode = BlurPlaybackMode.SENTENCE_BY_SENTENCE,
   } = options;
@@ -32,8 +32,8 @@ export const createVideoRecord = async (
   
   const record: VideoRecord = {
     id,
-    displayName: videoFile.name,
-    videoFileName: videoFile.name,
+    displayName: videoName,
+    videoFileName: videoName,
     subtitleFileName: subtitleFile.name,
     subtitleText,
     currentSubtitleIndex: 0,
@@ -45,15 +45,10 @@ export const createVideoRecord = async (
     totalPracticeTime: 0,
     learningMode,
     blurPlaybackMode,
+    videoPath,
   };
 
-  // Save to IndexedDB
   await FileSystemAccess.saveVideoToDB(record);
-
-  // Save file handle if available
-  if (videoFileHandle) {
-    await FileSystemAccess.saveFileHandle(id, videoFileHandle);
-  }
 
   return record;
 };
@@ -134,32 +129,6 @@ export const updateProgress = async (
     await updateVideoRecord(record);
   } catch (error) {
     console.error('Failed to update progress:', error);
-  }
-};
-
-/**
- * Get video file from stored handle
- */
-export const getVideoFileFromRecord = async (record: VideoRecord): Promise<File | null> => {
-  try {
-    const handle = await FileSystemAccess.getFileHandle(record.id);
-    if (!handle) return null;
-
-    return await FileSystemAccess.getFileFromHandle(handle);
-  } catch (error) {
-    console.error('Failed to get video file:', error);
-    return null;
-  }
-};
-
-/**
- * Save video file handle for a record
- */
-export const saveVideoFileHandle = async (videoId: string, handle: FileSystemFileHandle): Promise<void> => {
-  try {
-    await FileSystemAccess.saveFileHandle(videoId, handle);
-  } catch (error) {
-    console.error('Failed to save video file handle:', error);
   }
 };
 

@@ -25,6 +25,34 @@ export interface UseAnkiIntegrationReturn {
   reloadConfig: () => void;
 }
 
+type VideoAudioTap = {
+  ctx: AudioContext;
+  source: MediaElementAudioSourceNode;
+};
+
+const videoAudioTaps = new WeakMap<HTMLVideoElement, VideoAudioTap>();
+
+function tapVideo(video: HTMLVideoElement): VideoAudioTap {
+  const existing = videoAudioTaps.get(video);
+  if (existing) return existing;
+  const ctx = new AudioContext();
+  const source = ctx.createMediaElementSource(video);
+  source.connect(ctx.destination);
+  const tap = { ctx, source };
+  videoAudioTaps.set(video, tap);
+  return tap;
+}
+
+function pickRecorderMime(): { mimeType: string; ext: string } {
+  if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm')) {
+    return { mimeType: 'audio/webm', ext: 'webm' };
+  }
+  if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/mp4')) {
+    return { mimeType: 'audio/mp4', ext: 'mp4' };
+  }
+  return { mimeType: '', ext: 'webm' };
+}
+
 export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiIntegrationReturn {
   const { videoRef, videoFileName } = params;
 
@@ -37,7 +65,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
   }, []);
 
   // Capture audio clip from video with padding
-  const captureAudioClip = useCallback(async (start: number, end: number): Promise<string | null> => {
+  const captureAudioClip = useCallback(async (start: number, end: number): Promise<{ base64: string; ext: string } | null> => {
     const video = videoRef.current;
     if (!video) return null;
 
@@ -58,27 +86,34 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
       throw new Error(`Audio padding error: End time (${paddedEnd.toFixed(2)}s) exceeds video duration (${video.duration.toFixed(2)}s). Please reduce end padding.`);
     }
 
-    // Check for browser support
-    const stream: MediaStream | null = (video as any).captureStream ? (video as any).captureStream() :
-                                       (video as any).mozCaptureStream ? (video as any).mozCaptureStream() : null;
+    const tap = tapVideo(video);
+    await tap.ctx.resume();
 
-    if (!stream) return null;
+    const dest = tap.ctx.createMediaStreamDestination();
+    tap.source.connect(dest);
 
-    const audioTrack = stream.getAudioTracks()[0];
-    if (!audioTrack) return null;
-
-    const recorder = new MediaRecorder(new MediaStream([audioTrack]), { mimeType: 'audio/webm' });
+    const { mimeType, ext } = pickRecorderMime();
+    const recorder = mimeType
+      ? new MediaRecorder(dest.stream, { mimeType })
+      : new MediaRecorder(dest.stream);
     const chunks: BlobPart[] = [];
     const originalTime = video.currentTime;
     const wasPlaying = !video.paused;
+    const blobType = mimeType || 'audio/webm';
 
     return new Promise((resolve, reject) => {
+        let done = false;
+        const teardown = () => {
+            try { tap.source.disconnect(dest); } catch { /* already disconnected */ }
+        };
+
         recorder.ondataavailable = e => {
             if (e.data.size > 0) chunks.push(e.data);
         };
 
         recorder.onstop = () => {
-            const blob = new Blob(chunks, { type: 'audio/webm' });
+            teardown();
+            const blob = new Blob(chunks, { type: blobType });
             const reader = new FileReader();
             reader.readAsDataURL(blob);
             reader.onloadend = () => {
@@ -89,7 +124,10 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
                 video.currentTime = originalTime;
                 if (!wasPlaying) video.pause();
 
-                resolve(base64);
+                if (!done) {
+                    done = true;
+                    resolve({ base64, ext });
+                }
             }
         };
 
@@ -98,7 +136,12 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
         recorder.start();
         video.play().catch(e => {
             console.error("Record playback failed", e);
-            reject(e);
+            if (recorder.state !== 'inactive') recorder.stop();
+            teardown();
+            if (!done) {
+                done = true;
+                reject(e);
+            }
         });
 
         const duration = (paddedEnd - paddedStart) * 1000;
@@ -117,8 +160,9 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
   const captureMedia = useCallback(async (currentSub: Subtitle, template: AnkiCardTemplateConfig | null, includeAudio: boolean = true) => {
       let screenshotBase64 = undefined;
       let audioBase64 = undefined;
+      let audioExt = undefined;
 
-      if (!template) return { screenshotBase64, audioBase64 };
+      if (!template) return { screenshotBase64, audioBase64, audioExt };
 
       const mappingValues = Object.values(template.fieldMapping);
       const needsScreenshot = mappingValues.includes('screenshot');
@@ -144,13 +188,16 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
       if (includeAudio && needsAudio && videoRef.current) {
           try {
               const result = await captureAudioClip(currentSub.startTime, currentSub.endTime);
-              if (result) audioBase64 = result;
+              if (result) {
+                audioBase64 = result.base64;
+                audioExt = result.ext;
+              }
           } catch (e) {
               console.error("Audio capture failed", e);
           }
       }
 
-      return { screenshotBase64, audioBase64 };
+      return { screenshotBase64, audioBase64, audioExt };
   }, [ankiConfig, videoRef, captureAudioClip]);
 
   // Add current subtitle to Anki
@@ -174,7 +221,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
     if (needsAudio) setAnkiStatus('recording');
     else setAnkiStatus('adding');
 
-    const { screenshotBase64, audioBase64 } = await captureMedia(subtitle, template, true);
+    const { screenshotBase64, audioBase64, audioExt } = await captureMedia(subtitle, template, true);
 
     setAnkiStatus('adding');
     try {
@@ -183,7 +230,8 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
             videoName: videoFileName || 'Unknown',
             timestamp: Storage.formatTimeCode(subtitle.startTime),
             screenshotBase64,
-            audioBase64
+            audioBase64,
+            audioExt,
         });
         setAnkiStatus('success');
         setTimeout(() => setAnkiStatus('idle'), 2000);
@@ -216,7 +264,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
         throw new Error('Anki card not configured');
       }
 
-      const { screenshotBase64, audioBase64 } = await captureMedia(subtitle, template, includeAudio);
+      const { screenshotBase64, audioBase64, audioExt } = await captureMedia(subtitle, template, includeAudio);
 
       await Anki.addNote(ankiConfig.url, template, {
           sentence: subtitle.text,
@@ -224,6 +272,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
           timestamp: Storage.formatTimeCode(subtitle.startTime),
           screenshotBase64,
           audioBase64,
+          audioExt,
           word,
           definition
       });

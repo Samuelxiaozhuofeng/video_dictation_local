@@ -1,3 +1,4 @@
+import { fetch } from '@tauri-apps/plugin-http';
 import { AnkiConfig, AnkiCardTemplateConfig } from '../types';
 
 const STORAGE_KEY_ANKI = 'linguaclip_anki_config';
@@ -88,6 +89,7 @@ export const addNote = async (
     timestamp: string; 
     screenshotBase64?: string;
     audioBase64?: string;
+    audioExt?: string;
     word?: string;
     definition?: string;
   }
@@ -116,7 +118,7 @@ export const addNote = async (
     else if (appKey === 'audio' && data.audioBase64) {
         audio.push({
             data: data.audioBase64,
-            filename: `linguaclip_audio_${Date.now()}.webm`,
+            filename: `linguaclip_audio_${Date.now()}.${data.audioExt || 'webm'}`,
             fields: [ankiField]
         });
     }

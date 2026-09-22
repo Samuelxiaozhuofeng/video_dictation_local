@@ -13,8 +13,8 @@ const Shell: React.FC<{ active: AppState; onNav: (s: AppState) => void; children
   ];
   return (
   <div className="h-full flex flex-col">
-    <header className="shrink-0 border-b border-line bg-page">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+    <header className="shrink-0 border-b border-line bg-page pl-[80px]" data-tauri-drag-region>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4" data-tauri-drag-region>
         <div className="flex items-center gap-2.5 select-none">
           <span className="w-3 h-3 rounded-sm bg-green" aria-hidden />
           <span className="font-serif text-xl font-semibold tracking-tight">LinguaClip</span>

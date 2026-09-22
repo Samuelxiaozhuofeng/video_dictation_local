@@ -1,12 +1,6 @@
 /**
- * File System Access API and IndexedDB utilities
- * Handles video file references and subtitle storage
+ * IndexedDB utilities for video records and subtitle storage.
  */
-
-// Check if File System Access API is supported
-export const isFileSystemAccessSupported = (): boolean => {
-  return 'showOpenFilePicker' in window;
-};
 
 // IndexedDB setup
 const DB_NAME = 'linguaclip_db';
@@ -110,59 +104,5 @@ export const deleteVideoFromDB = async (id: string): Promise<void> => {
     request.onsuccess = () => resolve();
     request.onerror = () => reject(new Error('Failed to delete video record'));
   });
-};
-
-/**
- * Save file handle to IndexedDB (for File System Access API)
- */
-export const saveFileHandle = async (id: string, handle: FileSystemFileHandle): Promise<void> => {
-  if (!isFileSystemAccessSupported()) return;
-
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE_FILE_HANDLES], 'readwrite');
-    const store = transaction.objectStore(STORE_FILE_HANDLES);
-    const request = store.put({ id, handle });
-
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(new Error('Failed to save file handle'));
-  });
-};
-
-/**
- * Get file handle from IndexedDB
- */
-export const getFileHandle = async (id: string): Promise<FileSystemFileHandle | null> => {
-  if (!isFileSystemAccessSupported()) return null;
-
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE_FILE_HANDLES], 'readonly');
-    const store = transaction.objectStore(STORE_FILE_HANDLES);
-    const request = store.get(id);
-
-    request.onsuccess = () => resolve(request.result?.handle || null);
-    request.onerror = () => reject(new Error('Failed to get file handle'));
-  });
-};
-
-/**
- * Request file access and get File object from handle
- */
-export const getFileFromHandle = async (handle: FileSystemFileHandle): Promise<File | null> => {
-  try {
-    // Stored handles come back as 'prompt' after a reload; ask (needs a user gesture, which Resume is).
-    const h = handle as any;
-    let permission = await h.queryPermission({ mode: 'read' });
-    if (permission === 'prompt') permission = await h.requestPermission({ mode: 'read' });
-    if (permission !== 'granted') {
-      return null;
-    }
-
-    return await handle.getFile();
-  } catch (error) {
-    console.error('Failed to get file from handle:', error);
-    return null;
-  }
 };
 

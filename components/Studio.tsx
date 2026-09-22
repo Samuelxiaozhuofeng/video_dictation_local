@@ -62,7 +62,7 @@ const Studio: React.FC = () => {
   return (
     <div className="relative h-full flex flex-col bg-paper">
       {/* --- Top strip --- */}
-      <header className="shrink-0 h-14 border-b border-line bg-page px-3 sm:px-4 flex items-center justify-between gap-3">
+      <header className="shrink-0 h-14 border-b border-line bg-page pl-[80px] pr-3 sm:pr-4 flex items-center justify-between gap-3" data-tauri-drag-region>
         <div className="flex items-center gap-3 min-w-0">
           <Btn size="sm" flat onClick={actions.onExit} title={t('studio.backToVideos')}><HomeIcon size={14} /> <span className="hidden sm:inline">{t('nav.videos')}</span></Btn>
           <span className="font-serif font-semibold truncate min-w-0" title={videoName}>{videoName}</span>
@@ -85,7 +85,7 @@ const Studio: React.FC = () => {
       {/* --- Stage --- */}
       <div className="relative flex-1 min-h-0 flex items-center justify-center p-4 sm:p-6">
         {videoSrc ? (
-          <video ref={videoRef} src={videoSrc} onLoadedMetadata={() => actions.onReplayCurrent()} className="rounded-lg border border-line shadow-card bg-ink block max-h-full max-w-full" />
+          <video ref={videoRef} crossOrigin="anonymous" src={videoSrc} onLoadedMetadata={() => actions.onReplayCurrent()} className="rounded-lg border border-line shadow-card bg-ink block max-h-full max-w-full" />
         ) : (
           <Card tone="paper" flat className="p-6 text-mute">{t('studio.noVideoLoaded')}</Card>
         )}

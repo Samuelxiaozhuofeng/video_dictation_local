@@ -1,4 +1,5 @@
 import React from 'react';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import * as AI from '../utils/ai';
 import { Btn, Field, inputCls } from './ui';
 import { useT } from '../utils/i18n';
@@ -32,7 +33,16 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
         hint={
           <>
             {t('settingsAI.apiKeyHintPre')}{' '}
-            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline text-green">
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline text-green"
+              onClick={(e) => {
+                e.preventDefault();
+                void openUrl('https://aistudio.google.com/app/apikey');
+              }}
+            >
               {t('settingsAI.apiKeyHintLink')}
             </a>
             {t('settingsAI.apiKeyHintPost')}

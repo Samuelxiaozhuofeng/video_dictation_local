@@ -107,6 +107,7 @@ export interface VideoRecord {
 
   // File access (for File System Access API)
   videoFileHandle?: any;                // FileSystemFileHandle (stored separately in IndexedDB)
+  videoPath?: string;                   // Absolute video path on disk (desktop)
   subtitleText: string;                 // Subtitle content (stored in IndexedDB)
 
   // Progress information

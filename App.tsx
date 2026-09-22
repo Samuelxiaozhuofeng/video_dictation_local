@@ -15,31 +15,22 @@ import { useVideoController } from './hooks/useVideoController';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { usePracticeActions } from './hooks/usePracticeActions';
 import * as VideoStorage from './utils/videoStorage';
+import { fileNameFromPath, pathExists, pickVideoPath, videoSrcFromPath } from './utils/desktop';
 import { t, useLang } from './utils/i18n';
-
-// Plain <input type="file"> as a promise; used where showOpenFilePicker is unavailable.
-const pickFileWithInput = () => new Promise<File | null>(resolve => {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'video/*,.mp4,.webm,.mkv,.mov,.avi,.m4v';
-  input.onchange = () => resolve(input.files?.[0] ?? null);
-  input.oncancel = () => resolve(null);
-  input.click();
-});
 
 export default function App() {
   const lang = useLang();
   useEffect(() => { document.documentElement.lang = lang; }, [lang]);
 
   const [appState, setAppState] = useState<AppState>(AppState.UPLOAD);
-  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoFileName, setVideoFileName] = useState<string | null>(null);
   const [learningMode, setLearningMode] = useState<LearningMode>(LearningMode.DICTATION);
   const [blurPlaybackMode, setBlurPlaybackModeState] = useState<BlurPlaybackMode>(BlurPlaybackMode.SENTENCE_BY_SENTENCE);
   const [showComplete, setShowComplete] = useState(false);
 
   const {
     currentVideoId, setCurrentVideoId, createVideoRecord,
-    getVideoFileFromRecord, getSubtitleFileFromRecord, saveVideoFileHandle,
+    getSubtitleFileFromRecord,
   } = useVideoHistory();
 
   const {
@@ -53,7 +44,7 @@ export default function App() {
     savedIds, showSavedList, savedItems, setShowSavedList,
     toggleSave: savedLinesToggleSave, deleteSavedItem: savedLinesDeleteSavedItem,
     isCurrentSaved: savedLinesIsCurrentSaved, loadSavedIds, setSavedIds,
-  } = useSavedLines({ videoId: currentVideoId, fullSubtitles, videoFileName: videoFile?.name || null });
+  } = useSavedLines({ videoId: currentVideoId, fullSubtitles, videoFileName });
 
   const finishPractice = useCallback(() => {
     setShowComplete(true);
@@ -84,7 +75,7 @@ export default function App() {
   const {
     ankiConfig, ankiStatus, setAnkiStatus,
     handleAddToAnki: ankiHandleAddToAnki, handleWordToAnki: ankiHandleWordToAnki, reloadConfig: reloadAnkiConfig,
-  } = useAnkiIntegration({ videoRef, videoFileName: videoFile?.name || null });
+  } = useAnkiIntegration({ videoRef, videoFileName });
 
   // Settings autosaves; pick the latest Anki config up whenever we leave that page.
   useEffect(() => {
@@ -102,8 +93,8 @@ export default function App() {
   // --- Starting a session ---
 
   const startPractice = async (
-    vf: File, sf: File, lm: LearningMode, bpm: BlurPlaybackMode,
-    startIndex?: number, startSectionIndex?: number, videoId?: string, handle?: FileSystemFileHandle,
+    videoName: string, videoPath: string, sf: File, lm: LearningMode, bpm: BlurPlaybackMode,
+    startIndex?: number, startSectionIndex?: number, videoId?: string,
   ) => {
     let subText: string;
     try {
@@ -124,51 +115,41 @@ export default function App() {
     let recordId = videoId;
     if (!recordId) {
       try {
-        const record = await createVideoRecord(vf, sf, subText, result.parsed.length, { learningMode: lm, blurPlaybackMode: bpm, videoFileHandle: handle });
+        const record = await createVideoRecord(videoName, sf, subText, result.parsed.length, { learningMode: lm, blurPlaybackMode: bpm, videoPath });
         recordId = record.id;
       } catch (error) {
         console.error('Failed to save video record:', error);
       }
     }
 
-    setVideoFile(vf);
+    setVideoFileName(videoName);
     setIsPlaying(false);
     setCurrentVideoId(recordId || null);
     setSavedIds(loadSavedIds(result.parsed));
-    setVideoSrc(URL.createObjectURL(vf));
+    setVideoSrc(videoSrcFromPath(videoPath));
     setShowComplete(false);
     setAppState(AppState.PRACTICE);
   };
 
   const handleStartNew = (pair: NewPair, lm: LearningMode) =>
-    startPractice(pair.video, pair.srt, lm, BlurPlaybackMode.SENTENCE_BY_SENTENCE, undefined, undefined, undefined, pair.handle);
+    startPractice(fileNameFromPath(pair.videoPath), pair.videoPath, pair.srt, lm, BlurPlaybackMode.SENTENCE_BY_SENTENCE);
 
   const handleResume = async (record: VideoRecord, lm: LearningMode) => {
     try {
-      let vf = await getVideoFileFromRecord(record);
-
-      if (!vf) {
+      let videoPath = record.videoPath;
+      if (!videoPath || !(await pathExists(videoPath))) {
         const ok = await dialog.confirm(t('app.pickVideoTitle'), t('app.pickVideoBody', { name: record.videoFileName }), { ok: t('app.pickVideoOk') });
         if (!ok) return;
-        const picker = (window as any).showOpenFilePicker;
-        if (picker) {
-          try {
-            const [handle] = await picker({ types: [{ description: 'Video', accept: { 'video/*': ['.mp4', '.webm', '.mkv', '.mov', '.avi', '.m4v'] } }] });
-            vf = await handle.getFile();
-            await saveVideoFileHandle(record.id, handle);
-          } catch {
-            return; // cancelled
-          }
-        } else {
-          vf = await pickFileWithInput(); // browsers without the File System Access API: plain file input, no handle to remember
-          if (!vf) return;
-        }
+        const picked = await pickVideoPath();
+        if (!picked) return;
+        videoPath = picked;
+        await VideoStorage.updateVideoRecord({ ...record, videoPath });
       }
 
       if (record.learningMode !== lm) await VideoStorage.updateVideoMode(record.id, { learningMode: lm });
       const finished = record.completionRate >= 100;
       await startPractice(
-        vf!, getSubtitleFileFromRecord(record), lm,
+        record.videoFileName, videoPath, getSubtitleFileFromRecord(record), lm,
         record.blurPlaybackMode ?? BlurPlaybackMode.SENTENCE_BY_SENTENCE,
         finished ? 0 : record.currentSubtitleIndex, finished ? 0 : record.currentSectionIndex, record.id,
       );
@@ -211,9 +192,9 @@ export default function App() {
     { code: 'Space', shiftKey: true, preventDefault: true, condition: () => inPractice, handler: () => handleReplayCurrent() },
     { code: 'Space', shiftKey: false, preventDefault: true, allowInEditable: false, condition: () => inPractice, handler: () => togglePlay() },
     { code: 'Enter', preventDefault: true, allowInEditable: false, condition: () => inPractice && (mode === PracticeMode.FEEDBACK || blurStepPaused), handler: () => handleContinue() },
-    { code: 'ArrowLeft', ctrlOrMeta: true, preventDefault: true, condition: () => inPractice, handler: () => handleSkip('prev') },
-    { code: 'ArrowRight', ctrlOrMeta: true, preventDefault: true, condition: () => inPractice, handler: () => handleSkip('next') },
-    { code: 'KeyN', altKey: true, condition: () => inPractice, handler: (e: KeyboardEvent) => handleAddToAnkiShortcut(e) },
+    { code: 'ArrowUp', ctrlOrMeta: true, preventDefault: true, condition: () => inPractice, handler: () => handleSkip('prev') },
+    { code: 'ArrowDown', ctrlOrMeta: true, preventDefault: true, condition: () => inPractice, handler: () => handleSkip('next') },
+    { code: 'KeyN', metaKey: true, shiftKey: true, condition: () => inPractice, handler: (e: KeyboardEvent) => handleAddToAnkiShortcut(e) },
   ]), [inPractice, mode, blurStepPaused, handleReplayCurrent, togglePlay, handleContinue, handleSkip, handleAddToAnkiShortcut]);
 
   useKeyboardShortcuts(keyboardShortcuts);
@@ -233,7 +214,7 @@ export default function App() {
       practice={{
         subtitles, fullSubtitles, sections, currentSectionIndex, currentSubtitleIndex, mode,
         showSectionComplete, showComplete, learningMode, blurPlaybackMode,
-        videoName: videoFile?.name || 'Video',
+        videoName: videoFileName || 'Video',
       }}
       video={{ videoRef, videoSrc, isPlaying, volume, playbackSpeed, progress }}
       saved={{ savedIds, showSavedList, savedItems, isCurrentSaved: savedLinesIsCurrentSaved(currentSub) }}

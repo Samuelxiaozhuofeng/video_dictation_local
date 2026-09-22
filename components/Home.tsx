@@ -1,19 +1,22 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FileVideo, FileText, Pencil, EyeOff, Trash2, Clock, Loader2, Upload } from 'lucide-react';
 import { LearningMode, VideoRecord } from '../types';
 import * as VideoStorage from '../utils/videoStorage';
+import {
+  fileNameFromPath, listenDragDrop, pickSubtitlePath, pickVideoPath, readSubtitleFile,
+} from '../utils/desktop';
 import { Btn, Card, Stamp, H } from './ui';
 import { dialog } from './Dialog';
 import { useT, useLang } from '../utils/i18n';
 
-export interface NewPair { video: File; srt: File; handle?: FileSystemFileHandle }
+export interface NewPair { videoPath: string; srt: File }
 
 interface HomeProps {
   onStartNew: (pair: NewPair, mode: LearningMode) => void | Promise<void>;
   onResume: (record: VideoRecord, mode: LearningMode) => void | Promise<void>;
 }
 
-const VIDEO_EXT = /\.(mp4|webm|mkv|mov|avi|m4v)$/i;
+const VIDEO_EXT = /\.(mp4|mov|m4v)$/i;
 const SRT_EXT = /\.(srt|txt|vtt)$/i;
 
 // Two mode buttons used both for a fresh upload and for every shelf card.
@@ -37,52 +40,62 @@ const ModeButtons: React.FC<{ last?: LearningMode; onPick: (m: LearningMode) => 
 // One drop zone takes both files; each slot can also be browsed on its own.
 const DropZone: React.FC<{ onStart: (pair: NewPair, mode: LearningMode) => void }> = ({ onStart }) => {
   const t = useT();
-  const [video, setVideo] = useState<File | null>(null);
+  const [videoPath, setVideoPath] = useState<string | null>(null);
   const [srt, setSrt] = useState<File | null>(null);
-  const [handle, setHandle] = useState<FileSystemFileHandle | undefined>();
   const [over, setOver] = useState(false);
-  const videoInput = useRef<HTMLInputElement>(null);
-  const srtInput = useRef<HTMLInputElement>(null);
+  const videoName = videoPath ? fileNameFromPath(videoPath) : null;
 
-  const take = (files: Iterable<File>) => {
-    for (const f of files) {
-      if (VIDEO_EXT.test(f.name)) { setVideo(f); setHandle(undefined); }
-      else if (SRT_EXT.test(f.name)) setSrt(f);
+  const take = (paths: string[]) => {
+    for (const p of paths) {
+      const name = fileNameFromPath(p);
+      if (VIDEO_EXT.test(name)) setVideoPath(p);
+      else if (SRT_EXT.test(name)) {
+        readSubtitleFile(p).then(setSrt).catch(err => console.error(err));
+      }
     }
   };
 
-  const onDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    setOver(false);
-    take(Array.from(e.dataTransfer.files));
-    // Chrome hands out a handle for dropped files; keep it so Resume never asks for the file again.
-    for (const item of Array.from(e.dataTransfer.items)) {
-      const anyItem = item as any;
-      if (typeof anyItem.getAsFileSystemHandle !== 'function') continue;
-      const h = await anyItem.getAsFileSystemHandle();
-      if (h?.kind === 'file' && VIDEO_EXT.test(h.name)) setHandle(h);
-    }
-  };
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    listenDragDrop({
+      onHover: () => setOver(true),
+      onLeave: () => setOver(false),
+      onDrop: (paths) => {
+        setOver(false);
+        take(paths);
+      },
+    }).then(fn => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
 
   const browseVideo = async () => {
-    const picker = (window as any).showOpenFilePicker;
-    if (!picker) { videoInput.current?.click(); return; }
-    try {
-      const [h] = await picker({ types: [{ description: 'Video', accept: { 'video/*': ['.mp4', '.webm', '.mkv', '.mov', '.avi', '.m4v'] } }] });
-      setVideo(await h.getFile());
-      setHandle(h);
-    } catch { /* cancelled */ }
+    const p = await pickVideoPath();
+    if (p) setVideoPath(p);
   };
 
-  const ready = !!video && !!srt;
+  const browseSrt = async () => {
+    const p = await pickSubtitlePath();
+    if (!p) return;
+    try {
+      setSrt(await readSubtitleFile(p));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const ready = !!videoPath && !!srt;
 
   return (
     <Card
       flat
       className={`p-5 sm:p-6 border-dashed transition-colors ${over ? 'bg-green-soft border-green' : ''}`}
-      onDragOver={e => { e.preventDefault(); setOver(true); }}
-      onDragLeave={() => setOver(false)}
-      onDrop={onDrop}
     >
       <div className="flex flex-col lg:flex-row lg:items-center gap-5">
         <div className="flex items-center gap-4 lg:w-64 shrink-0">
@@ -94,27 +107,25 @@ const DropZone: React.FC<{ onStart: (pair: NewPair, mode: LearningMode) => void 
         </div>
 
         <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <button type="button" onClick={browseVideo} className={`flat press p-3 text-left flex items-center gap-3 ${video ? 'bg-green-soft border-green text-green' : 'hover:bg-paper'}`}>
+          <button type="button" onClick={browseVideo} className={`flat press p-3 text-left flex items-center gap-3 ${videoPath ? 'bg-green-soft border-green text-green' : 'hover:bg-paper'}`}>
             <FileVideo size={20} className="shrink-0" />
             <span className="min-w-0">
-              <span className="block text-[11px] font-medium opacity-70">{video ? t('home.videoLabel') : t('home.chooseVideo')}</span>
-              <span className="block text-sm font-medium truncate">{video ? video.name : '.mp4 .webm .mkv'}</span>
+              <span className="block text-[11px] font-medium opacity-70">{videoPath ? t('home.videoLabel') : t('home.chooseVideo')}</span>
+              <span className="block text-sm font-medium truncate">{videoName ?? '.mp4 .mov .m4v'}</span>
             </span>
           </button>
-          <button type="button" onClick={() => srtInput.current?.click()} className={`flat press p-3 text-left flex items-center gap-3 ${srt ? 'bg-green-soft border-green text-green' : 'hover:bg-paper'}`}>
+          <button type="button" onClick={browseSrt} className={`flat press p-3 text-left flex items-center gap-3 ${srt ? 'bg-green-soft border-green text-green' : 'hover:bg-paper'}`}>
             <FileText size={20} className="shrink-0" />
             <span className="min-w-0">
               <span className="block text-[11px] font-medium opacity-70">{srt ? t('home.subtitlesLabel') : t('home.chooseSubtitles')}</span>
               <span className="block text-sm font-medium truncate">{srt ? srt.name : '.srt'}</span>
             </span>
           </button>
-          <input ref={videoInput} type="file" accept="video/*,.mp4,.webm,.mkv,.mov,.avi,.m4v" className="hidden" onChange={e => e.target.files && take(Array.from(e.target.files))} />
-          <input ref={srtInput} type="file" accept=".srt,.txt,.vtt" className="hidden" onChange={e => e.target.files && take(Array.from(e.target.files))} />
         </div>
 
         <div className="lg:pl-5 lg:border-l lg:border-line shrink-0">
           {ready ? (
-            <ModeButtons size="lg" onPick={m => onStart({ video: video!, srt: srt!, handle }, m)} />
+            <ModeButtons size="lg" onPick={m => onStart({ videoPath: videoPath!, srt: srt! }, m)} />
           ) : (
             <span className="text-sm text-mute">{t('home.thenPickMode')}</span>
           )}
