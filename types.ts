@@ -78,7 +78,9 @@ export interface AIConfig {
   model: string;
   temperature: number;
   promptTemplate?: string;
-  apiKey?: string; // User's own Gemini API Key
+  apiKey?: string;      // User's own key for the OpenAI-compatible endpoint
+  baseUrl?: string;     // OpenAI-compatible base URL; empty = Gemini's compat endpoint
+  segmentModel?: string; // model used to re-cut transcript lines on import
 }
 
 // Audio Padding Configuration

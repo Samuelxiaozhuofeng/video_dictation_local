@@ -34,6 +34,8 @@ const Settings: React.FC = () => {
   const [aiTemperature, setAiTemperature] = useState(0.7);
   const [aiPrompt, setAiPrompt] = useState(AI.DEFAULT_PROMPT);
   const [aiApiKey, setAiApiKey] = useState('');
+  const [aiBaseUrl, setAiBaseUrl] = useState('');
+  const [aiSegmentModel, setAiSegmentModel] = useState('');
 
   const [sectionLength, setSectionLength] = useState(0);
   const [audioPadding, setAudioPadding] = useState<AudioPaddingConfig>({ startPadding: 100, endPadding: 200 });
@@ -72,6 +74,8 @@ const Settings: React.FC = () => {
     setAiTemperature(savedAI.temperature);
     setAiPrompt(savedAI.promptTemplate || AI.DEFAULT_PROMPT);
     setAiApiKey(savedAI.apiKey || '');
+    setAiBaseUrl(savedAI.baseUrl || '');
+    setAiSegmentModel(savedAI.segmentModel || '');
 
     const savedPractice = Storage.getPracticeConfig();
     setSectionLength(savedPractice.sectionLength);
@@ -107,6 +111,8 @@ const Settings: React.FC = () => {
       temperature: next.temperature ?? aiTemperature,
       promptTemplate: next.promptTemplate ?? next.prompt ?? aiPrompt,
       apiKey: next.apiKey ?? aiApiKey,
+      baseUrl: next.baseUrl ?? aiBaseUrl,
+      segmentModel: next.segmentModel ?? aiSegmentModel,
     });
     flashSaved();
   };
@@ -158,6 +164,16 @@ const Settings: React.FC = () => {
           setAiApiKey={(v) => {
             setAiApiKey(v);
             saveAI({ apiKey: v });
+          }}
+          aiBaseUrl={aiBaseUrl}
+          setAiBaseUrl={(v) => {
+            setAiBaseUrl(v);
+            saveAI({ baseUrl: v });
+          }}
+          aiSegmentModel={aiSegmentModel}
+          setAiSegmentModel={(v) => {
+            setAiSegmentModel(v);
+            saveAI({ segmentModel: v });
           }}
         />
       </Card>

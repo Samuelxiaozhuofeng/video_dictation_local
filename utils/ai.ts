@@ -1,51 +1,8 @@
-import { GoogleGenAI, Type } from "@google/genai";
-import { AIConfig } from '../types';
+import { fetch } from '@tauri-apps/plugin-http';
 import { t } from './i18n';
+import { getAIConfig, getEndpoint, readJsonBody, DEFAULT_PROMPT } from './aiConfig';
 
-const STORAGE_KEY_AI = 'linguaclip_ai_config';
-
-export const DEFAULT_PROMPT = `Define the word "{word}" as it is used in this sentence: "{context}". Provide a brief definition and its part of speech.`;
-
-const getClient = (userApiKey?: string) => {
-    // Priority: 1. User's API Key, 2. Environment variable
-    const apiKey = userApiKey || process.env.API_KEY || '';
-
-    if (!apiKey) {
-        throw new Error("No API Key provided. Please enter your Gemini API Key in Settings.");
-    }
-
-    return new GoogleGenAI({ apiKey });
-};
-
-export const getAIConfig = (): AIConfig => {
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY_AI);
-        const config = stored ? JSON.parse(stored) : {
-            model: 'gemini-2.5-flash',
-            temperature: 0.7,
-            promptTemplate: DEFAULT_PROMPT,
-            apiKey: ''
-        };
-
-        // Backwards compatibility: ensure promptTemplate exists
-        if (!config.promptTemplate) {
-            config.promptTemplate = DEFAULT_PROMPT;
-        }
-
-        // Backwards compatibility: ensure apiKey exists
-        if (!config.apiKey) {
-            config.apiKey = '';
-        }
-
-        return config;
-    } catch (e) {
-        return { model: 'gemini-2.5-flash', temperature: 0.7, promptTemplate: DEFAULT_PROMPT, apiKey: '' };
-    }
-};
-
-export const saveAIConfig = (config: AIConfig) => {
-    localStorage.setItem(STORAGE_KEY_AI, JSON.stringify(config));
-};
+export { getAIConfig, saveAIConfig, listModels, getCachedModels, DEFAULT_PROMPT, DEFAULT_BASE_URL } from './aiConfig';
 
 export interface WordDefinition {
     word: string;
@@ -53,41 +10,58 @@ export interface WordDefinition {
     partOfSpeech: string;
 }
 
+// The prompt template is the user's, so the JSON contract is pinned here
+// instead — whatever they write, the reply still has to parse.
+// Appended to the user message, not sent as a system message: gateways vary in
+// how much attention a system role gets, and a trailing instruction is the one
+// models follow most reliably. Keys are fixed in English whatever the language
+// of the answer.
+const JSON_RULE = '\n\nReply with a single JSON object and nothing else (no markdown fence). Use exactly these keys, in English: {"word": string, "definition": string, "partOfSpeech": string}.';
+
+const readJson = (content: string): WordDefinition => {
+    const match = content.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error(`model did not return JSON: ${content.slice(0, 120)}`);
+    const parsed = JSON.parse(match[0]) as Partial<WordDefinition>;
+    if (typeof parsed.definition !== 'string') {
+        throw new Error(`model returned unexpected keys: ${Object.keys(parsed).join(', ')}`);
+    }
+    return { word: parsed.word ?? '', definition: parsed.definition, partOfSpeech: parsed.partOfSpeech ?? '' };
+};
+
 export const getWordDefinition = async (word: string, context: string): Promise<WordDefinition> => {
     try {
+        const endpoint = getEndpoint();
+        if (!endpoint) throw new Error('API Key missing');
         const config = getAIConfig();
-        const ai = getClient(config.apiKey);
 
-        const promptTemplate = config.promptTemplate || DEFAULT_PROMPT;
-        const prompt = promptTemplate
+        const prompt = (config.promptTemplate || DEFAULT_PROMPT)
             .replace('{word}', word)
             .replace('{context}', context);
 
-        const response = await ai.models.generateContent({
-            model: config.model,
-            contents: prompt,
-            config: {
+        const res = await fetch(`${endpoint.baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${endpoint.apiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: config.model,
                 temperature: config.temperature,
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        word: { type: Type.STRING },
-                        definition: { type: Type.STRING },
-                        partOfSpeech: { type: Type.STRING },
-                    },
-                    required: ["word", "definition", "partOfSpeech"]
-                }
-            }
+                messages: [{ role: 'user', content: prompt + JSON_RULE }],
+            }),
+            signal: AbortSignal.timeout(60_000),
         });
-
-        if (response.text) {
-            return JSON.parse(response.text) as WordDefinition;
+        if (!res.ok) {
+            // The provider's own message (unknown model, no quota, bad key) is
+            // the only thing that tells the user what to change, so carry it up.
+            const detail = (await res.text().catch(() => '')).slice(0, 200);
+            throw new Error(`HTTP ${res.status} ${detail}`);
         }
-        throw new Error("No response text from AI");
+        const body = await readJsonBody<{ choices?: { message?: { content?: string } }[] }>(res);
+        const content = body?.choices?.[0]?.message?.content;
+        if (typeof content !== 'string') throw new Error('No response text from AI');
+        return readJson(content);
     } catch (error) {
         console.error("AI Definition Error:", error);
-        const noKey = error instanceof Error && error.message.includes("API Key");
-        throw new Error(noKey ? t('ai.noKeyError') : t('ai.genericError'));
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('API Key')) throw new Error(t('ai.noKeyError'));
+        throw new Error(`${t('ai.genericError')}\n${message}`);
     }
 };

@@ -99,7 +99,7 @@ const DefinitionPanel: React.FC<{
       ) : def.failed ? (
         <div className="space-y-3">
           <h4 className="font-serif text-3xl font-semibold leading-none break-words">{def.word}</h4>
-          <div className="rounded-md bg-rose-soft text-rose p-3 text-sm">{def.error}</div>
+          <div className="rounded-md bg-rose-soft text-rose p-3 text-sm whitespace-pre-wrap break-words">{def.error}</div>
         </div>
       ) : (
         <p className="text-sm text-mute">{t('definition.emptyHint')}</p>

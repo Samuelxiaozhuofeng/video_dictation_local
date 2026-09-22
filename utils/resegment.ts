@@ -1,4 +1,5 @@
 import { fetch } from '@tauri-apps/plugin-http';
+import { getAIConfig, normalizeBaseUrl, readJsonBody } from './aiConfig';
 
 // Whisper breaks a transcript wherever its decoder happened to stop, which
 // regularly lands you a 12-second, 30-word line. Dictation on a line that long
@@ -8,7 +9,7 @@ import { fetch } from '@tauri-apps/plugin-http';
 
 export type Word = { w: string; from: number; to: number };
 
-const MODEL = 'cpa/gemini-3.8-flash-high';
+const FALLBACK_MODEL = 'cpa/gemini-3.8-flash-high';
 const TARGET_WORDS = 10;   // what we ask each line to be
 const MAX_WORDS = 16;      // hard ceiling we enforce ourselves
 const BATCH_WORDS = 250;   // one model call; keeps it counting reliably
@@ -18,8 +19,22 @@ const REQUEST_TIMEOUT_MS = 90_000;
 const BASE_URL = process.env.ROUTER9_BASE_URL || '';
 const BASE_KEY = process.env.ROUTER9_BASE_KEY || '';
 
+// The user's own AI settings win; the build-time router stays as a fallback so
+// existing installs keep working without touching Settings.
+type Router = { baseUrl: string; apiKey: string; model: string };
+
+export function getRouter(): Router | null {
+  const config = getAIConfig();
+  const model = config.segmentModel?.trim();
+  if (model && config.apiKey) {
+    return { baseUrl: normalizeBaseUrl(config.baseUrl), apiKey: config.apiKey, model };
+  }
+  if (BASE_URL && BASE_KEY) return { baseUrl: BASE_URL, apiKey: BASE_KEY, model: FALLBACK_MODEL };
+  return null;
+}
+
 export function canResegment(): boolean {
-  return !!BASE_URL && !!BASE_KEY;
+  return getRouter() !== null;
 }
 
 const ENDS_SENTENCE = /[.!?。！？…]["')\]]?$/;
@@ -58,11 +73,7 @@ function prompt(words: Word[]): string {
 ${listing}`;
 }
 
-// The router answers with a JSON body that sometimes has a trailing SSE
-// "data: [DONE]" glued to it.
-function readBody(raw: string): string {
-  const cleaned = raw.replace(/\s*data:\s*\[DONE\]\s*$/, '').trim();
-  const parsed = JSON.parse(cleaned);
+function readBody(parsed: { choices?: { message?: { content?: string } }[] }): string {
   const content = parsed?.choices?.[0]?.message?.content;
   if (typeof content !== 'string') throw new Error('no content in response');
   return content;
@@ -103,14 +114,16 @@ function enforceCeiling(starts: number[], count: number): number[] {
 async function askOnce(words: Word[]): Promise<number[]> {
   // Without a deadline a router that accepts the connection and then goes quiet
   // leaves the import stuck on "shaping lines" with no way out.
-  const res = await fetch(`${BASE_URL}/chat/completions`, {
+  const router = getRouter();
+  if (!router) throw new Error('no router configured');
+  const res = await fetch(`${router.baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${BASE_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODEL, messages: [{ role: 'user', content: prompt(words) }] }),
+    headers: { Authorization: `Bearer ${router.apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: router.model, messages: [{ role: 'user', content: prompt(words) }] }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`router ${res.status}`);
-  return readStarts(readBody(await res.text()), words.length);
+  return readStarts(readBody(await readJsonBody(res)), words.length);
 }
 
 async function ask(words: Word[]): Promise<number[]> {
