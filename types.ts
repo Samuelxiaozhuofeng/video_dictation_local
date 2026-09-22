@@ -122,6 +122,15 @@ export interface VideoRecord {
   totalPracticeTime: number;            // Total practice time in seconds
   learningMode?: LearningMode;          // Last-used practice mode
   blurPlaybackMode?: BlurPlaybackMode;  // Last-used blur playback variant
+
+  // Present while a YouTube/local import is generating subtitles (or failed).
+  // Cleared once videoPath / subtitleText / totalSubtitles are filled in.
+  importJob?: {
+    stage: 'download' | 'extract' | 'transcribe';
+    percent?: number;
+    error?: string;
+    source: string;
+  };
 }
 
 export interface PracticeProgress {

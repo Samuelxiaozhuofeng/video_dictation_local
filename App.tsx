@@ -17,10 +17,34 @@ import { usePracticeActions } from './hooks/usePracticeActions';
 import * as VideoStorage from './utils/videoStorage';
 import { fileNameFromPath, pathExists, pickVideoPath, videoSrcFromPath } from './utils/desktop';
 import { t, useLang } from './utils/i18n';
+import { markInterruptedJobs, startImportListener } from './utils/importJob';
 
 export default function App() {
   const lang = useLang();
   useEffect(() => { document.documentElement.lang = lang; }, [lang]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        await markInterruptedJobs();
+      } catch (err) {
+        console.error(err);
+      }
+      try {
+        const fn = await startImportListener();
+        if (cancelled) fn();
+        else unlisten = fn;
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
 
   const [appState, setAppState] = useState<AppState>(AppState.UPLOAD);
   const [videoFileName, setVideoFileName] = useState<string | null>(null);
@@ -135,6 +159,7 @@ export default function App() {
     startPractice(fileNameFromPath(pair.videoPath), pair.videoPath, pair.srt, lm, BlurPlaybackMode.SENTENCE_BY_SENTENCE);
 
   const handleResume = async (record: VideoRecord, lm: LearningMode) => {
+    if (record.importJob) return;
     try {
       let videoPath = record.videoPath;
       if (!videoPath || !(await pathExists(videoPath))) {

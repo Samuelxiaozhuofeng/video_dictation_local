@@ -21,6 +21,7 @@
 | `utils/videoStorage.ts` + `fileSystemAccess.ts` | 练习记录（IndexedDB） |
 | `utils/anki.ts` | AnkiConnect 请求（经 Tauri http 插件代发） |
 | `utils/ai.ts` | Gemini 查词 |
+| `components/ImportBox.tsx` + `utils/importJob.ts` + `src-tauri/src/import.rs` | YouTube 下载 / 本地转录出字幕，见 [import.md](import.md) |
 | `utils/i18n.*.ts` | 中 / 英文案，两份都要改 |
 | `src-tauri/` | Rust 壳子；`tauri.conf.json` 窗口与 asset 协议，`capabilities/default.json` 权限 |
 

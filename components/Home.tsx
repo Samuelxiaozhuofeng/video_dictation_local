@@ -5,9 +5,11 @@ import * as VideoStorage from '../utils/videoStorage';
 import {
   fileNameFromPath, listenDragDrop, pickSubtitlePath, pickVideoPath, readSubtitleFile,
 } from '../utils/desktop';
+import { subscribeImportJobs } from '../utils/importJob';
 import { Btn, Card, Stamp, H } from './ui';
 import { dialog } from './Dialog';
 import { useT, useLang } from '../utils/i18n';
+import ImportBox from './ImportBox';
 
 export interface NewPair { videoPath: string; srt: File }
 
@@ -148,7 +150,11 @@ const Home: React.FC<HomeProps> = ({ onStartNew, onResume }) => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    VideoStorage.getAllVideoRecords().then(setVideos).catch(() => setVideos([]));
+    const load = () => {
+      VideoStorage.getAllVideoRecords().then(setVideos).catch(() => setVideos([]));
+    };
+    load();
+    return subscribeImportJobs(load);
   }, []);
 
   // Reimplements utils/videoStorage.ts's formatLastPracticed with translated output
@@ -180,9 +186,17 @@ const Home: React.FC<HomeProps> = ({ onStartNew, onResume }) => {
     }
   };
 
+  const jobLabel = (job: NonNullable<VideoRecord['importJob']>) => {
+    const pct = job.percent ?? 0;
+    if (job.stage === 'download') return t('import.stageDownload', { pct });
+    if (job.stage === 'transcribe') return t('import.stageTranscribe', { pct });
+    return t('import.stageExtract');
+  };
+
   return (
     <div className="space-y-10">
       <DropZone onStart={onStartNew} />
+      <ImportBox />
 
       <section>
         <H sub={t('home.pickModeContinue')} badge={videos && videos.length > 0 && <Stamp tone="ink">{videos.length}</Stamp>}>{t('home.yourVideos')}</H>
@@ -196,25 +210,43 @@ const Home: React.FC<HomeProps> = ({ onStartNew, onResume }) => {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {videos.map(v => (
-              <Card key={v.id} className="p-5 flex flex-col gap-4">
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="font-serif text-lg font-semibold leading-tight break-words min-w-0">{v.displayName}</h3>
-                  <Stamp tone={v.completionRate >= 100 ? 'green-soft' : 'white'} className="shrink-0">{v.completionRate}%</Stamp>
-                </div>
-                <Progress pct={v.completionRate} />
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-mute">
-                  <span>{t('home.linesCount', { current: v.currentSubtitleIndex, total: v.totalSubtitles })}</span>
-                  <span className="inline-flex items-center gap-1"><Clock size={12} /> {formatRelativeTime(v.lastPracticed)}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3 pt-4 border-t border-line border-dashed">
-                  <ModeButtons last={v.learningMode ?? LearningMode.DICTATION} onPick={m => onResume(v, m)} />
-                  <Btn square flat tone="white" onClick={() => handleDelete(v)} disabled={deletingId === v.id} title={t('home.deleteRecordTitle')} className="hover:!bg-rose-soft hover:!text-rose">
-                    {deletingId === v.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                  </Btn>
-                </div>
-              </Card>
-            ))}
+            {videos.map(v => {
+              const job = v.importJob;
+              return (
+                <Card key={v.id} className="p-5 flex flex-col gap-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="font-serif text-lg font-semibold leading-tight break-words min-w-0">{v.displayName}</h3>
+                    {!job && (
+                      <Stamp tone={v.completionRate >= 100 ? 'green-soft' : 'white'} className="shrink-0">{v.completionRate}%</Stamp>
+                    )}
+                  </div>
+                  {job && !job.error && (
+                    <>
+                      <p className="text-sm text-mute">{jobLabel(job)}</p>
+                      <Progress pct={job.percent ?? 0} />
+                    </>
+                  )}
+                  {job?.error && <p className="text-sm text-rose">{job.error}</p>}
+                  {!job && (
+                    <>
+                      <Progress pct={v.completionRate} />
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-mute">
+                        <span>{t('home.linesCount', { current: v.currentSubtitleIndex, total: v.totalSubtitles })}</span>
+                        <span className="inline-flex items-center gap-1"><Clock size={12} /> {formatRelativeTime(v.lastPracticed)}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="flex items-center justify-between gap-3 pt-4 border-t border-line border-dashed">
+                    {job ? <span /> : (
+                      <ModeButtons last={v.learningMode ?? LearningMode.DICTATION} onPick={m => onResume(v, m)} />
+                    )}
+                    <Btn square flat tone="white" onClick={() => handleDelete(v)} disabled={deletingId === v.id} title={t('home.deleteRecordTitle')} className="hover:!bg-rose-soft hover:!text-rose">
+                      {deletingId === v.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                    </Btn>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         )}
       </section>
