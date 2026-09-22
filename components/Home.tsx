@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { FileVideo, FileText, Pencil, EyeOff, Trash2, Clock, Loader2, Upload, KeyRound } from 'lucide-react';
+import { FileVideo, FileText, Pencil, EyeOff, Trash2, Clock, Loader2, Upload, KeyRound, RotateCw } from 'lucide-react';
 import { LearningMode, VideoRecord } from '../types';
 import * as VideoStorage from '../utils/videoStorage';
 import {
   fileNameFromPath, listenDragDrop, pickSubtitlePath, pickVideoPath, readSubtitleFile,
 } from '../utils/desktop';
-import { formatImportError, isCookieError, openYouTubeLogin, startLocalImport, subscribeImportJobs } from '../utils/importJob';
+import { formatImportError, isCookieError, openYouTubeLogin, retryImport, startLocalImport, subscribeImportJobs } from '../utils/importJob';
 import { Btn, Card, Stamp, H, inputCls } from './ui';
 import { dialog } from './Dialog';
 import { useT, useLang } from '../utils/i18n';
@@ -180,6 +180,7 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
   const lang = useLang();
   const [videos, setVideos] = useState<VideoRecord[] | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = () => {
@@ -211,6 +212,18 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
     } catch (e) {
       const missing = String(e).includes('missing:');
       dialog.alert(t('home.ytLoginFailTitle'), missing ? t('home.ytLoginNoChrome') : t('home.ytLoginFailBody'));
+    }
+  };
+
+  const handleRetry = async (v: VideoRecord) => {
+    setRetryingId(v.id);
+    try {
+      await retryImport(v.id);
+    } catch (e) {
+      console.error(e);
+      dialog.alert(t('home.retryFailTitle'), t('home.retryFailBody'));
+    } finally {
+      setRetryingId(null);
     }
   };
 
@@ -272,11 +285,18 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
                   {job?.error && (
                     <div className="flex flex-col items-start gap-2">
                       <p className="text-sm text-rose">{formatImportError(job.error)}</p>
-                      {isCookieError(job.error) && (
-                        <Btn flat tone="white" onClick={handleYouTubeLogin}>
-                          <KeyRound size={14} /> {t('home.ytLogin')}
-                        </Btn>
-                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {isCookieError(job.error) && (
+                          <Btn flat tone="white" onClick={handleYouTubeLogin}>
+                            <KeyRound size={14} /> {t('home.ytLogin')}
+                          </Btn>
+                        )}
+                        {job.stage === 'download' && (
+                          <Btn flat tone="white" onClick={() => handleRetry(v)} disabled={retryingId === v.id}>
+                            <RotateCw size={14} /> {t('home.retry')}
+                          </Btn>
+                        )}
+                      </div>
                     </div>
                   )}
                   {!job && (

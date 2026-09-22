@@ -78,7 +78,13 @@ export function formatImportError(raw: string): string {
   return raw;
 }
 
-function pendingRecord(id: string, source: string, fromUrl: boolean): VideoRecord {
+function pendingRecord(
+  id: string,
+  source: string,
+  fromUrl: boolean,
+  lang: string,
+  quality: ImportQuality,
+): VideoRecord {
   const now = Date.now();
   const label = fromUrl ? source : fileNameFromPath(source);
   return {
@@ -98,6 +104,8 @@ function pendingRecord(id: string, source: string, fromUrl: boolean): VideoRecor
       stage: fromUrl ? 'download' : 'extract',
       percent: 0,
       source,
+      lang,
+      quality,
     },
   };
 }
@@ -109,7 +117,7 @@ async function startImport(
   quality: ImportQuality,
 ): Promise<void> {
   const id = crypto.randomUUID();
-  const record = pendingRecord(id, source, fromUrl);
+  const record = pendingRecord(id, source, fromUrl, lang, quality);
   await VideoStorage.updateVideoRecord(record);
   notify();
   try {
@@ -132,6 +140,39 @@ export function startUrlImport(url: string, lang: string, quality: ImportQuality
 
 export function startLocalImport(path: string, lang: string): Promise<void> {
   return startImport(path, lang, false, 1080);
+}
+
+// Retry a download that failed, on the same record: no second card in the history,
+// and the language and quality the user originally picked are reused. Two clicks in
+// the moment before the card repaints would start two yt-dlp runs writing the same
+// file, so a click is ignored while its retry is in flight.
+const retrying = new Set<string>();
+
+export async function retryImport(id: string): Promise<void> {
+  if (retrying.has(id)) return;
+  const rec = await VideoStorage.getVideoRecord(id);
+  const job = rec?.importJob;
+  if (!rec || !job) return;
+  retrying.add(id);
+  const lang = job.lang ?? 'en';
+  const quality = (job.quality ?? 1080) as ImportQuality;
+  const next = { stage: 'download' as const, percent: 0, source: job.source, lang, quality };
+  await VideoStorage.updateVideoRecord({ ...rec, importJob: next });
+  notify();
+  try {
+    await invoke('start_import', { id, source: job.source, lang, quality });
+  } catch (err) {
+    const fresh = await VideoStorage.getVideoRecord(id);
+    if (!fresh?.importJob) return;
+    const detail = err instanceof Error ? err.message : String(err);
+    await VideoStorage.updateVideoRecord({
+      ...fresh,
+      importJob: { ...fresh.importJob, error: detail },
+    });
+    notify();
+  } finally {
+    retrying.delete(id);
+  }
 }
 
 export async function probeImportSizes(url: string): Promise<QualitySizes> {

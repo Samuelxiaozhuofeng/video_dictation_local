@@ -94,23 +94,35 @@ fn yt_login_ready() -> bool {
   std::fs::read(&db).map(|b| db_shows_login(&b)).unwrap_or(false)
 }
 
-// Signed-in session first; a hand-exported cookies.txt stays as the fallback so
-// an existing working setup keeps working. Shared by download and size probe.
-fn yt_cookie_args(dir: &Path) -> Result<Vec<String>, String> {
-  if yt_login_ready() {
-    return Ok(vec![
-      "--cookies-from-browser".into(),
-      format!("chrome:{}", yt_login_dir()?.to_string_lossy()),
-    ]);
+// The in-app sign-in is the only source of a YouTube session. A hand-exported
+// cookies.txt used to be a fallback, but it could never be reached once the user
+// had signed in here even if that session had since expired, so a stale sign-in
+// silently shadowed a good file. One source, no shadowing.
+//
+// Not signed in at all -> send nothing: YouTube then answers with its own
+// "sign in to confirm you're not a bot", which the front end recognises and turns
+// into the sign-in button. Forcing an empty profile on yt-dlp instead would make it
+// fail with "could not find cookies database", which nothing recognises and which
+// leaves the user with no way forward.
+fn yt_cookie_args() -> Result<Vec<String>, String> {
+  if !yt_login_ready() {
+    return Ok(Vec::new());
   }
-  let cookies = dir.join("cookies.txt");
-  if cookies.is_file() {
-    return Ok(vec![
-      "--cookies".into(),
-      cookies.to_string_lossy().into_owned(),
-    ]);
-  }
-  Ok(Vec::new())
+  Ok(vec![
+    "--cookies-from-browser".into(),
+    format!("chrome:{}", yt_login_dir()?.to_string_lossy()),
+  ])
+}
+
+// Recent YouTube clients require yt-dlp's JavaScript challenge solver. The
+// Finder-launched app has Node on PATH, but yt-dlp does not reliably discover
+// that runtime from PATH, so pass the executable explicitly.
+fn yt_runtime_args() -> Result<Vec<String>, String> {
+  let node = find_bin("node")?;
+  Ok(vec![
+    "--js-runtimes".into(),
+    format!("node:{}", node.to_string_lossy()),
+  ])
 }
 
 // Finder-launched apps get a bare PATH; yt-dlp needs node (YouTube's n-challenge)
@@ -337,7 +349,8 @@ fn download_video(
   quality: u32,
 ) -> Result<PathBuf, String> {
   let template = dir.join("%(title).80s [%(id)s].%(ext)s");
-  let mut args: Vec<String> = yt_cookie_args(dir)?;
+  let mut args: Vec<String> = yt_cookie_args()?;
+  args.extend(yt_runtime_args()?);
   // The codec belongs in the filter, not only in `-S`: `-S` merely sorts, so a clip
   // with no H.264 at this height would still download as VP9/AV1, which this Mac's
   // player cannot show — and the file then sits on disk with no way to delete it from
@@ -737,10 +750,10 @@ fn probe_sizes_blocking(url: String) -> Result<QualitySizes, String> {
     return Err("download:not a YouTube URL".into());
   }
   let yt = find_bin("yt-dlp")?;
-  let dir = movies_dir()?;
   let mut cmd = Command::new(&yt);
   cmd.env("PATH", augmented_path());
-  cmd.args(yt_cookie_args(&dir)?);
+  cmd.args(yt_cookie_args()?);
+  cmd.args(yt_runtime_args()?);
   // Without a socket timeout a stalled connection leaves the dropdown on "checking…"
   // for good, and every re-typed URL would start another yt-dlp that never exits.
   cmd.args(["--socket-timeout", "15", "-J", "--no-playlist", &url]);

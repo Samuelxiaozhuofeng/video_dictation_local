@@ -130,6 +130,11 @@ export interface VideoRecord {
     percent?: number;
     error?: string;
     source: string;
+    // What the user picked when they started this import, kept so a retry repeats
+    // it instead of silently falling back to English/1080p. Absent on records made
+    // before retry existed; the retry then uses those same defaults.
+    lang?: string;
+    quality?: number;
   };
 }
 
