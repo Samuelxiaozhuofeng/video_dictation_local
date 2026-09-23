@@ -1,12 +1,10 @@
-# Builds the Windows installer on every push to main (or by hand from the
-# Actions tab) and first runs the whole local-transcription chain on a real
-# Windows machine: download parts, pull audio out of a video, whisper.
-# The installer is attached to the run as the "LinguaClip-windows" artifact.
+# Builds the Windows installer only when asked (Actions tab, or
+# `gh workflow run windows.yml`), and first runs the whole local-transcription
+# chain on a real Windows machine: download parts, pull audio out of a video,
+# whisper. The installer is attached to the run as the "LinguaClip-windows" artifact.
 name: Windows build
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:

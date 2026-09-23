@@ -25,7 +25,7 @@ node test-cloze.mjs       # 挖空逻辑 + 缓存自检（同上）
 
 ## 验证流程（改完功能必须走）
 
-**Mac 正式包本机打；Windows 包只由 GitHub CI 打**（`.github/workflows/windows.yml`，push 到 main 触发，先在 Windows 上跑一遍下载组件 + 转录的真链路，安装包挂在那次运行的 artifact 里），用户在 Windows 虚拟机里验。平台差异收口在 `src-tauri/src/paths.rs`（目录、起子进程）和 `utils/platform.ts`；Windows 抽声音用 `decode.rs`（symphonia），不用 afconvert。用户验收在正式包里；交给用户之前，Claude 先在浏览器里把改动走一遍，拿到真实运行证据。顺序：
+**Mac 正式包本机打；Windows 包只由 GitHub CI 打**（`.github/workflows/windows.yml`，只在用户说要打时手动触发：`gh workflow run windows.yml`，push 不会触发；先在 Windows 上跑一遍下载组件 + 转录的真链路，安装包挂在那次运行的 artifact 里），用户在 Windows 虚拟机里验。平台差异收口在 `src-tauri/src/paths.rs`（目录、起子进程）和 `utils/platform.ts`；Windows 抽声音用 `decode.rs`（symphonia），不用 afconvert。用户验收在正式包里；交给用户之前，Claude 先在浏览器里把改动走一遍，拿到真实运行证据。顺序：
 
 1. `npx tsc --noEmit` + 相关 `node test-*.mjs`（碰 Rust 再跑 `cargo test`）。
 2. **浏览器实测**：`preview_start` 启 `.claude/launch.json` 的 `dev`（= `npm run dev`），在内置浏览器里按用户会做的操作走一遍改动，外加改动碰过的原有操作；截图给用户当证据。
