@@ -218,6 +218,8 @@ async function applyProgress(payload: ImportProgressPayload): Promise<void> {
     });
     notify();
     const recut = payload.words ? await resegment(payload.words) : null;
+    // The re-cut can take a minute; a record deleted meanwhile must stay deleted.
+    if (!(await VideoStorage.getVideoRecord(rec.id))) return;
     const subtitleText = recut ?? payload.subtitleText ?? '';
     const name = fileNameFromPath(videoPath);
     const rest = { ...rec };
