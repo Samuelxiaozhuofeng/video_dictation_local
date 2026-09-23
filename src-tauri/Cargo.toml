@@ -28,6 +28,8 @@ tauri-plugin-http = "=2.6.1"
 tauri-plugin-fs = "2.5.2"
 tauri-plugin-opener = "2.5.5"
 reqwest-websocket = "0.5"
+# Same 0.12 the http plugin already pulls in; used for AnkiConnect (anki.rs)
+reqwest = { version = "0.12", default-features = false }
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 sha2 = "0.10"
 uuid = { version = "1", features = ["v4"] }

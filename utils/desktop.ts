@@ -112,3 +112,9 @@ export async function synthesizeSpeech(text: string, voice: string): Promise<Arr
     return null;
   }
 }
+
+// AnkiConnect through Rust (src-tauri/src/anki.rs), which skips the system
+// proxy. Resolves to the raw response text; rejects with "HTTP 502: …" etc.
+export async function ankiRequest(url: string, body: string): Promise<string> {
+  return invoke<string>('anki_request', { url, body });
+}

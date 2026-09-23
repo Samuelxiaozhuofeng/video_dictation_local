@@ -61,6 +61,12 @@ async function handle(cmd: string, args: Args): Promise<unknown> {
       return null; // recorded in __MOCK__.calls; real files untouched
     case 'tts':
       return mock.tts ? mock.tts(args) : null;
+    case 'anki_request': {
+      const res = await fetch(args.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: args.body });
+      const text = await res.text();
+      if (!res.ok) throw `HTTP ${res.status}: ${text.slice(0, 120) || '(empty body)'}`;
+      return text;
+    }
     case 'probe_import_sizes':
       return { '1080': null, '720': null, '480': null };
     default:

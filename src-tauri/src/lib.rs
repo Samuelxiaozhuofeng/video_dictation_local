@@ -1,3 +1,4 @@
+mod anki;
 mod cache;
 mod import;
 mod tts;
@@ -23,6 +24,7 @@ pub fn run() {
       import::start_import,
       import::open_youtube_login,
       import::probe_import_sizes,
+      anki::anki_request,
       cache::write_cache,
       tts::tts,
       trash_file

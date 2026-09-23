@@ -1,4 +1,4 @@
-import { fetch } from '@tauri-apps/plugin-http';
+import { ankiRequest } from './desktop';
 import { AnkiConfig, AnkiCardTemplateConfig } from '../types';
 
 const STORAGE_KEY_ANKI = 'linguaclip_anki_config';
@@ -49,23 +49,14 @@ export const saveAnkiConfig = (config: AnkiConfig) => {
 // Helper to invoke AnkiConnect actions
 export const invokeAnki = async (action: string, params: any = {}, url: string = DEFAULT_URL) => {
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, version: 6, params }),
-    });
-    
-    // res.json() on the Tauri http plugin's response throws WebKit's bare "string
-    // did not match the expected pattern" in the desktop app; parse the text
-    // ourselves and keep what came back, so a real failure says what it got.
-    const raw = await response.text();
+    const raw = await ankiRequest(url, JSON.stringify({ action, version: 6, params }));
     let result: any;
     try {
       result = JSON.parse(raw);
     } catch {
-      throw new Error(`HTTP ${response.status}: ${raw.slice(0, 120) || '(empty body)'}`);
+      throw new Error(`not AnkiConnect: ${raw.slice(0, 120) || '(empty body)'}`);
     }
-    
+
     if (result.error) {
       throw new Error(result.error);
     }
