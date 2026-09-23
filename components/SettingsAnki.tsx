@@ -24,6 +24,7 @@ interface SettingsAnkiProps {
   url: string;
   setUrl: (value: string) => void;
   status: AnkiConnectionStatus;
+  error: string;
   onConnect: () => void;
   decks: string[];
   models: string[];
@@ -89,6 +90,7 @@ const SettingsAnki: React.FC<SettingsAnkiProps> = ({
   url,
   setUrl,
   status,
+  error,
   onConnect,
   decks,
   models,
@@ -160,7 +162,10 @@ const SettingsAnki: React.FC<SettingsAnkiProps> = ({
       </div>
 
       {status === 'error' && (
-        <Card flat tone="rose-soft" className="px-4 py-3 text-sm">{t('settingsAnki.connectFailed')}</Card>
+        <Card flat tone="rose-soft" className="px-4 py-3 text-sm">
+          {t('settingsAnki.connectFailed')}
+          {error && <p className="mt-1 text-xs text-mute break-all">{error}</p>}
+        </Card>
       )}
       {status === 'success' && (
         <Card flat tone="green-soft" className="px-4 py-3 text-sm">{t('settingsAnki.connected')}</Card>

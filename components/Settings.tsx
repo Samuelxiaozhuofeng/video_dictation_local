@@ -187,6 +187,7 @@ const Settings: React.FC = () => {
             saveAnki({ url: v });
           }}
           status={ankiConnection.status}
+          error={ankiConnection.error}
           onConnect={ankiConnection.connect}
           decks={ankiConnection.decks}
           models={ankiConnection.models}
