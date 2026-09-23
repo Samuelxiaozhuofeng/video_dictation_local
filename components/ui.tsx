@@ -1,22 +1,18 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
-// Shared paper/notebook primitives. Every screen builds from these four shapes:
-// Btn (pressable), Card (a sheet), Stamp (margin note), Seg (segmented switch).
+// Shared primitives for the "night reading" look: deep ground, cream type, one warm accent.
+// Btn (pressable), Card (a raised surface), Stamp (small label), Seg (segmented switch),
+// Menu (the "…" popover).
 
-export type Tone = 'white' | 'green' | 'ochre' | 'highlight' | 'rose' | 'shade' | 'paper' | 'ink' | 'green-soft' | 'rose-soft' | 'ochre-soft';
+export type Tone = 'white' | 'accent' | 'accent-soft' | 'shade' | 'paper' | 'ink';
 
 export const toneBg: Record<Tone, string> = {
   white: 'bg-page text-ink',
   paper: 'bg-paper text-ink',
-  green: 'bg-green text-page',
-  ochre: 'bg-ochre text-page',
-  highlight: 'bg-highlight text-ink',
-  rose: 'bg-rose text-page',
   shade: 'bg-shade text-ink',
-  ink: 'bg-ink text-page',
-  'green-soft': 'bg-green-soft text-green',
-  'rose-soft': 'bg-rose-soft text-rose',
-  'ochre-soft': 'bg-ochre-soft text-ochre',
+  accent: 'bg-accent text-paper',
+  'accent-soft': 'bg-accent-soft text-accent',
+  ink: 'bg-ink text-paper',
 };
 
 type BtnProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -29,25 +25,25 @@ type BtnProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 const btnSize = {
   sm: 'h-8 px-3 text-xs',
   md: 'h-10 px-4 text-sm',
-  lg: 'h-12 px-5 text-base',
+  lg: 'h-12 px-6 text-[15px]',
 };
 const sqSize = { sm: 'h-8 w-8', md: 'h-10 w-10', lg: 'h-12 w-12' };
 
-// Three weights: solid (any colour tone), outline (tone="white"), ghost (flat).
+// Three weights: solid (accent / ink), outline (tone="white"), ghost (flat).
 export const Btn: React.FC<BtnProps> = ({
   tone = 'white', size = 'md', flat = false, square = false, className = '', children, onClick, ...rest
 }) => {
   const skin = flat
-    ? 'bg-transparent text-ink hover:bg-shade/70 border border-transparent'
+    ? 'bg-transparent text-mute hover:text-ink hover:bg-shade border border-transparent'
     : tone === 'white'
-      ? 'bg-page text-ink border border-line shadow-sm hover:bg-paper'
-      : `${toneBg[tone]} border border-transparent shadow-sm`;
+      ? 'bg-transparent text-ink border border-line hover:bg-shade'
+      : `${toneBg[tone]} border border-transparent`;
   return (
     <button
       {...rest}
       // Drop focus after a mouse click so Space/Enter shortcuts don't re-fire this button.
       onClick={e => { onClick?.(e); e.currentTarget.blur(); }}
-      className={`press rounded-md ${skin} ${square ? sqSize[size] : btnSize[size]}
+      className={`press rounded-lg ${skin} ${square ? sqSize[size] : btnSize[size]}
         inline-flex items-center justify-center gap-2 font-medium whitespace-nowrap select-none
         disabled:cursor-not-allowed ${className}`}
     >
@@ -59,7 +55,7 @@ export const Btn: React.FC<BtnProps> = ({
 type CardProps = React.HTMLAttributes<HTMLDivElement> & { tone?: Tone; flat?: boolean };
 
 export const Card: React.FC<CardProps> = ({ tone = 'white', flat = false, className = '', children, ...rest }) => (
-  <div {...rest} className={`${flat ? 'border border-line rounded-[10px]' : 'card'} ${toneBg[tone]} ${className}`}>
+  <div {...rest} className={`${flat ? 'border border-line rounded-xl' : 'card'} ${toneBg[tone]} ${className}`}>
     {children}
   </div>
 );
@@ -69,7 +65,7 @@ export const Stamp: React.FC<React.HTMLAttributes<HTMLSpanElement> & { tone?: To
 }) => (
   <span
     {...rest}
-    className={`${toneBg[tone]} ${tone === 'white' ? 'border border-line' : ''} inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-mono text-[11px] font-semibold uppercase tracking-wider leading-tight ${className}`}
+    className={`${tone === 'white' ? 'text-mute' : toneBg[tone]} inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs leading-tight ${className}`}
   >
     {children}
   </span>
@@ -85,7 +81,7 @@ export function Seg<T extends string | number>({
   className?: string;
 }) {
   return (
-    <div className={`inline-flex p-0.5 gap-0.5 bg-shade/70 rounded-md ${className}`} role="radiogroup">
+    <div className={`inline-flex p-0.5 gap-0.5 bg-shade rounded-lg ${className}`} role="radiogroup">
       {options.map(o => (
         <button
           key={String(o.value)}
@@ -93,9 +89,9 @@ export function Seg<T extends string | number>({
           role="radio"
           aria-checked={o.value === value}
           title={o.title}
-          onClick={() => onChange(o.value)}
-          className={`${size === 'sm' ? 'h-7 px-2.5 text-xs' : 'h-9 px-3.5 text-sm'} rounded font-medium transition-colors
-            ${o.value === value ? 'bg-page text-ink shadow-sm' : 'text-mute hover:text-ink'}`}
+          onClick={e => { onChange(o.value); e.currentTarget.blur(); }}
+          className={`${size === 'sm' ? 'h-7 px-2.5 text-xs' : 'h-9 px-3.5 text-sm'} rounded-md font-medium transition-colors
+            ${o.value === value ? 'bg-line text-ink' : 'text-mute hover:text-ink'}`}
         >
           {o.label}
         </button>
@@ -106,9 +102,9 @@ export function Seg<T extends string | number>({
 
 // Section heading used across settings / library pages.
 export const H: React.FC<{ children: React.ReactNode; sub?: React.ReactNode; badge?: React.ReactNode; className?: string }> = ({ children, sub, badge, className = '' }) => (
-  <div className={`mb-4 ${className}`}>
-    <h2 className="font-serif text-2xl font-semibold tracking-tight leading-none flex items-center gap-3">{children}{badge}</h2>
-    {sub && <p className="mt-1.5 text-sm text-mute">{sub}</p>}
+  <div className={`mb-5 ${className}`}>
+    <h2 className="font-serif text-[28px] font-normal leading-tight flex items-center gap-3">{children}{badge}</h2>
+    {sub && <p className="mt-1 text-sm text-mute">{sub}</p>}
   </div>
 );
 
@@ -118,11 +114,58 @@ export const Field: React.FC<{ label: React.ReactNode; hint?: React.ReactNode; r
   <label className={`block ${className}`}>
     <span className="flex items-baseline justify-between mb-1.5">
       <span className="text-[13px] font-medium">{label}</span>
-      {right && <span className="font-mono text-xs text-mute">{right}</span>}
+      {right && <span className="text-xs text-mute">{right}</span>}
     </span>
     {children}
     {hint && <span className="block mt-1.5 text-xs text-mute leading-relaxed">{hint}</span>}
   </label>
 );
 
-export const inputCls = 'flat w-full px-3 py-2 text-sm placeholder:text-mute/60 focus:border-green';
+export const inputCls = 'flat w-full h-10 px-3 text-sm text-ink placeholder:text-faint focus:border-accent';
+
+// "…" popover. Items close it on click; Esc and a click outside close it too.
+export type MenuItem = { label: React.ReactNode; onClick: () => void; disabled?: boolean; title?: string } | 'divider';
+
+export const Menu: React.FC<{
+  items: MenuItem[];
+  trigger: (open: boolean, toggle: () => void) => React.ReactNode;
+  align?: 'left' | 'right';
+  up?: boolean;
+  children?: React.ReactNode; // extra panel content above the items (e.g. a Seg)
+}> = ({ items, trigger, align = 'right', up = false, children }) => {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); } };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey, true);
+    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey, true); };
+  }, [open]);
+  return (
+    <div ref={box} className="relative">
+      {trigger(open, () => setOpen(o => !o))}
+      {open && (
+        <div className={`absolute z-30 ${up ? 'bottom-full mb-2' : 'top-full mt-2'} ${align === 'right' ? 'right-0' : 'left-0'} card min-w-[200px] py-1.5 fade-in`} role="menu">
+          {children}
+          {items.map((it, i) => it === 'divider' ? (
+            <div key={i} className="my-1.5 border-t border-line" />
+          ) : (
+            <button
+              key={i}
+              type="button"
+              role="menuitem"
+              disabled={it.disabled}
+              title={it.title}
+              onClick={e => { e.currentTarget.blur(); setOpen(false); it.onClick(); }}
+              className="w-full h-9 px-3.5 flex items-center gap-2.5 text-sm text-ink text-left hover:bg-shade disabled:text-faint disabled:hover:bg-transparent disabled:cursor-not-allowed"
+            >
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};

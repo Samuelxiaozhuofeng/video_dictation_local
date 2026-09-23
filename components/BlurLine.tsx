@@ -27,7 +27,7 @@ const BlurLine: React.FC<{ text: string; onLookup: (word: string) => void }> = (
 
   let wordIdx = 0;
   return (
-    <div className="text-center font-serif text-2xl sm:text-[28px] font-medium leading-[2]">
+    <div className="font-serif text-[30px] leading-[1.6]">
       {tokens.map((tk, i) => {
         if (tk.type === TokenType.WORD) {
           const idx = wordIdx++;
@@ -40,7 +40,7 @@ const BlurLine: React.FC<{ text: string; onLookup: (word: string) => void }> = (
               onClick={e => click(e, idx, tk.value)}
               title={isRevealed ? t('common.lookup') : t('blur.reveal')}
               aria-label={isRevealed ? undefined : t('blur.hiddenWord')}
-              className={`press inline-block align-baseline rounded px-1 ${
+              className={`press inline-block align-baseline rounded-md px-1 ${
                 isRevealed
                   ? (isPicked ? 'mark-yellow' : 'hover:mark-yellow')
                   : 'bg-shade text-transparent select-none hover:bg-line'}`}

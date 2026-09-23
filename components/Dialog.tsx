@@ -12,7 +12,7 @@ type Pending = {
   body?: string;
   ok?: string;
   cancel?: string;
-  tone?: 'green' | 'rose-soft';
+  tone?: 'accent' | 'shade';
   resolve: (v: boolean) => void;
 };
 
@@ -27,7 +27,7 @@ function open(p: Omit<Pending, 'resolve'>): Promise<boolean> {
 export const dialog = {
   alert: (title: string, body?: string, ok?: string) => open({ kind: 'alert', title, body, ok: ok ?? t('dialog.ok') }),
   confirm: (title: string, body?: string, opts: { ok?: string; cancel?: string; danger?: boolean } = {}) =>
-    open({ kind: 'confirm', title, body, ok: opts.ok ?? t('dialog.confirm'), cancel: opts.cancel ?? t('dialog.cancel'), tone: opts.danger ? 'rose-soft' : 'green' }),
+    open({ kind: 'confirm', title, body, ok: opts.ok ?? t('dialog.confirm'), cancel: opts.cancel ?? t('dialog.cancel'), tone: opts.danger ? 'shade' : 'accent' }),
 };
 
 export const DialogHost: React.FC = () => {
@@ -55,15 +55,15 @@ export const DialogHost: React.FC = () => {
   if (!p) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-ink/50 flex items-center justify-center p-4 fade-in" onClick={() => close(p.kind === 'alert')}>
+    <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 fade-in" onClick={() => close(p.kind === 'alert')}>
       <Card className="w-full max-w-md shadow-lift" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
         <div className="px-6 pt-6 pb-2">
-          <h3 className="font-serif text-xl font-semibold leading-tight">{p.title}</h3>
+          <h3 className="font-serif text-xl leading-tight">{p.title}</h3>
         </div>
         {p.body && <p className="px-6 pb-5 text-sm text-mute leading-relaxed whitespace-pre-line">{p.body}</p>}
         <div className="px-6 py-4 flex justify-end gap-3 border-t border-line">
           {p.kind === 'confirm' && <Btn onClick={() => close(false)}>{p.cancel}</Btn>}
-          <Btn tone={p.kind === 'confirm' && p.tone === 'rose-soft' ? 'rose' : 'green'} onClick={() => close(true)} autoFocus>{p.ok}</Btn>
+          <Btn tone={p.kind === 'confirm' && p.tone === 'shade' ? 'ink' : 'accent'} onClick={() => close(true)} autoFocus>{p.ok}</Btn>
         </div>
       </Card>
     </div>

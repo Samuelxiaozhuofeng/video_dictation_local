@@ -1,31 +1,28 @@
 /** @type {import('tailwindcss').Config} */
+// One accent (warm yellow) + a grey ramp on deep ink-teal. Nothing else.
 export default {
   content: ['./index.html', './*.tsx', './components/**/*.tsx', './hooks/**/*.{ts,tsx}', './utils/**/*.ts'],
   theme: {
     extend: {
       colors: {
-        paper: '#F6F1E6',
-        page: '#FFFDF7',
-        line: '#DED5C2',
-        ink: '#2B2521',
-        mute: '#7A7066',
-        green: '#2F6B4F',
-        'green-soft': '#DCEBDF',
-        ochre: '#B8702A',
-        'ochre-soft': '#F5E3C6',
-        highlight: '#FBEFB4',
-        rose: '#B94A3A',
-        'rose-soft': '#F5D9D2',
-        shade: '#E8E1D2',
+        paper: '#12262B',   // app background
+        page: '#172E34',    // raised surfaces: dialogs, drawers, menus
+        shade: '#1B3237',   // quiet fills: inputs, pills, hover
+        line: '#26414A',    // hairlines
+        faint: '#3E5A60',   // placeholders, empty word slots
+        mute: '#7F8F8E',    // secondary text
+        ink: '#EFE8DA',     // primary text
+        accent: '#F2C94C',  // the one colour: caret, current word, primary action
+        'accent-soft': '#313D30',
       },
       fontFamily: {
-        sans: ['Inter', '"PingFang SC"', '"Microsoft YaHei"', 'system-ui', 'sans-serif'],
-        serif: ['"Fraunces Variable"', '"Songti SC"', 'Georgia', 'serif'],
-        mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
+        sans: ['"Instrument Sans"', '"PingFang SC"', '"Microsoft YaHei"', 'system-ui', 'sans-serif'],
+        serif: ['Newsreader', '"Songti SC"', 'Georgia', 'serif'],
+        mono: ['"Instrument Sans"', '"PingFang SC"', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        card: '0 1px 2px rgba(43,37,33,.05), 0 6px 16px rgba(43,37,33,.06)',
-        lift: '0 2px 4px rgba(43,37,33,.08), 0 16px 40px rgba(43,37,33,.14)',
+        card: '0 1px 2px rgba(0,0,0,.25)',
+        lift: '0 12px 32px rgba(0,0,0,.35)',
       },
     },
   },

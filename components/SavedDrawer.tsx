@@ -14,10 +14,10 @@ const SavedDrawer: React.FC = () => {
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-ink/60" onClick={close} />
+      <div className="fixed inset-0 z-40 bg-black/60" onClick={close} />
       <aside className="fixed inset-y-0 right-0 z-50 w-full sm:w-[360px] bg-page border-l border-line shadow-lift flex flex-col slide-in" aria-label={t('common.savedLines')}>
         <div className="h-14 px-4 flex items-center justify-between border-b border-line">
-          <span className="font-serif font-semibold text-lg inline-flex items-center gap-2"><Bookmark size={18} className="text-ochre" /> {t('common.savedLines')}</span>
+          <span className="font-serif text-lg inline-flex items-center gap-2"><Bookmark size={18} className="text-accent" /> {t('common.savedLines')}</span>
           <Btn square size="sm" flat onClick={close} title={t('common.close')}><X size={16} /></Btn>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -29,8 +29,8 @@ const SavedDrawer: React.FC = () => {
               <div className="mt-3 flex items-center justify-between">
                 <Stamp>{Storage.formatTimeCode(item.startTime)}</Stamp>
                 <div className="flex gap-2">
-                  <Btn square size="sm" flat onClick={e => actions.onDeleteSavedItem(item.id, e)} title={t('savedDrawer.remove')} className="hover:!bg-rose-soft hover:!text-rose"><Trash2 size={14} /></Btn>
-                  <Btn size="sm" tone="green" onClick={() => actions.onJumpToSaved(item.id)}><Play size={14} fill="currentColor" /> {t('savedDrawer.go')}</Btn>
+                  <Btn square size="sm" flat onClick={e => actions.onDeleteSavedItem(item.id, e)} title={t('savedDrawer.remove')} className="hover:!bg-shade hover:!text-ink"><Trash2 size={14} /></Btn>
+                  <Btn size="sm" tone="accent" onClick={() => actions.onJumpToSaved(item.id)}><Play size={14} fill="currentColor" /> {t('savedDrawer.go')}</Btn>
                 </div>
               </div>
             </div>

@@ -1,15 +1,17 @@
 import React from 'react';
-import { Play, Pause, SkipBack, SkipForward, RotateCcw, Bookmark, PlusCircle, Volume2, VolumeX, Mic, Check, X, Loader2 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, RotateCcw, Bookmark, PlusCircle, Volume2, VolumeX, Mic, Check, X, Loader2, MoreHorizontal } from 'lucide-react';
 import { LearningMode } from '../types';
 import * as Storage from '../utils/storage';
 import { usePracticeContext } from '../hooks/usePracticeContext';
-import { Btn, Seg } from './ui';
+import { Btn, Menu, MenuItem, Seg } from './ui';
 import { useT } from '../utils/i18n';
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5];
 
-// The remote: progress, transport buttons, speed, save, Anki. Turns pink while recording.
-const Transport: React.FC = () => {
+// The remote along the bottom: a hairline progress bar you can seek on, the play
+// controls, the key legend, save / Anki / mute, and a "…" menu for the rarer
+// settings (speed, plus whatever the page adds: cloze level, breakdown).
+const Transport: React.FC<{ lineLabel: string; menuItems: MenuItem[]; menuPanel?: React.ReactNode }> = ({ lineLabel, menuItems, menuPanel }) => {
   const t = useT();
   const { practice, video, saved, anki, actions } = usePracticeContext();
   const { learningMode } = practice;
@@ -24,68 +26,68 @@ const Transport: React.FC = () => {
 
   const ankiFace = () => {
     switch (ankiStatus) {
-      case 'recording': return { tone: 'rose' as const, icon: <Mic size={16} />, label: t('transport.rec') };
-      case 'adding': return { tone: 'ink' as const, icon: <Loader2 size={16} className="animate-spin" />, label: t('transport.adding') };
-      case 'success': return { tone: 'green-soft' as const, icon: <Check size={16} />, label: t('common.added') };
-      case 'error': return { tone: 'rose-soft' as const, icon: <X size={16} />, label: t('common.failed') };
-      default: return { tone: 'white' as const, icon: <PlusCircle size={16} />, label: 'Anki' };
+      case 'recording': return { icon: <Mic size={15} />, label: t('transport.rec') };
+      case 'adding': return { icon: <Loader2 size={15} className="animate-spin" />, label: t('transport.adding') };
+      case 'success': return { icon: <Check size={15} />, label: t('common.added') };
+      case 'error': return { icon: <X size={15} />, label: t('common.failed') };
+      default: return { icon: <PlusCircle size={15} />, label: 'Anki' };
     }
   };
   const af = ankiFace();
 
   return (
-    <footer className={`shrink-0 border-t border-line transition-colors ${recording ? 'bg-rose-soft' : 'bg-page'}`}>
-      <div className="px-4 sm:px-6 pt-3">
-        {/* Progress */}
-        <div className="flex items-center gap-3 font-mono text-xs text-mute">
-          <span className="w-12">{cur}</span>
-          <div className="relative flex-1 h-4 flex items-center group">
-            <div className="w-full h-1.5 rounded-full bg-shade overflow-hidden">
-              <div className="h-full rounded-full bg-green" style={{ width: `${progress}%` }} />
-            </div>
-            <input type="range" min="0" max="100" step="0.1" value={progress} onChange={actions.onProgressSeek}
-              className="absolute inset-0 !h-full opacity-0 cursor-pointer" aria-label={t('transport.seek')} />
-          </div>
-          <span className="w-12 text-right">{dur}</span>
+    <footer className={`relative shrink-0 h-14 px-4 flex items-center gap-4 text-xs text-mute transition-colors ${recording ? 'bg-accent-soft' : ''}`}>
+      {/* Progress: a hairline across the top edge, seekable */}
+      <div className="absolute left-0 right-0 top-0 h-3 -translate-y-1/2 flex items-center group" title={`${cur} / ${dur}`}>
+        <div className="w-full h-[2px] bg-shade group-hover:h-1 transition-all">
+          <div className="h-full bg-mute" style={{ width: `${progress}%` }} />
         </div>
-
-        {/* Controls */}
-        <div className="mt-3 pb-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Btn square flat onClick={() => actions.onSkip('prev')} title={t('transport.previousLine')}><SkipBack size={18} /></Btn>
-            <Btn square flat onClick={() => actions.onReplayCurrent()} title={t('transport.replayLine')}><RotateCcw size={18} /></Btn>
-            <Btn square tone="green" onClick={actions.onTogglePlay} title={isPlaying ? t('transport.pauseSpace') : t('transport.playSpace')} className="!rounded-full">
-              {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" className="ml-0.5" />}
-            </Btn>
-            <Btn square flat onClick={() => actions.onSkip('next')} title={t('transport.nextLine')}><SkipForward size={18} /></Btn>
-          </div>
-
-          <Seg size="sm" value={playbackSpeed} onChange={actions.onSetPlaybackSpeed}
-            options={SPEEDS.map(s => ({ value: s, label: `${s}×` }))} className="order-last sm:order-none" />
-
-          <div className="flex items-center gap-2">
-            <Btn square flat onClick={actions.onToggleSaveCurrent} title={isCurrentSaved ? t('transport.unsaveLine') : t('transport.saveLine')} className={isCurrentSaved ? '!bg-ochre-soft !text-ochre' : ''}>
-              <Bookmark size={18} fill={isCurrentSaved ? 'currentColor' : 'none'} />
-            </Btn>
-            {ankiReady && (
-              <Btn size="md" flat={ankiStatus === 'idle'} tone={af.tone} disabled={ankiStatus !== 'idle'} onClick={actions.onAddToAnki} title={t('transport.sendToAnki')}>
-                {af.icon} <span className="hidden sm:inline">{af.label}</span>
-              </Btn>
-            )}
-            <Btn square flat onClick={() => actions.onSetVolume(volume === 0 ? 1 : 0)} title={volume === 0 ? t('transport.unmute') : t('transport.mute')}>
-              {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
-            </Btn>
-          </div>
-        </div>
+        <input type="range" min="0" max="100" step="0.1" value={progress} onChange={actions.onProgressSeek}
+          className="absolute inset-0 !h-full opacity-0 cursor-pointer" aria-label={t('transport.seek')} />
       </div>
 
-      {/* Key legend / recording banner */}
-      <div className={`border-t border-line px-4 sm:px-6 py-1.5 text-[11px] ${recording ? 'bg-rose text-page' : 'bg-paper text-mute'}`}>
+      <div className="flex items-center gap-0.5 shrink-0">
+        <Btn square size="sm" flat onClick={() => actions.onSkip('prev')} title={t('transport.previousLine')}><SkipBack size={16} /></Btn>
+        <Btn square size="sm" flat onClick={() => actions.onReplayCurrent()} title={t('transport.replayLine')}><RotateCcw size={16} /></Btn>
+        <Btn square size="sm" flat onClick={actions.onTogglePlay} title={isPlaying ? t('transport.pauseSpace') : t('transport.playSpace')} className="!text-ink">
+          {isPlaying ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" className="ml-0.5" />}
+        </Btn>
+        <Btn square size="sm" flat onClick={() => actions.onSkip('next')} title={t('transport.nextLine')}><SkipForward size={16} /></Btn>
+      </div>
+
+      <div className="min-w-0 flex-1 truncate">
         {recording ? (
-          <span className="blink">{t('transport.recordingBanner')}</span>
+          <span className="blink text-accent">{t('transport.recordingBanner')}</span>
         ) : (
-          <span className="hidden md:inline">{learningMode === LearningMode.DICTATION ? t('transport.legendDictation') : t('transport.legend')}</span>
+          <span className="hidden xl:inline">{learningMode === LearningMode.DICTATION ? t('transport.legendDictation') : t('transport.legend')}</span>
         )}
+      </div>
+
+      <div className="flex items-center gap-0.5 shrink-0">
+        <span className="px-2">{lineLabel}</span>
+        <Btn square size="sm" flat onClick={actions.onToggleSaveCurrent} title={isCurrentSaved ? t('transport.unsaveLine') : t('transport.saveLine')} className={isCurrentSaved ? '!text-accent' : ''}>
+          <Bookmark size={16} fill={isCurrentSaved ? 'currentColor' : 'none'} />
+        </Btn>
+        {ankiReady && (
+          <Btn size="sm" flat disabled={ankiStatus !== 'idle'} onClick={actions.onAddToAnki} title={t('transport.sendToAnki')} className={ankiStatus === 'idle' ? '' : '!opacity-100 !text-ink'}>
+            {af.icon} <span className="hidden sm:inline">{af.label}</span>
+          </Btn>
+        )}
+        <Btn square size="sm" flat onClick={() => actions.onSetVolume(volume === 0 ? 1 : 0)} title={volume === 0 ? t('transport.unmute') : t('transport.mute')}>
+          {volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+        </Btn>
+        <Menu up items={menuItems} trigger={(open, toggle) => (
+          <Btn square size="sm" flat onClick={toggle} title={t('home.more')} aria-label={t('home.more')} className={open ? '!bg-shade !text-ink' : ''}>
+            <MoreHorizontal size={17} />
+          </Btn>
+        )}>
+          <div className="px-3.5 py-2 flex flex-col gap-2">
+            <span className="text-xs text-mute">{t('transport.speed')}</span>
+            <Seg size="sm" value={playbackSpeed} onChange={actions.onSetPlaybackSpeed} options={SPEEDS.map(s => ({ value: s, label: `${s}×` }))} />
+          </div>
+          {menuPanel}
+          {menuItems.length > 0 && <div className="my-1.5 border-t border-line" />}
+        </Menu>
       </div>
     </footer>
   );

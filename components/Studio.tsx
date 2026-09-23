@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Play, Bookmark, Check, RotateCcw, PlayCircle, Home as HomeIcon, Pencil, EyeOff, Scissors } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, Bookmark, RotateCcw, ArrowLeft, ArrowRight, Scissors } from 'lucide-react';
 import { PracticeMode, LearningMode, BlurPlaybackMode, ClozeLevel } from '../types';
 import * as AI from '../utils/ai';
 import * as Storage from '../utils/storage';
 import { usePracticeContext } from '../hooks/usePracticeContext';
 import { useBreakdown } from '../hooks/useBreakdown';
-import { Btn, Card, Stamp, Seg } from './ui';
+import { Btn, Card, Seg, MenuItem } from './ui';
 import DictationLine from './DictationLine';
 import BlurLine from './BlurLine';
 import Transport from './Transport';
@@ -16,7 +16,8 @@ import { useT } from '../utils/i18n';
 import { canCloze, loadOrBuildCloze, pickBlanks } from '../utils/aiDrills';
 import { readCacheText, writeCacheText } from '../utils/desktop';
 
-// The practice room: a TV (video) over a chyron (the line you work on) over a remote (Transport).
+// The practice room: video on the left, a transcript column on the right (two faded
+// past lines over the line you work on), the remote (Transport) along the bottom.
 const Studio: React.FC = () => {
   const t = useT();
   const { practice, video, saved, anki, actions } = usePracticeContext();
@@ -152,138 +153,143 @@ const Studio: React.FC = () => {
   const defOpen = pinned || def.word !== null;
   const showCenterPlay = !isPlaying && mode === PracticeMode.LISTENING && ankiStatus !== 'recording' && !showSectionComplete && !showComplete;
 
+  // The two lines just before this one, fading back like a transcript.
+  const past = [currentSubtitleIndex - 2, currentSubtitleIndex - 1].filter(i => i >= 0 && subtitles[i]);
+
+  const menuItems: MenuItem[] = [];
+  if (!isBlur && mode === PracticeMode.INPUT && !bdActive) {
+    menuItems.push({
+      label: <><Scissors size={15} /> {bd.state.status === 'loading' ? t('studio.breakdownLoading') : t('studio.breakdown')}</>,
+      onClick: startBreakdown,
+      disabled: !hasClozeAi || bd.tooShort || bd.state.status === 'loading',
+      title: !hasClozeAi ? t('studio.breakdownNeedKey') : bd.tooShort ? t('studio.breakdownTooShort') : t('studio.breakdownTitle'),
+    });
+  }
+  const menuPanel = isBlur ? (
+    <MenuRow label={t('studio.playbackLabel')}>
+      <Seg size="sm" value={blurPlaybackMode} onChange={actions.onSetBlurPlaybackMode} options={[
+        { value: BlurPlaybackMode.SENTENCE_BY_SENTENCE, label: t('studio.stepLabel'), title: t('studio.stepTitle') },
+        { value: BlurPlaybackMode.CONTINUOUS, label: t('studio.flowLabel'), title: t('studio.flowTitle') },
+      ]} />
+    </MenuRow>
+  ) : (
+    <MenuRow label={t('studio.clozeLabel')} hint={!hasClozeAi ? t('studio.clozeNeedKey') : undefined}>
+      <Seg size="sm" value={effectiveLevel} onChange={setLevel} options={[
+        { value: 'easy', label: hasClozeAi ? t('studio.clozeEasy') : <span className="opacity-40">{t('studio.clozeEasy')}</span>, title: hasClozeAi ? t('studio.clozeEasyTitle') : t('studio.clozeNeedKey') },
+        { value: 'medium', label: hasClozeAi ? t('studio.clozeMedium') : <span className="opacity-40">{t('studio.clozeMedium')}</span>, title: hasClozeAi ? t('studio.clozeMediumTitle') : t('studio.clozeNeedKey') },
+        { value: 'full', label: t('studio.clozeFull'), title: t('studio.clozeFullTitle') },
+      ]} />
+    </MenuRow>
+  );
+
   return (
     <div className="relative h-full flex flex-col bg-paper">
       {/* --- Top strip --- */}
-      <header className="shrink-0 h-14 border-b border-line bg-page pl-[80px] pr-3 sm:pr-4 flex items-center justify-between gap-3" data-tauri-drag-region="deep">
-        <div className="flex items-center gap-3 min-w-0">
-          <Btn size="sm" flat onClick={actions.onExit} title={t('studio.backToVideos')}><HomeIcon size={14} /> <span className="hidden sm:inline">{t('nav.videos')}</span></Btn>
-          <span className="font-serif font-semibold truncate min-w-0" title={videoName}>{videoName}</span>
+      <header className="shrink-0 h-14 pl-[80px] pr-4 flex items-center justify-between gap-3 text-[13px] text-mute" data-tauri-drag-region="deep">
+        <div className="flex items-center gap-2 min-w-0">
+          <Btn square size="sm" flat onClick={actions.onExit} title={t('studio.backToVideos')} aria-label={t('studio.backToVideos')}><ArrowLeft size={16} /></Btn>
+          <span className="truncate min-w-0" title={videoName}>{videoName}</span>
           {sections.length > 1 && (
-            <div className="inline-flex items-center gap-1 shrink-0 text-xs text-mute">
-              <Btn square size="sm" flat onClick={() => actions.onSwitchSection(currentSectionIndex - 1)} disabled={currentSectionIndex === 0} title={t('studio.previousSection')}><ChevronLeft size={16} /></Btn>
-              <span className="font-mono">{t('studio.part', { current: currentSectionIndex + 1, total: sections.length })}</span>
-              <Btn square size="sm" flat onClick={() => actions.onSwitchSection(currentSectionIndex + 1)} disabled={currentSectionIndex === sections.length - 1} title={t('studio.nextSection')}><ChevronRight size={16} /></Btn>
+            <div className="inline-flex items-center shrink-0">
+              <span className="text-faint mx-1">/</span>
+              <Btn square size="sm" flat onClick={() => actions.onSwitchSection(currentSectionIndex - 1)} disabled={currentSectionIndex === 0} title={t('studio.previousSection')}><ChevronLeft size={15} /></Btn>
+              <span>{t('studio.part', { current: currentSectionIndex + 1, total: sections.length })}</span>
+              <Btn square size="sm" flat onClick={() => actions.onSwitchSection(currentSectionIndex + 1)} disabled={currentSectionIndex === sections.length - 1} title={t('studio.nextSection')}><ChevronRight size={15} /></Btn>
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Stamp tone={isBlur ? 'ochre-soft' : 'green-soft'} className="hidden sm:inline-flex">{isBlur ? <><EyeOff size={12} /> {t('studio.blurBadge')}</> : <><Pencil size={12} /> {t('studio.dictationBadge')}</>}</Stamp>
-          <Btn size="sm" flat onClick={() => actions.onToggleSavedList(!showSavedList)} title={t('studio.savedLinesFromVideo')} className={showSavedList ? '!bg-ochre-soft !text-ochre' : ''}>
-            <Bookmark size={14} /> <span className="hidden sm:inline">{t('nav.saved')}</span>{savedIds.size > 0 && <span className="font-mono">{savedIds.size}</span>}
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="hidden sm:inline px-2">{isBlur ? t('studio.blurBadge') : t('studio.dictationBadge')}</span>
+          <Btn size="sm" flat onClick={() => actions.onToggleSavedList(!showSavedList)} title={t('studio.savedLinesFromVideo')} className={showSavedList ? '!bg-shade !text-ink' : ''}>
+            <Bookmark size={14} /> <span className="hidden sm:inline">{t('nav.saved')}</span>{savedIds.size > 0 && <span>{savedIds.size}</span>}
           </Btn>
         </div>
       </header>
 
-      {/* --- Stage --- */}
-      <div className="relative flex-1 min-h-0 flex items-center justify-center p-4 sm:p-6">
-        {videoSrc ? (
-          <video ref={videoRef} crossOrigin="anonymous" src={videoSrc} onLoadedMetadata={() => actions.onReplayCurrent()} className="rounded-lg border border-line shadow-card bg-ink block max-h-full max-w-full" />
-        ) : (
-          <Card tone="paper" flat className="p-6 text-mute">{t('studio.noVideoLoaded')}</Card>
-        )}
+      {/* --- Video left, transcript right --- */}
+      <div className="relative flex-1 min-h-0 flex flex-col lg:flex-row lg:items-center gap-8 lg:gap-14 px-6 lg:px-11 pb-6">
+        <div className="relative min-h-0 min-w-0 flex-1 self-stretch flex items-center justify-center">
+          {videoSrc ? (
+            <video ref={videoRef} crossOrigin="anonymous" src={videoSrc} onLoadedMetadata={() => actions.onReplayCurrent()} className="block w-full h-full object-contain" />
+          ) : (
+            <p className="text-mute text-sm">{t('studio.noVideoLoaded')}</p>
+          )}
+          {showCenterPlay && (
+            <button onClick={actions.onTogglePlay} className="absolute inset-0 flex items-center justify-center" aria-label={t('studio.playAriaLabel')}>
+              <span className="press rounded-full bg-accent text-paper w-16 h-16 flex items-center justify-center"><Play size={26} fill="currentColor" className="ml-1" /></span>
+            </button>
+          )}
+        </div>
 
-        {showCenterPlay && (
-          <button onClick={actions.onTogglePlay} className="absolute inset-0 flex items-center justify-center" aria-label={t('studio.playAriaLabel')}>
-            <span className="press rounded-full bg-green text-page shadow-lift w-20 h-20 flex items-center justify-center"><Play size={34} fill="currentColor" className="ml-1" /></span>
-          </button>
-        )}
-
-      </div>
-
-      {/* --- Chyron --- */}
-      <div className="shrink-0 px-4 sm:px-6 pb-4">
-        <Card className="max-w-5xl mx-auto ruled margin-rule pl-14 pr-5 sm:pr-6 py-4">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div className="flex items-center gap-2 font-mono text-xs">
-              <Stamp tone="ochre-soft">{t('studio.lineCount', { current: currentSubtitleIndex + 1, total: subtitles.length })}</Stamp>
-              {currentSub && <span className="text-mute">{Storage.formatTimeCode(currentSub.startTime)} – {Storage.formatTimeCode(currentSub.endTime)}</span>}
+        <section className="shrink-0 lg:w-[440px] flex flex-col gap-5 lg:max-h-full lg:overflow-y-auto" aria-label={t('studio.lineCount', { current: currentSubtitleIndex + 1, total: subtitles.length })}>
+          {past.map((i, k) => (
+            <div key={subtitles[i].id} className={`flex gap-4 items-baseline ${k === past.length - 1 ? 'opacity-40' : 'opacity-20'}`}>
+              <span className="w-6 shrink-0 text-xs">{i + 1}</span>
+              <span className="font-serif text-[19px] leading-[26px]">{subtitles[i].text}</span>
             </div>
-            {isBlur ? (
-              <Seg size="sm" value={blurPlaybackMode} onChange={actions.onSetBlurPlaybackMode} options={[
-                { value: BlurPlaybackMode.SENTENCE_BY_SENTENCE, label: t('studio.stepLabel'), title: t('studio.stepTitle') },
-                { value: BlurPlaybackMode.CONTINUOUS, label: t('studio.flowLabel'), title: t('studio.flowTitle') },
-              ]} />
-            ) : (
-              <div className="flex items-center gap-2">
-                <Seg size="sm" value={effectiveLevel} onChange={setLevel} options={[
-                  { value: 'easy', label: hasClozeAi ? t('studio.clozeEasy') : <span className="opacity-40">{t('studio.clozeEasy')}</span>, title: hasClozeAi ? t('studio.clozeEasyTitle') : t('studio.clozeNeedKey') },
-                  { value: 'medium', label: hasClozeAi ? t('studio.clozeMedium') : <span className="opacity-40">{t('studio.clozeMedium')}</span>, title: hasClozeAi ? t('studio.clozeMediumTitle') : t('studio.clozeNeedKey') },
-                  { value: 'full', label: t('studio.clozeFull'), title: t('studio.clozeFullTitle') },
-                ]} />
-                {!hasClozeAi && <span className="text-[11px] text-mute max-w-[12rem] leading-tight">{t('studio.clozeNeedKey')}</span>}
-                {clozeProgress && effectiveLevel !== 'full' && <span className="text-[11px] text-mute">{t('studio.clozePreparing', clozeProgress)}</span>}
-              </div>
-            )}
-          </div>
+          ))}
 
-          <div className="min-h-[72px] flex items-center justify-center">
-            {!currentSub ? (
-              <span className="font-serif italic text-mute">{t('studio.endOfPart')}</span>
-            ) : isBlur ? (
-              <div className="w-full flex flex-col items-center gap-4">
-                <BlurLine text={currentSub.text} onLookup={lookup} />
-                {isStep && !isPlaying && (
-                  <Btn tone="green" onClick={actions.onContinue}>{t('common.nextLine')} <ChevronRight size={16} /></Btn>
-                )}
-              </div>
-            ) : bdActive && bdStep ? (
-              <div className="w-full flex flex-col items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <Stamp tone="green-soft"><Scissors size={12} /> {t('studio.breakdownStep', { current: bdActive.step + 1, total: bdActive.steps.length })}</Stamp>
-                  <span className="text-[11px] text-mute">{bdLast ? t('studio.breakdownOriginal') : t('studio.breakdownClean')}</span>
-                  <Btn size="sm" flat onClick={bd.cancel} title={t('studio.breakdownQuitTitle')}>{t('studio.breakdownQuit')}</Btn>
+          <div className="flex gap-4 items-start mt-1">
+            <span className="w-6 shrink-0 pt-3 text-xs text-ink">{currentSubtitleIndex + 1}</span>
+            <div className="min-w-0 flex-1">
+              {!currentSub ? (
+                <span className="font-serif italic text-mute text-xl">{t('studio.endOfPart')}</span>
+              ) : isBlur ? (
+                <div className="flex flex-col items-start gap-5">
+                  <BlurLine text={currentSub.text} onLookup={lookup} />
+                  {isStep && !isPlaying && (
+                    <Btn tone="accent" onClick={actions.onContinue}>{t('common.nextLine')} <ChevronRight size={16} /></Btn>
+                  )}
                 </div>
-                <DictationLine
-                  key={`${bdActive.lineId}-${bdActive.step}`}
-                  targetText={bdStep.text}
-                  mode={bdActive.reviewing ? PracticeMode.FEEDBACK : PracticeMode.INPUT}
-                  onComplete={() => (bdActive.reviewing ? bdNext() : bd.review())}
-                  onReplay={allRight => { if (allRight) bd.review(); bdReplay(); }}
-                  onLookup={lookup}
-                  nextLabel={bdLast ? undefined : t('dictation.nextStep')}
-                />
-                {bdActive.reviewing && (bdLast ? bdActive.steps.slice(0, -1) : [bdStep]).map(s => (
-                  <p key={s.text} className="max-w-2xl text-center text-sm sm:text-base text-ink/80 bg-paper border border-line rounded-md px-3 py-1.5 fade-in">{s.note}</p>
-                ))}
-              </div>
-            ) : mode === PracticeMode.LISTENING ? (
-              <ListeningGhost text={currentSub.text} blanks={blanks} />
-            ) : (
-              <div className="w-full">
-                <DictationLine
-                  targetText={currentSub.text}
-                  mode={mode}
-                  blanks={blanks}
-                  onComplete={correct => (correct ? actions.onContinue() : actions.onInputComplete(correct))}
-                  onReplay={actions.onReplayCurrent}
-                  onLookup={lookup}
-                />
-                {mode === PracticeMode.INPUT && (
-                  <div className="mt-1 flex justify-center items-center gap-2 text-[11px] text-mute">
-                    <Btn
-                      size="sm" flat className="!text-mute disabled:opacity-40"
-                      disabled={!hasClozeAi || bd.tooShort || bd.state.status === 'loading'}
-                      onClick={startBreakdown}
-                      title={!hasClozeAi ? t('studio.breakdownNeedKey') : bd.tooShort ? t('studio.breakdownTooShort') : t('studio.breakdownTitle')}
-                    >
-                      <Scissors size={13} /> {bd.state.status === 'loading' ? t('studio.breakdownLoading') : t('studio.breakdown')}
-                    </Btn>
-                    {!hasClozeAi && <span>{t('studio.breakdownNeedKey')}</span>}
-                    {bd.state.status === 'failed' && <span>{t('studio.breakdownFailed')}</span>}
+              ) : bdActive && bdStep ? (
+                <div className="flex flex-col items-start gap-4">
+                  <div className="flex items-center gap-3 text-xs text-mute">
+                    <span className="inline-flex items-center gap-1.5"><Scissors size={12} /> {t('studio.breakdownStep', { current: bdActive.step + 1, total: bdActive.steps.length })}</span>
+                    <span>{bdLast ? t('studio.breakdownOriginal') : t('studio.breakdownClean')}</span>
+                    <Btn size="sm" flat onClick={bd.cancel} title={t('studio.breakdownQuitTitle')}>{t('studio.breakdownQuit')}</Btn>
                   </div>
-                )}
-              </div>
-            )}
+                  <DictationLine
+                    key={`${bdActive.lineId}-${bdActive.step}`}
+                    targetText={bdStep.text}
+                    mode={bdActive.reviewing ? PracticeMode.FEEDBACK : PracticeMode.INPUT}
+                    onComplete={() => (bdActive.reviewing ? bdNext() : bd.review())}
+                    onReplay={allRight => { if (allRight) bd.review(); bdReplay(); }}
+                    onLookup={lookup}
+                    nextLabel={bdLast ? undefined : t('dictation.nextStep')}
+                  />
+                  {bdActive.reviewing && (bdLast ? bdActive.steps.slice(0, -1) : [bdStep]).map(s => (
+                    <p key={s.text} className="text-[15px] leading-relaxed text-ink/80 fade-in">{s.note}</p>
+                  ))}
+                </div>
+              ) : mode === PracticeMode.LISTENING ? (
+                <ListeningGhost text={currentSub.text} blanks={blanks} />
+              ) : (
+                <>
+                  <DictationLine
+                    targetText={currentSub.text}
+                    mode={mode}
+                    blanks={blanks}
+                    onComplete={correct => (correct ? actions.onContinue() : actions.onInputComplete(correct))}
+                    onReplay={actions.onReplayCurrent}
+                    onLookup={lookup}
+                  />
+                  {mode === PracticeMode.INPUT && (bd.state.status === 'failed' || (clozeProgress && effectiveLevel !== 'full')) && (
+                    <p className="mt-3 text-xs text-mute">
+                      {bd.state.status === 'failed' ? t('studio.breakdownFailed') : t('studio.clozePreparing', clozeProgress!)}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
           </div>
-        </Card>
+        </section>
       </div>
 
       {showSectionComplete && (
         <Overlay title={t('studio.sectionDoneTitle', { n: currentSectionIndex + 1 })} body={t('studio.sectionDoneBody')}>
           <Btn onClick={() => actions.onSetShowSectionComplete(false)}><RotateCcw size={16} /> {t('studio.review')}</Btn>
-          <Btn onClick={actions.onStopAfterSection}><HomeIcon size={16} /> {t('studio.stopHere')}</Btn>
-          <Btn tone="green" onClick={actions.onNextSection} autoFocus><PlayCircle size={16} /> {t('studio.nextSection')}</Btn>
+          <Btn onClick={actions.onStopAfterSection}>{t('studio.stopHere')}</Btn>
+          <Btn tone="accent" onClick={actions.onNextSection} autoFocus>{t('studio.nextSection')} <ArrowRight size={16} /></Btn>
         </Overlay>
       )}
 
@@ -293,11 +299,11 @@ const Studio: React.FC = () => {
           [String(savedIds.size), t('studio.statSaved')],
         ]}>
           <Btn onClick={actions.onRestart}><RotateCcw size={16} /> {t('studio.startOver')}</Btn>
-          <Btn tone="green" onClick={actions.onExit} autoFocus><HomeIcon size={16} /> {t('studio.backToVideosBtn')}</Btn>
+          <Btn tone="accent" onClick={actions.onExit} autoFocus>{t('studio.backToVideosBtn')}</Btn>
         </Overlay>
       )}
 
-      <Transport />
+      <Transport lineLabel={t('studio.lineCount', { current: currentSubtitleIndex + 1, total: subtitles.length })} menuItems={menuItems} menuPanel={menuPanel} />
 
       {showSavedList && <SavedDrawer />}
       {defOpen && (
@@ -307,46 +313,51 @@ const Studio: React.FC = () => {
   );
 };
 
-// One covered block per word while the line plays: given words show as text, blanks as dashes.
+const MenuRow: React.FC<{ label: string; hint?: string; children: React.ReactNode }> = ({ label, hint, children }) => (
+  <div className="px-3.5 py-2 flex flex-col gap-2">
+    <span className="text-xs text-mute">{label}</span>
+    {children}
+    {hint && <span className="text-[11px] text-faint leading-snug max-w-[14rem]">{hint}</span>}
+  </div>
+);
+
+// One covered slot per word while the line plays: given words show as text, blanks as underlines.
 const ListeningGhost: React.FC<{ text: string; blanks: number[] }> = ({ text, blanks }) => {
   const t = useT();
   const words = getWordTokens(tokenizeText(text));
   const set = new Set(blanks);
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="flex flex-wrap justify-center gap-x-3 gap-y-2 font-mono text-xl sm:text-2xl">
+    <div className="flex flex-col items-start gap-4">
+      <div className="flex flex-wrap gap-x-2.5 gap-y-2 font-serif text-[30px] leading-[42px]">
         {words.map((w, i) => set.has(i) ? (
-          <span key={i} className="inline-block h-8 border-b-2 border-dashed border-line" style={{ width: `${Math.max(3, w.value.length + 1)}ch` }} />
+          <span key={i} className="inline-block h-[40px] border-b-[1.5px] border-line" style={{ width: `${Math.max(2, w.value.length) * 0.5}em` }} />
         ) : (
-          <span key={i} className="inline-block h-8 text-ink/70 leading-8">{w.value}</span>
+          <span key={i} className="text-ink/60">{w.value}</span>
         ))}
       </div>
-      <Stamp tone="green-soft"><span className="blink">●</span> {t('studio.listening')}</Stamp>
+      <span className="text-xs text-mute inline-flex items-center gap-2"><span className="blink w-1.5 h-1.5 rounded-full bg-accent" /> {t('studio.listening')}</span>
     </div>
   );
 };
 
 const Overlay: React.FC<{ title: string; body: string; stats?: [string, string][]; children: React.ReactNode }> = ({ title, body, stats, children }) => (
-  <div className="absolute inset-0 z-20 bg-ink/60 flex items-center justify-center p-4">
-    <Card className="w-full max-w-md shadow-lift fade-in">
-      <div className="px-6 pt-6 pb-4 flex items-center gap-3">
-        <span className="w-10 h-10 rounded-full bg-green-soft text-green flex items-center justify-center"><Check size={22} /></span>
-        <h2 className="font-serif text-3xl font-semibold leading-none">{title}</h2>
-      </div>
-      <div className="px-6 pb-5 space-y-4">
+  <div className="absolute inset-0 z-20 bg-black/60 flex items-center justify-center p-4">
+    <Card className="w-full max-w-md fade-in">
+      <div className="px-7 pt-7 pb-5 space-y-3">
+        <h2 className="font-serif text-[32px] leading-tight">{title}</h2>
         <p className="text-sm text-mute leading-relaxed">{body}</p>
         {stats && (
-          <div className="flex gap-3">
+          <div className="flex gap-10 pt-3">
             {stats.map(([n, label]) => (
-              <div key={label} className="flat bg-paper px-4 py-3 flex-1">
-                <div className="font-serif text-3xl font-semibold leading-none">{n}</div>
-                <div className="text-xs text-mute mt-1">{label}</div>
+              <div key={label}>
+                <div className="font-serif text-[36px] leading-none">{n}</div>
+                <div className="text-xs text-mute mt-1.5">{label}</div>
               </div>
             ))}
           </div>
         )}
       </div>
-      <div className="px-6 py-4 border-t border-line flex justify-end gap-3">{children}</div>
+      <div className="px-7 py-4 border-t border-line flex justify-end gap-2">{children}</div>
     </Card>
   </div>
 );

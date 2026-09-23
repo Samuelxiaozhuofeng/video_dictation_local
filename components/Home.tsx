@@ -1,182 +1,32 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { FileVideo, FileText, Pencil, EyeOff, Trash2, Clock, Loader2, Upload, KeyRound, RotateCw, Scissors, Check } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Plus, MoreHorizontal, Loader2, KeyRound, RotateCw, ArrowRight } from 'lucide-react';
 import { LearningMode, VideoRecord } from '../types';
 import * as VideoStorage from '../utils/videoStorage';
 import { getPracticeConfig } from '../utils/storage';
 import { parseSRT } from '../utils/srtParser';
 import { buildSections } from '../utils/sections';
-import {
-  fileNameFromPath, listenDragDrop, pickSubtitlePath, pickVideoPath, readSubtitleFile, trashFile, relatedFilePaths,
-} from '../utils/desktop';
-import { formatImportError, isCookieError, openYouTubeLogin, retryImport, startLocalImport, subscribeImportJobs } from '../utils/importJob';
-import { Btn, Card, Stamp, H, inputCls } from './ui';
+import { fileNameFromPath, listenDragDrop, trashFile, relatedFilePaths } from '../utils/desktop';
+import { formatImportError, isCookieError, openYouTubeLogin, retryImport, subscribeImportJobs } from '../utils/importJob';
+import { Btn, Menu, MenuItem } from './ui';
 import { dialog } from './Dialog';
 import { useT, useLang } from '../utils/i18n';
-import ImportBox from './ImportBox';
+import AddVideo from './AddVideo';
 import { canCloze } from '../utils/aiDrills';
 import { cancelPrep, getPrepJob, prepStatus, prepareBreakdowns, subscribePrep } from '../utils/breakdownPrep';
+
+// Home does two things: pick up the video you were on, and add a new one.
+// The most recent video leads; the rest are quiet rows. Everything else
+// (mode switch, breakdown prep, delete) waits behind hover or the "…" menu.
 
 interface HomeProps {
   onResume: (record: VideoRecord, mode: LearningMode) => void | Promise<void>;
 }
 
-const LANGS = [
-  { value: 'en', key: 'import.langEn' },
-  { value: 'es', key: 'import.langEs' },
-  { value: 'ja', key: 'import.langJa' },
-  { value: 'zh', key: 'import.langZh' },
-  { value: 'auto', key: 'import.langAuto' },
-] as const;
-
 const VIDEO_EXT = /\.(mp4|mov|m4v)$/i;
-const SRT_EXT = /\.(srt|txt|vtt)$/i;
 
-// Two mode buttons used both for a fresh upload and for every shelf card.
-// With `last` set, the last-used mode is the loud one and the other is an outline.
-const ModeButtons: React.FC<{ last?: LearningMode; onPick: (m: LearningMode) => void; size?: 'md' | 'lg' }> = ({ last, onPick, size = 'md' }) => {
-  const t = useT();
-  const dLoud = last === undefined || last !== LearningMode.BLUR;
-  const bLoud = last === undefined || last === LearningMode.BLUR;
-  return (
-    <div className="flex gap-3">
-      <Btn tone={dLoud ? 'green' : 'white'} size={size} onClick={() => onPick(LearningMode.DICTATION)} title={t('home.dictateTitle')}>
-        <Pencil size={16} /> {t('home.dictate')}
-      </Btn>
-      <Btn tone={bLoud ? 'ochre' : 'white'} size={size} onClick={() => onPick(LearningMode.BLUR)} title={t('home.blurTitle')}>
-        <EyeOff size={16} /> {t('home.blur')}
-      </Btn>
-    </div>
-  );
-};
-
-// Drop a video and the app writes its own subtitles: whisper transcribes it,
-// then the lines get re-cut into short ones. A subtitle file may still be
-// dropped alongside, but it is not what you practise against.
-const DropZone: React.FC = () => {
-  const t = useT();
-  const [videoPath, setVideoPath] = useState<string | null>(null);
-  const [srt, setSrt] = useState<File | null>(null);
-  const [lang, setLang] = useState('en');
-  const [busy, setBusy] = useState(false);
-  const [over, setOver] = useState(false);
-  const videoName = videoPath ? fileNameFromPath(videoPath) : null;
-
-  const take = (paths: string[]) => {
-    for (const p of paths) {
-      const name = fileNameFromPath(p);
-      if (VIDEO_EXT.test(name)) setVideoPath(p);
-      else if (SRT_EXT.test(name)) {
-        readSubtitleFile(p).then(setSrt).catch(err => console.error(err));
-      }
-    }
-  };
-
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-    listenDragDrop({
-      onHover: () => setOver(true),
-      onLeave: () => setOver(false),
-      onDrop: (paths) => {
-        setOver(false);
-        take(paths);
-      },
-    }).then(fn => {
-      if (cancelled) fn();
-      else unlisten = fn;
-    });
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, []);
-
-  const browseVideo = async () => {
-    const p = await pickVideoPath();
-    if (p) setVideoPath(p);
-  };
-
-  const browseSrt = async () => {
-    const p = await pickSubtitlePath();
-    if (!p) return;
-    try {
-      setSrt(await readSubtitleFile(p));
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const ready = !!videoPath;
-
-  const start = async () => {
-    if (!videoPath || busy) return;
-    setBusy(true);
-    try {
-      await startLocalImport(videoPath, lang);
-      setVideoPath(null);
-      setSrt(null);
-    } catch (err) {
-      console.error(err);
-      dialog.alert(t('import.startFailTitle'), t('import.startFailBody'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Card
-      flat
-      className={`p-5 sm:p-6 border-dashed transition-colors ${over ? 'bg-green-soft border-green' : ''}`}
-    >
-      <div className="flex flex-col lg:flex-row lg:items-center gap-5">
-        <div className="flex items-center gap-4 lg:w-64 shrink-0">
-          <div className="w-12 h-12 rounded-full bg-shade/70 text-mute flex items-center justify-center shrink-0"><Upload size={22} /></div>
-          <div>
-            <p className="font-serif text-xl font-semibold leading-tight">{t('home.dropLine1')}<br />{t('home.dropLine2')}</p>
-            <p className="text-xs text-mute mt-1">{t('home.dropHint')}</p>
-          </div>
-        </div>
-
-        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <button type="button" onClick={browseVideo} className={`flat press p-3 text-left flex items-center gap-3 ${videoPath ? 'bg-green-soft border-green text-green' : 'hover:bg-paper'}`}>
-            <FileVideo size={20} className="shrink-0" />
-            <span className="min-w-0">
-              <span className="block text-[11px] font-medium opacity-70">{videoPath ? t('home.videoLabel') : t('home.chooseVideo')}</span>
-              <span className="block text-sm font-medium truncate">{videoName ?? '.mp4 .mov .m4v'}</span>
-            </span>
-          </button>
-          <button type="button" onClick={browseSrt} className={`flat press p-3 text-left flex items-center gap-3 ${srt ? 'bg-green-soft border-green text-green' : 'hover:bg-paper'}`}>
-            <FileText size={20} className="shrink-0" />
-            <span className="min-w-0">
-              <span className="block text-[11px] font-medium opacity-70">{srt ? t('home.subtitlesLabel') : t('home.chooseSubtitles')}</span>
-              <span className="block text-sm font-medium truncate">{srt ? srt.name : '.srt'}</span>
-            </span>
-          </button>
-        </div>
-
-        <div className="lg:pl-5 lg:border-l lg:border-line shrink-0 flex flex-col gap-2">
-          {ready ? (
-            <>
-              <div className="flex gap-2">
-                <select value={lang} onChange={e => setLang(e.target.value)} className={`w-32 ${inputCls}`}>
-                  {LANGS.map(opt => <option key={opt.value} value={opt.value}>{t(opt.key)}</option>)}
-                </select>
-                <Btn tone="green" size="lg" disabled={busy} onClick={start}>{t('home.makeSubtitles')}</Btn>
-              </div>
-              {srt && <span className="text-xs text-mute">{t('home.subtitlesIgnored')}</span>}
-            </>
-          ) : (
-            <span className="text-sm text-mute">{t('home.thenPickVideo')}</span>
-          )}
-        </div>
-      </div>
-    </Card>
-  );
-};
-
-const Progress: React.FC<{ pct: number }> = ({ pct }) => (
-  <div className="h-1.5 rounded-full bg-shade overflow-hidden">
-    <div className="h-full rounded-full bg-green" style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
+const Line: React.FC<{ pct: number; className?: string }> = ({ pct, className = '' }) => (
+  <div className={`h-[2px] bg-line ${className}`}>
+    <div className="h-full bg-mute" style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
   </div>
 );
 
@@ -186,7 +36,9 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
   const [videos, setVideos] = useState<VideoRecord[] | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
-  // Breakdown prep per card: how many lines are still unprepared, and a tick
+  const [adding, setAdding] = useState<{ path: string | null } | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  // Breakdown prep per video: how many lines are still unprepared, and a tick
   // that re-renders running jobs' progress.
   const [prep, setPrep] = useState<Map<string, { eligible: number; missing: number }>>(new Map());
   const [prepTick, setPrepTick] = useState(0);
@@ -224,6 +76,28 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
     return subscribeImportJobs(load);
   }, []);
 
+  // The whole window takes a dropped video; it opens the add dialog with it filled in.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    listenDragDrop({
+      onHover: () => setDragOver(true),
+      onLeave: () => setDragOver(false),
+      onDrop: (paths) => {
+        setDragOver(false);
+        const video = paths.find(p => VIDEO_EXT.test(fileNameFromPath(p)));
+        if (video) setAdding({ path: video });
+      },
+    }).then(fn => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
+
   useEffect(() => subscribePrep(() => setPrepTick(n => n + 1)), []);
   useEffect(() => {
     if (!hasAi || !videos) return;
@@ -235,24 +109,7 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
     return () => { cancelled = true; };
   }, [videos, lang, hasAi, prepTick]);
 
-  const handlePrep = (v: VideoRecord) => {
-    prepareBreakdowns(v.id, v.subtitleText, lang).catch(err => console.error(err));
-  };
-
-  // Reimplements utils/videoStorage.ts's formatLastPracticed with translated output
-  // (that file is out of i18n scope, so the formatting logic lives here instead).
-  const formatRelativeTime = (timestamp: number): string => {
-    const diff = Date.now() - timestamp;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-    if (minutes < 1) return t('home.timeJustNow');
-    if (minutes < 60) return t(minutes > 1 ? 'home.timeMinutesAgo' : 'home.timeMinuteAgo', { n: minutes });
-    if (hours < 24) return t(hours > 1 ? 'home.timeHoursAgo' : 'home.timeHourAgo', { n: hours });
-    if (days === 1) return t('home.timeYesterday');
-    if (days < 7) return t('home.timeDaysAgo', { n: days });
-    return new Date(timestamp).toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US');
-  };
+  const closeAdd = useCallback(() => setAdding(null), []);
 
   const handleYouTubeLogin = async () => {
     try {
@@ -315,103 +172,164 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
     return t('import.stageExtract');
   };
 
-  return (
-    <div className="space-y-10">
-      <DropZone />
-      <ImportBox />
+  const modeName = (m: LearningMode) => (m === LearningMode.BLUR ? t('home.blur') : t('home.dictate'));
+  const lastMode = (v: VideoRecord) => v.learningMode ?? LearningMode.DICTATION;
+  const otherMode = (v: VideoRecord) => (lastMode(v) === LearningMode.BLUR ? LearningMode.DICTATION : LearningMode.BLUR);
 
-      <section>
-        <H sub={t('home.pickModeContinue')} badge={videos && videos.length > 0 && <Stamp tone="ink">{videos.length}</Stamp>}>{t('home.yourVideos')}</H>
+  // "Part 2 of 5" and how far into that part, or lines when there is only one part.
+  const where = (v: VideoRecord) => {
+    const pos = shelfPosition.get(v.id);
+    if (!pos) return { text: `${v.completionRate}%`, pct: v.completionRate };
+    const pct = pos.lines ? (pos.line / pos.lines) * 100 : 0;
+    if (pos.parts > 1) return { text: t('home.partOf', { current: pos.part + 1, total: pos.parts }), pct };
+    return { text: t('home.linesCount', { current: pos.line, total: pos.lines }), pct };
+  };
 
-        {videos === null ? (
-          <div className="flex items-center gap-3 text-mute text-sm"><Loader2 className="animate-spin" size={18} /> {t('home.loading')}</div>
-        ) : videos.length === 0 ? (
-          <Card tone="paper" flat className="p-10 text-center border-dashed">
-            <p className="font-serif text-2xl font-semibold">{t('home.nothingHereYet')}</p>
-            <p className="text-sm text-mute mt-2">{t('home.nothingHereHint')}</p>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {videos.map(v => {
-              const job = v.importJob;
-              const pos = shelfPosition.get(v.id);
-              const inParts = !!pos && pos.parts > 1;
-              const prepJob = hasAi && !job ? getPrepJob(v.id) : undefined;
-              const prepInfo = hasAi && !job && !prepJob ? prep.get(v.id) : undefined;
-              return (
-                <Card key={v.id} className="p-5 flex flex-col gap-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <h3 className="font-serif text-lg font-semibold leading-tight break-words min-w-0">{v.displayName}</h3>
-                    {!job && (
-                      <Stamp tone={v.completionRate >= 100 ? 'green-soft' : 'white'} className="shrink-0">
-                        {inParts ? t('home.partOf', { current: pos!.part + 1, total: pos!.parts }) : `${v.completionRate}%`}
-                      </Stamp>
-                    )}
-                  </div>
-                  {job && !job.error && (
-                    <>
-                      <p className="text-sm text-mute">{jobLabel(job)}</p>
-                      <Progress pct={job.percent ?? 0} />
-                    </>
-                  )}
-                  {job?.error && (
-                    <div className="flex flex-col items-start gap-2">
-                      <p className="text-sm text-rose">{formatImportError(job.error)}</p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {isCookieError(job.error) && (
-                          <Btn flat tone="white" onClick={handleYouTubeLogin}>
-                            <KeyRound size={14} /> {t('home.ytLogin')}
-                          </Btn>
-                        )}
-                        {job.stage === 'download' && (
-                          <Btn flat tone="white" onClick={() => handleRetry(v)} disabled={retryingId === v.id}>
-                            <RotateCw size={14} /> {t('home.retry')}
-                          </Btn>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {!job && (
-                    <>
-                      <Progress pct={inParts ? (pos!.lines ? (pos!.line / pos!.lines) * 100 : 0) : v.completionRate} />
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-mute">
-                        <span>{t('home.linesCount', { current: pos?.line ?? v.currentSubtitleIndex, total: pos?.lines ?? v.totalSubtitles })}</span>
-                        <span className="inline-flex items-center gap-1"><Clock size={12} /> {formatRelativeTime(v.lastPracticed)}</span>
-                        {prepInfo && prepInfo.eligible > 0 && prepInfo.missing === 0 && (
-                          <span className="inline-flex items-center gap-1 text-green"><Check size={12} /> {t('home.prepBreakdownReady')}</span>
-                        )}
-                      </div>
-                      {prepJob && (
-                        <div className="flex flex-col gap-1.5">
-                          <p className="text-xs text-mute inline-flex items-center gap-1.5">
-                            <Loader2 size={12} className="animate-spin" /> {t('home.prepBreakdownRunning', { done: prepJob.done, total: prepJob.total || '…' })}
-                          </p>
-                          <Progress pct={prepJob.total ? (prepJob.done / prepJob.total) * 100 : 0} />
-                        </div>
-                      )}
-                    </>
-                  )}
-                  <div className="flex items-center justify-between gap-3 pt-4 border-t border-line border-dashed">
-                    {job ? <span /> : (
-                      <ModeButtons last={v.learningMode ?? LearningMode.DICTATION} onPick={m => onResume(v, m)} />
-                    )}
-                    <div className="flex items-center gap-2">
-                      {prepInfo && prepInfo.missing > 0 && (
-                        <Btn flat tone="white" onClick={() => handlePrep(v)} title={t('home.prepBreakdownTitle')}>
-                          <Scissors size={14} /> {prepInfo.missing < prepInfo.eligible ? t('home.prepBreakdownMore', { n: prepInfo.missing }) : t('home.prepBreakdown')}
-                        </Btn>
-                      )}
-                      <Btn square flat tone="white" onClick={() => handleDelete(v)} disabled={deletingId === v.id} title={t('home.deleteRecordTitle')} className="hover:!bg-rose-soft hover:!text-rose">
-                        {deletingId === v.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                      </Btn>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+  const menuFor = (v: VideoRecord): MenuItem[] => {
+    const items: MenuItem[] = [];
+    if (!v.importJob) {
+      items.push({ label: t('home.practiceAs', { mode: modeName(otherMode(v)) }), onClick: () => onResume(v, otherMode(v)) });
+      const prepJob = hasAi ? getPrepJob(v.id) : undefined;
+      const info = hasAi && !prepJob ? prep.get(v.id) : undefined;
+      if (prepJob) {
+        items.push({ label: t('home.prepBreakdownRunning', { done: prepJob.done, total: prepJob.total || '…' }), onClick: () => {}, disabled: true });
+      } else if (info && info.eligible > 0) {
+        items.push(info.missing > 0
+          ? { label: info.missing < info.eligible ? t('home.prepBreakdownMore', { n: info.missing }) : t('home.prepBreakdown'), title: t('home.prepBreakdownTitle'), onClick: () => { prepareBreakdowns(v.id, v.subtitleText, lang).catch(err => console.error(err)); } }
+          : { label: t('home.prepBreakdownReady'), onClick: () => {}, disabled: true });
+      }
+      items.push('divider');
+    }
+    items.push({ label: t('home.deleteRecordTitle'), onClick: () => handleDelete(v), disabled: deletingId === v.id });
+    return items;
+  };
+
+  const more = (v: VideoRecord) => (
+    <Menu items={menuFor(v)} trigger={(open, toggle) => (
+      <Btn square size="sm" flat onClick={toggle} title={t('home.more')} aria-label={t('home.more')} className={open ? '!bg-shade !text-ink' : ''}>
+        {deletingId === v.id ? <Loader2 size={16} className="animate-spin" /> : <MoreHorizontal size={16} />}
+      </Btn>
+    )} />
+  );
+
+  // A running import, or one that failed: its own status instead of a position.
+  const jobStatus = (v: VideoRecord) => {
+    const job = v.importJob!;
+    if (!job.error) {
+      return (
+        <div className="mt-2 max-w-md">
+          <p className="text-[13px] text-mute">{jobLabel(job)}</p>
+          <Line pct={job.percent ?? 0} className="mt-2" />
+        </div>
+      );
+    }
+    return (
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <p className="text-[13px] text-ink">{formatImportError(job.error)}</p>
+        {isCookieError(job.error) && (
+          <Btn size="sm" onClick={handleYouTubeLogin}><KeyRound size={14} /> {t('home.ytLogin')}</Btn>
         )}
-      </section>
+        {job.stage === 'download' && (
+          <Btn size="sm" onClick={() => handleRetry(v)} disabled={retryingId === v.id}><RotateCw size={14} /> {t('home.retry')}</Btn>
+        )}
+      </div>
+    );
+  };
+
+  const prepLine = (v: VideoRecord) => {
+    const job = hasAi && !v.importJob ? getPrepJob(v.id) : undefined;
+    return job ? <span> · {t('home.prepBreakdownRunning', { done: job.done, total: job.total || '…' })}</span> : null;
+  };
+
+  const lead = videos?.find(v => !v.importJob);
+  const rest = (videos ?? []).filter(v => v !== lead);
+
+  return (
+    <div className="max-w-3xl mx-auto">
+      {dragOver && (
+        <div className="fixed inset-3 z-[70] rounded-2xl border-2 border-dashed border-accent bg-paper/90 flex items-center justify-center pointer-events-none fade-in">
+          <p className="font-serif text-3xl text-ink">{t('home.dropRelease')}</p>
+        </div>
+      )}
+      {adding && <AddVideo initialPath={adding.path} onClose={closeAdd} />}
+
+      {videos === null ? (
+        <div className="pt-24 flex justify-center text-mute"><Loader2 className="animate-spin" size={20} /></div>
+      ) : videos.length === 0 ? (
+        <div className="pt-28 flex flex-col items-center text-center">
+          <p className="font-serif text-[34px] leading-tight">{t('home.nothingHereYet')}</p>
+          <p className="mt-3 text-sm text-mute max-w-sm leading-relaxed">{t('home.nothingHereHint')}</p>
+          <Btn tone="accent" size="lg" className="mt-8" onClick={() => setAdding({ path: null })}><Plus size={18} /> {t('home.addVideo')}</Btn>
+        </div>
+      ) : (
+        <>
+          {lead && (() => {
+            const w = where(lead);
+            return (
+              <section className="pt-6 pb-12">
+                <p className="text-xs text-mute">{t('home.continueLast')}</p>
+                <button type="button" onClick={() => onResume(lead, lastMode(lead))} className="mt-3 block text-left font-serif text-[40px] leading-[1.15] hover:text-white transition-colors break-words">
+                  {lead.displayName}
+                </button>
+                <div className="mt-4 flex items-center gap-4 text-[13px] text-mute">
+                  <span>{w.text}{prepLine(lead)}</span>
+                  <Line pct={w.pct} className="w-40" />
+                </div>
+                <div className="mt-8 flex items-center gap-2">
+                  <Btn tone="accent" size="lg" onClick={() => onResume(lead, lastMode(lead))}>
+                    {t('home.continueMode', { mode: modeName(lastMode(lead)) })} <ArrowRight size={17} />
+                  </Btn>
+                  {more(lead)}
+                </div>
+              </section>
+            );
+          })()}
+
+          <section className="border-t border-line">
+            <div className="h-14 flex items-center justify-between">
+              <h2 className="text-xs text-mute">{t('home.yourVideos')}</h2>
+              <Btn size="sm" flat onClick={() => setAdding({ path: null })}><Plus size={15} /> {t('home.addVideo')}</Btn>
+            </div>
+            {rest.length === 0 ? (
+              <p className="py-6 text-[13px] text-faint">{t('home.onlyOne')}</p>
+            ) : (
+              <ul>
+                {rest.map(v => {
+                  const w = v.importJob ? null : where(v);
+                  return (
+                    <li key={v.id} className="group relative flex items-center gap-4 py-4 border-t border-line first:border-t-0 focus-within:z-10 hover:z-10">
+                      <div className="min-w-0 flex-1">
+                        {v.importJob ? (
+                          <p className="font-serif text-xl leading-snug text-ink/80 break-words">{v.displayName}</p>
+                        ) : (
+                          <button type="button" onClick={() => onResume(v, lastMode(v))} className="block text-left font-serif text-xl leading-snug hover:text-white transition-colors break-words">
+                            {v.displayName}
+                          </button>
+                        )}
+                        {v.importJob ? jobStatus(v) : (
+                          <div className="mt-1.5 flex items-center gap-4 text-[13px] text-mute">
+                            <span>{w!.text}{prepLine(v)}</span>
+                            <Line pct={w!.pct} className="w-24" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                        {!v.importJob && (
+                          <>
+                            <Btn size="sm" flat onClick={() => onResume(v, LearningMode.DICTATION)} title={t('home.dictateTitle')}>{t('home.dictate')}</Btn>
+                            <Btn size="sm" flat onClick={() => onResume(v, LearningMode.BLUR)} title={t('home.blurTitle')}>{t('home.blur')}</Btn>
+                          </>
+                        )}
+                        {more(v)}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 };

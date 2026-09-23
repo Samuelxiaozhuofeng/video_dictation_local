@@ -155,26 +155,26 @@ const SettingsAnki: React.FC<SettingsAnkiProps> = ({
             placeholder="http://127.0.0.1:8765"
           />
         </Field>
-        <Btn type="button" tone="green" onClick={onConnect} disabled={status === 'loading'}>
+        <Btn type="button" tone="accent" onClick={onConnect} disabled={status === 'loading'}>
           {status === 'loading' ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
           {status === 'success' ? t('settingsAnki.reconnect') : t('settingsAnki.connect')}
         </Btn>
       </div>
 
       {status === 'error' && (
-        <Card flat tone="rose-soft" className="px-4 py-3 text-sm">
+        <Card flat tone="shade" className="px-4 py-3 text-sm">
           {t('settingsAnki.connectFailed')}
           {error && <p className="mt-1 text-xs text-mute break-all">{error}</p>}
         </Card>
       )}
       {status === 'success' && (
-        <Card flat tone="green-soft" className="px-4 py-3 text-sm">{t('settingsAnki.connected')}</Card>
+        <Card flat tone="accent-soft" className="px-4 py-3 text-sm">{t('settingsAnki.connected')}</Card>
       )}
 
       {status === 'success' && (
         <div className="space-y-8">
           <div>
-            <h3 className="font-serif text-lg font-semibold mb-4">{t('settingsAnki.wordCard')}</h3>
+            <h3 className="font-serif text-lg mb-4">{t('settingsAnki.wordCard')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <Field label={t('settingsAnki.targetDeck')}>
                 <select value={wordDeckName} onChange={(e) => setWordDeckName(e.target.value)} className={inputCls}>
@@ -195,7 +195,7 @@ const SettingsAnki: React.FC<SettingsAnkiProps> = ({
           </div>
 
           <div className="border-t border-line pt-6">
-            <h3 className="font-serif text-lg font-semibold mb-4">{t('settingsAnki.audioCard')}</h3>
+            <h3 className="font-serif text-lg mb-4">{t('settingsAnki.audioCard')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <Field label={t('settingsAnki.targetDeck')}>
                 <select value={audioDeckName} onChange={(e) => setAudioDeckName(e.target.value)} className={inputCls}>

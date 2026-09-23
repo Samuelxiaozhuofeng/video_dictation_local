@@ -73,7 +73,7 @@ const SavedLibrary: React.FC = () => {
         </div>
       ) : (
         <Card tone="paper" className="p-10 text-center max-w-lg mx-auto">
-          <h3 className="font-serif text-2xl font-semibold">
+          <h3 className="font-serif text-2xl">
             {searchTerm ? t('savedLibrary.noMatch') : t('savedLibrary.nothingSavedYet')}
           </h3>
           <p className="mt-2 text-sm text-mute font-medium">

@@ -94,7 +94,7 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
               href="https://aistudio.google.com/app/apikey"
               target="_blank"
               rel="noopener noreferrer"
-              className="underline text-green"
+              className="underline text-accent"
               onClick={(e) => {
                 e.preventDefault();
                 void openUrl('https://aistudio.google.com/app/apikey');

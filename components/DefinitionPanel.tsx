@@ -44,7 +44,7 @@ const AnkiWordButtons: React.FC<{ word: string; data: AI.WordDefinition; onWordT
 
   const face = (which: 'word' | 'audio', label: string, Icon: React.FC<{ size?: number }>) => {
     const mine = state.which === which ? state.s : 'idle';
-    const tone = mine === 'done' ? 'green-soft' : mine === 'error' ? 'rose-soft' : which === 'audio' ? 'green' : 'white';
+    const tone = mine === 'done' ? 'accent-soft' : mine === 'error' ? 'shade' : which === 'audio' ? 'accent' : 'white';
     return (
       <Btn tone={tone} disabled={state.s === 'busy'} onClick={() => send(which === 'audio')} className="flex-1">
         {mine === 'busy' ? <Loader2 size={16} className="animate-spin" /> : mine === 'done' ? <Check size={16} /> : <Icon size={16} />}
@@ -75,9 +75,9 @@ const DefinitionPanel: React.FC<{
   return (
   <aside className="fixed inset-y-0 right-0 z-40 w-full sm:w-[360px] bg-page border-l border-line shadow-lift flex flex-col slide-in" aria-label={t('definition.ariaLabel')}>
     <div className="h-14 px-4 flex items-center justify-between border-b border-line">
-      <span className="font-serif font-semibold text-lg">{t('definition.heading')}</span>
+      <span className="font-serif text-lg">{t('definition.heading')}</span>
       <div className="flex gap-2">
-        <Btn square size="sm" flat onClick={onTogglePin} className={pinned ? '!bg-green-soft !text-green' : ''} title={pinned ? t('definition.unpin') : t('definition.pin')}>
+        <Btn square size="sm" flat onClick={onTogglePin} className={pinned ? '!bg-accent-soft !text-accent' : ''} title={pinned ? t('definition.unpin') : t('definition.pin')}>
           {pinned ? <PinOff size={16} /> : <Pin size={16} />}
         </Btn>
         <Btn square size="sm" flat onClick={onClose} title={t('common.close')}><X size={16} /></Btn>
@@ -90,7 +90,7 @@ const DefinitionPanel: React.FC<{
       ) : def.data ? (
         <div className="space-y-4">
           <div>
-            <h4 className="font-serif text-3xl font-semibold leading-none break-words">{def.data.word}</h4>
+            <h4 className="font-serif text-3xl leading-none break-words">{def.data.word}</h4>
             <Stamp tone="shade" className="mt-2">{def.data.partOfSpeech}</Stamp>
           </div>
           <p className="text-[15px] leading-relaxed">{def.data.definition}</p>
@@ -98,8 +98,8 @@ const DefinitionPanel: React.FC<{
         </div>
       ) : def.failed ? (
         <div className="space-y-3">
-          <h4 className="font-serif text-3xl font-semibold leading-none break-words">{def.word}</h4>
-          <div className="rounded-md bg-rose-soft text-rose p-3 text-sm whitespace-pre-wrap break-words">{def.error}</div>
+          <h4 className="font-serif text-3xl leading-none break-words">{def.word}</h4>
+          <div className="rounded-md bg-shade text-ink p-3 text-sm whitespace-pre-wrap break-words">{def.error}</div>
         </div>
       ) : (
         <p className="text-sm text-mute">{t('definition.emptyHint')}</p>

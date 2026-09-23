@@ -222,7 +222,7 @@ const Settings: React.FC = () => {
 
       {savedFlash && (
         <div className="fixed bottom-6 right-6 z-50">
-          <Stamp tone="green-soft" className="shadow-card">{t('settings.savedFlash')}</Stamp>
+          <Stamp tone="accent-soft" className="shadow-card">{t('settings.savedFlash')}</Stamp>
         </div>
       )}
     </div>
