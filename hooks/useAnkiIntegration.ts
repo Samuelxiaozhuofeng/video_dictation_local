@@ -21,7 +21,7 @@ export interface UseAnkiIntegrationReturn {
   setAnkiConfig: (config: Anki.AnkiConfig | null) => void;
   setAnkiStatus: (status: AnkiStatus) => void;
   handleAddToAnki: (subtitle: Subtitle) => Promise<void>;
-  handleWordToAnki: (word: string, definition: string, subtitle: Subtitle, includeAudio?: boolean) => Promise<void>;
+  handleWordToAnki: (word: string, definition: string, subtitle: Subtitle, includeAudio?: boolean, example?: string) => Promise<void>;
   reloadConfig: () => void;
 }
 
@@ -245,7 +245,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
   }, [ankiConfig, ankiStatus, captureMedia, videoFileName]);
 
   // Add word with definition to Anki
-  const handleWordToAnki = useCallback(async (word: string, definition: string, subtitle: Subtitle, includeAudio: boolean = true) => {
+  const handleWordToAnki = useCallback(async (word: string, definition: string, subtitle: Subtitle, includeAudio: boolean = true, example?: string) => {
       if (!ankiConfig) {
         dialog.alert(t('anki.notConnectedTitle'), t('anki.notConnectedBody'));
         throw new Error('Anki not configured');
@@ -275,7 +275,8 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
           audioBase64,
           audioExt,
           word,
-          definition
+          definition,
+          example
       });
   }, [ankiConfig, captureMedia, videoFileName]);
 

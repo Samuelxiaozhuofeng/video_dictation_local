@@ -49,7 +49,7 @@ export interface PracticeContextActions {
   onProgressSeek: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onToggleSaveCurrent: () => void;
   onAddToAnki: () => void;
-  onWordToAnki: (word: string, definition: string, includeAudio?: boolean) => void | Promise<void>;
+  onWordToAnki: (word: string, definition: string, includeAudio?: boolean, example?: string) => void | Promise<void>;
   onNextSection: () => void;
   onStopAfterSection: () => void;
   onSetShowSectionComplete: (show: boolean) => void;

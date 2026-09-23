@@ -13,7 +13,7 @@ import SavedDrawer from './SavedDrawer';
 import DefinitionPanel, { DefinitionState, emptyDefinition } from './DefinitionPanel';
 import { tokenizeText, getWordTokens } from '../utils/textTokenizer';
 import { useT, getLang } from '../utils/i18n';
-import { detectLang, lookupWord, DictEntry } from '../utils/dictionary';
+import { detectLang, lookupWord, senseList, DictEntry } from '../utils/dictionary';
 import { canCloze, pickBlanks } from '../utils/aiDrills';
 import { getClozeJob, prepareCloze, subscribeCloze } from '../utils/clozePrep';
 import { IS_WINDOWS } from '../utils/platform';
@@ -173,15 +173,15 @@ const Studio: React.FC = () => {
     }
   };
 
-  // "Explain in this sentence" under a dictionary entry.
+  // AI points at the dictionary meaning this sentence uses.
   const explain = async () => {
     const seq = lookupSeq.current;
-    const { word, context } = def;
-    if (!word) return;
+    const { word, context, dict } = def;
+    if (!word || !dict) return;
     setDef(d => ({ ...d, aiLoading: true, aiError: undefined }));
     try {
-      const data = await AI.getWordDefinition(word, context ?? '');
-      if (seq === lookupSeq.current) setDef(d => ({ ...d, data, aiLoading: false }));
+      const pick = await AI.pickSense(word, context ?? '', senseList(dict).map(s => s.line));
+      if (seq === lookupSeq.current) setDef(d => ({ ...d, pick, aiLoading: false }));
     } catch (e) {
       if (seq === lookupSeq.current) setDef(d => ({ ...d, aiLoading: false, aiError: (e as Error).message }));
     }
@@ -366,7 +366,7 @@ const Studio: React.FC = () => {
 
       {showSavedList && <SavedDrawer />}
       {defOpen && (
-        <DefinitionPanel def={def} onClose={closeDef} onWordToAnki={actions.onWordToAnki} onExplain={AI.aiReady() ? explain : undefined} />
+        <DefinitionPanel key={def.word} def={def} onClose={closeDef} onWordToAnki={actions.onWordToAnki} onExplain={AI.aiReady() ? explain : undefined} />
       )}
     </div>
   );

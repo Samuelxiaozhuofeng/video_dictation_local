@@ -1,5 +1,5 @@
 import { fetch } from '@tauri-apps/plugin-http';
-import { t } from './i18n';
+import { t, getLang } from './i18n';
 import { getAIConfig, getEndpoint, readJsonBody, DEFAULT_PROMPT } from './aiConfig';
 
 export { getAIConfig, saveAIConfig, listModels, getCachedModels, isBadKey, DEFAULT_PROMPT } from './aiConfig';
@@ -28,18 +28,16 @@ const readJson = (content: string): WordDefinition => {
     return { word: parsed.word ?? '', definition: parsed.definition, partOfSpeech: parsed.partOfSpeech ?? '' };
 };
 
-// Word lookup can use AI: the same check getWordDefinition makes before asking.
+// Word lookup can use AI: the same check chat() makes before asking.
 export const aiReady = (): boolean => !!getEndpoint() && !!getAIConfig().model?.trim();
 
-export const getWordDefinition = async (word: string, context: string): Promise<WordDefinition> => {
+// One user message to the configured model; returns the reply text. Errors come
+// out already worded for the user.
+const chat = async (prompt: string): Promise<string> => {
     try {
         const endpoint = getEndpoint();
         const config = getAIConfig();
         if (!endpoint || !config.model?.trim()) throw new Error('API Key missing');
-
-        const prompt = (config.promptTemplate || DEFAULT_PROMPT)
-            .replace('{word}', word)
-            .replace('{context}', context);
 
         const res = await fetch(`${endpoint.baseUrl}/chat/completions`, {
             method: 'POST',
@@ -47,7 +45,7 @@ export const getWordDefinition = async (word: string, context: string): Promise<
             body: JSON.stringify({
                 model: config.model,
                 temperature: config.temperature,
-                messages: [{ role: 'user', content: prompt + JSON_RULE }],
+                messages: [{ role: 'user', content: prompt }],
             }),
             signal: AbortSignal.timeout(60_000),
         });
@@ -60,11 +58,55 @@ export const getWordDefinition = async (word: string, context: string): Promise<
         const body = await readJsonBody<{ choices?: { message?: { content?: string } }[] }>(res);
         const content = body?.choices?.[0]?.message?.content;
         if (typeof content !== 'string') throw new Error('No response text from AI');
-        return readJson(content);
+        return content;
     } catch (error) {
         console.error("AI Definition Error:", error);
         const message = error instanceof Error ? error.message : String(error);
         if (message.includes('API Key')) throw new Error(t('ai.noKeyError'));
         throw new Error(`${t('ai.genericError')}\n${message}`);
     }
+};
+
+// A reply that does not parse is worded like any other failure.
+const orGeneric = <T,>(parse: () => T): T => {
+    try {
+        return parse();
+    } catch (e) {
+        throw new Error(`${t('ai.genericError')}\n${e instanceof Error ? e.message : String(e)}`);
+    }
+};
+
+const jsonOf = (content: string): Record<string, unknown> => {
+    const match = content.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error(`model did not return JSON: ${content.slice(0, 120)}`);
+    return JSON.parse(match[0]);
+};
+
+export const getWordDefinition = async (word: string, context: string): Promise<WordDefinition> => {
+    const config = getAIConfig();
+    const prompt = (config.promptTemplate || DEFAULT_PROMPT)
+        .replace('{word}', word)
+        .replace('{context}', context);
+    const content = await chat(prompt + JSON_RULE);
+    return orGeneric(() => readJson(content));
+};
+
+export interface SensePick { index: number | null; note: string }
+
+// Which of the dictionary's numbered meanings the sentence uses. The model only
+// answers with a number (1-based) into the list it was shown, so it cannot
+// reword the dictionary; a number outside the list counts as "none fits".
+export const pickSense = async (word: string, context: string, lines: string[]): Promise<SensePick> => {
+    const language = getLang() === 'zh' ? 'Simplified Chinese' : 'English';
+    const prompt = `The word "${word}" appears in this sentence: "${context}".\n`
+        + `Its dictionary meanings, numbered:\n${lines.join('\n')}\n\n`
+        + `Which single number is the meaning used in this sentence? Reply with a single JSON object and nothing else (no markdown fence): `
+        + `{"index": <that number, or 0 if none fits>, "note": "<one short sentence in ${language} on what it means here>"}`;
+    const content = await chat(prompt);
+    const parsed = orGeneric(() => jsonOf(content));
+    const n = Number(parsed.index);
+    return {
+        index: Number.isInteger(n) && n >= 1 && n <= lines.length ? n : null,
+        note: typeof parsed.note === 'string' ? parsed.note : '',
+    };
 };

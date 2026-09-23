@@ -15,6 +15,7 @@ const FIELD_LABEL_KEYS: Record<(typeof APP_DATA_FIELDS)[number]['key'], DictKey>
   audio: 'settingsAnki.fieldAudio',
   word: 'settingsAnki.fieldWord',
   definition: 'settingsAnki.fieldDefinition',
+  example: 'settingsAnki.fieldExample',
   context: 'settingsAnki.fieldContext',
 };
 

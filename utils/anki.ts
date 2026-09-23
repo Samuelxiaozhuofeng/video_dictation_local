@@ -92,6 +92,7 @@ export const addNote = async (
     audioExt?: string;
     word?: string;
     definition?: string;
+    example?: string;
   }
 ) => {
   const fields: Record<string, string> = {};
@@ -107,6 +108,7 @@ export const addNote = async (
     else if (appKey === 'timestamp') fields[ankiField] = data.timestamp;
     else if (appKey === 'word') fields[ankiField] = data.word || '';
     else if (appKey === 'definition') fields[ankiField] = data.definition || '';
+    else if (appKey === 'example') fields[ankiField] = data.example || '';
     else if (appKey === 'context') fields[ankiField] = data.sentence; // Context is usually the full sentence
     else if (appKey === 'screenshot' && data.screenshotBase64) {
         picture.push({

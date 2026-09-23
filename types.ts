@@ -103,7 +103,8 @@ export const APP_DATA_FIELDS = [
   { key: 'screenshot', label: 'Screenshot (Image)' },
   { key: 'audio', label: 'Audio (Clip)' },
   { key: 'word', label: 'Selected Word' },
-  { key: 'definition', label: 'Word Definition (AI)' },
+  { key: 'definition', label: 'Word Definition' },
+  { key: 'example', label: 'Example Sentences (Dictionary)' },
   { key: 'context', label: 'Context (Sentence)' },
 ] as const;
 

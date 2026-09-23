@@ -99,3 +99,20 @@
 - [x] tsc / node 自检（认语言 + 解析）/ 浏览器实测
 - [x] codex-review
 - [x] npm run release
+
+# 查词：按条加入 Anki（2026-09-23 用户拍板）
+
+- 每条释义末尾「＋」，点了直接发「带音频」卡片（只这一条 + 前 2 句例句）；撤掉底部「仅单词 / 带音频」；AI 兜底那段末尾也有「＋」
+- 弹窗每条下只显示第 1 句例句；Anki 新增「例句」栏位（设置 → Anki 里选对应格）
+- 「结合这句解释」→ AI 指出第几条（亮起 + 滚到眼前）+ 一句说明；说明不进卡片
+- 英语有道 → 柯林斯双解（没有就退回简明）；西法德默认词典改欧路（已选过的不变）
+- 顺手：同一条加过显示 ✓ 不能再点、录音时其他「＋」锁住；欧路固定搭配带上短语；例句 ~ 换回原词；挤一行的两条拆开
+
+- [x] 产品门 pm
+- [x] dictionary.ts：例句 / 搭配 / 拆条 / ~ / 柯林斯 / 默认欧路 / 单条转 HTML
+- [x] Anki：新「例句」栏位（types / anki.ts / useAnkiIntegration / SettingsAnki / 文案）
+- [x] AI 挑第几条（ai.ts）+ Studio explain
+- [x] DefinitionPanel：每条「＋」、例句、亮起滚动、撤底部按钮
+- [x] tsc / test-dictionary / 浏览器实测
+- [x] codex-review（修：欧路例句嵌在释义里被混进释义；单条带例句的柯林斯被丢）
+- [ ] npm run release
