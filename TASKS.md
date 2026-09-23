@@ -98,4 +98,4 @@
 - [x] 设置页：每门语言选词典；文案两份（加载中、没配 AI、Anki 字段名、提示词说明）
 - [x] tsc / node 自检（认语言 + 解析）/ 浏览器实测
 - [x] codex-review
-- [ ] npm run release
+- [x] npm run release
