@@ -1,0 +1,36 @@
+# Builds the Windows installer on every push to main (or by hand from the
+# Actions tab) and first runs the whole local-transcription chain on a real
+# Windows machine: download parts, pull audio out of a video, whisper.
+# The installer is attached to the run as the "LinguaClip-windows" artifact.
+name: Windows build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Download parts and transcribe a clip (network)
+        run: cargo test --manifest-path src-tauri/Cargo.toml -- --ignored fetch_vad fetch_whisper transcribes_speech
+      # No AI keys exist in CI, so nothing of the author's can end up in the build.
+      - run: npx tauri build --bundles nsis
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LinguaClip-windows
+          path: src-tauri/target/release/bundle/nsis/*.exe

@@ -1,15 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-fn home_dir() -> Result<PathBuf, String> {
-  std::env::var("HOME")
-    .map(PathBuf::from)
-    .map_err(|_| "missing:HOME".to_string())
-}
-
-fn movies_dir() -> Result<PathBuf, String> {
-  Ok(home_dir()?.join("Movies").join("LinguaClip"))
-}
+use crate::paths::own_dir as movies_dir;
 
 fn valid_id(id: &str) -> bool {
   !id.is_empty()

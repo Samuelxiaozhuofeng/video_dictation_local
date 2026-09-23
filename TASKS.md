@@ -1,3 +1,19 @@
+# Windows 版（GitHub CI 打包，用户在 Windows 虚拟机里验）
+
+- 用户 2026-09-23 同意为此推送到 GitHub；公开 Release 仍需另外点头
+- Windows 不做 YouTube（Chrome 127+ 在 Windows 上加密 cookies，yt-dlp 读不了）
+- 转录组件：官方 whisper-bin-x64.zip（4MB）+ 同一套模型；抽声音用内置解码（symphonia），不下 ffmpeg
+
+- [x] Rust：家目录 / 视频目录 / 组件目录按系统分；find_bin 认 .exe；子进程不弹黑窗
+- [x] Rust：Windows 组件 = 官方 zip 下载后用系统 tar 解压；import_tools 在 Windows 报 youtube=false
+- [x] Rust：内置解码 mp4/mov/m4v 音频 → 16k wav（Windows 用；Mac 仍用 afconvert），带样片测试
+- [x] Rust：删除到回收站（Windows）
+- [x] 前端：视频目录按系统分；⌘/⇧ 在 Windows 显示成 Ctrl/Shift，快捷键认 Ctrl；标题栏留白
+- [x] CI：windows 打 NSIS 安装包 + 跑 cargo test（含下载 whisper 并运行）→ 上传为 artifact
+- [x] Mac 侧回归：cargo test / tsc / 浏览器 / npm run release
+- [x] codex-review
+- [ ] push，看 CI 绿，给用户 Windows 验收路径
+
 # 开源发布：自带字幕 + 一键下载转录组件
 
 用户拍板（2026-09-23）：

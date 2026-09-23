@@ -15,6 +15,7 @@ import { tokenizeText, getWordTokens } from '../utils/textTokenizer';
 import { useT } from '../utils/i18n';
 import { canCloze, loadOrBuildCloze, pickBlanks } from '../utils/aiDrills';
 import { readCacheText, writeCacheText } from '../utils/desktop';
+import { IS_WINDOWS } from '../utils/platform';
 
 // The practice room: video on the left, a transcript column on the right (two faded
 // past lines over the line you work on), the remote (Transport) along the bottom.
@@ -187,7 +188,7 @@ const Studio: React.FC = () => {
   return (
     <div className="relative h-full flex flex-col bg-paper">
       {/* --- Top strip --- */}
-      <header className="shrink-0 h-14 pl-[80px] pr-4 flex items-center justify-between gap-3 text-sm text-mute" data-tauri-drag-region="deep">
+      <header className={`shrink-0 h-14 ${IS_WINDOWS ? 'pl-4' : 'pl-[80px]'} pr-4 flex items-center justify-between gap-3 text-sm text-mute`} data-tauri-drag-region="deep">
         <div className="flex items-center gap-2 min-w-0">
           <Btn square size="sm" flat onClick={actions.onExit} title={t('studio.backToVideos')} aria-label={t('studio.backToVideos')}><ArrowLeft size={16} /></Btn>
           <span className="truncate min-w-0" title={videoName}>{videoName}</span>

@@ -1,6 +1,8 @@
 mod anki;
 mod cache;
+mod decode;
 mod import;
+mod paths;
 mod tts;
 mod whisper_setup;
 
@@ -35,16 +37,26 @@ pub fn run() {
     .expect("error while running tauri application");
 }
 
-// Move a file to the macOS Trash (recoverable), via the system `trash` tool.
+// Move a file to the Trash / Recycle Bin (recoverable), with the system's own tool.
 #[tauri::command]
 fn trash_file(path: String) -> Result<(), String> {
   if !std::path::Path::new(&path).is_file() {
     return Err("not a file".into());
   }
-  let out = std::process::Command::new("/usr/bin/trash")
-    .arg(&path)
-    .output()
-    .map_err(|e| e.to_string())?;
+  #[cfg(not(windows))]
+  let out = paths::command("/usr/bin/trash").arg(&path).output();
+  // The path travels in an env var, never spliced into the script.
+  #[cfg(windows)]
+  let out = paths::command("powershell")
+    .args([
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      "Add-Type -AssemblyName Microsoft.VisualBasic; [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($env:LC_TRASH_PATH, 'OnlyErrorDialogs', 'SendToRecycleBin')",
+    ])
+    .env("LC_TRASH_PATH", &path)
+    .output();
+  let out = out.map_err(|e| e.to_string())?;
   if out.status.success() {
     Ok(())
   } else {

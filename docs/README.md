@@ -24,6 +24,8 @@
 | `utils/ai.ts` | Gemini 查词 |
 | `components/AddVideo.tsx`（添加视频弹窗）+ `utils/importJob.ts` + `src-tauri/src/import.rs` + `whisper_setup.rs` | 自带字幕 / 本地转录（首次自动下载转录组件）/ YouTube 下载，见 [import.md](import.md) |
 | `utils/i18n.*.ts` | 中 / 英文案，两份都要改 |
+| `src-tauri/src/paths.rs` + `utils/platform.ts` | Mac / Windows 差异：自有目录（~/Movies 或 ~/Videos 下的 LinguaClip）、起子进程不弹黑窗、快捷键和「废纸篓」文案 |
+| `src-tauri/src/decode.rs` | 纯 Rust 抽视频音轨成 16k wav（Windows 用；Mac 用系统 afconvert） |
 | `src-tauri/` | Rust 壳子；`tauri.conf.json` 窗口与 asset 协议，`capabilities/default.json` 权限 |
 
 ## 桌面版的关键约定（改这些地方前先读）

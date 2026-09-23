@@ -7,6 +7,7 @@ import { getCurrentWebview } from '@tauri-apps/api/webview';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { exists, readTextFile } from '@tauri-apps/plugin-fs';
+import { IS_WINDOWS } from './platform';
 
 const VIDEO_FILTER = { name: 'Video', extensions: ['mp4', 'mov', 'm4v'] };
 const SUBTITLE_FILTER = { name: 'Subtitles', extensions: ['srt'] }; // parseSRT reads nothing else
@@ -60,9 +61,14 @@ export async function listenDragDrop(handler: DragDropHandler): Promise<Unlisten
 
 export type CacheKind = 'words' | 'cloze' | 'breakdown';
 
+// ~/Movies/LinguaClip on macOS, ~/Videos/LinguaClip on Windows; must match
+// own_dir() in src-tauri/src/paths.rs.
+async function ownDir(): Promise<string> {
+  return join(await homeDir(), IS_WINDOWS ? 'Videos' : 'Movies', 'LinguaClip');
+}
+
 export async function cacheFilePath(id: string, kind: CacheKind): Promise<string> {
-  const home = await homeDir();
-  return join(home, 'Movies', 'LinguaClip', `${id}.${kind}.json`);
+  return join(await ownDir(), `${id}.${kind}.json`);
 }
 
 export async function readCacheText(id: string, kind: CacheKind): Promise<string | null> {
@@ -83,9 +89,8 @@ export async function writeCacheText(id: string, kind: CacheKind, text: string):
 // in ~/Movies/LinguaClip, hand-picked ones usually beside the video) and our
 // word/cloze/breakdown caches. Only paths that exist.
 export async function relatedFilePaths(id: string, videoPath: string, subtitleFileName: string): Promise<string[]> {
-  const home = await homeDir();
-  const ours = await join(home, 'Movies', 'LinguaClip');
-  const videoDir = videoPath.slice(0, videoPath.lastIndexOf('/'));
+  const ours = await ownDir();
+  const videoDir = videoPath.slice(0, Math.max(videoPath.lastIndexOf('/'), videoPath.lastIndexOf('\\')));
   const candidates = [
     await cacheFilePath(id, 'words'),
     await cacheFilePath(id, 'cloze'),
@@ -97,7 +102,7 @@ export async function relatedFilePaths(id: string, videoPath: string, subtitleFi
   return unique.filter((_, i) => found[i]);
 }
 
-// Moves the file to the macOS Trash (user can put it back).
+// Moves the file to the Trash / Recycle Bin (user can put it back).
 export async function trashFile(path: string): Promise<void> {
   await invoke('trash_file', { path });
 }

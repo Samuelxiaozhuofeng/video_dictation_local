@@ -25,7 +25,8 @@ struct Asset {
   urls: &'static [&'static str],
 }
 
-// Built by scripts/build-whisper-cli.sh; links only system frameworks.
+// macOS: built by scripts/build-whisper-cli.sh; links only system frameworks.
+#[cfg(not(windows))]
 const WHISPER_CLI: Asset = Asset {
   name: "whisper-cli",
   size: 3_055_240,
@@ -33,6 +34,19 @@ const WHISPER_CLI: Asset = Asset {
   // ponytail: GitHub only; add a mirror if users in China report this step failing.
   urls: &["https://github.com/Samuelxiaozhuofeng/video_dictation_local/releases/download/whisper-cli-1.8.4/whisper-cli"],
 };
+#[cfg(not(windows))]
+const WHISPER_EXE: &str = "whisper-cli";
+
+// Windows: whisper.cpp's own CPU build, unpacked in place (exe + its DLLs).
+#[cfg(windows)]
+const WHISPER_CLI: Asset = Asset {
+  name: "whisper-bin-x64.zip",
+  size: 4_078_768,
+  sha256: "74f973345cb52ef5ba3ec9e7e7af8e48cc8c71722d1528603b80588a11f82e3e",
+  urls: &["https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.4/whisper-bin-x64.zip"],
+};
+#[cfg(windows)]
+const WHISPER_EXE: &str = "Release/whisper-cli.exe";
 // q5_0 is a third of the full model's size with near-identical output, and the
 // DTW preset "large.v3.turbo" still gives word timings with it.
 const MODEL: Asset = Asset {
@@ -61,11 +75,19 @@ const STALL: Duration = Duration::from_secs(30);
 static INSTALLING: Mutex<()> = Mutex::new(());
 
 fn home() -> PathBuf {
-  std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default()
+  crate::paths::home_dir().unwrap_or_default()
 }
 
+// ponytail: whisper-cli on Windows reads paths in the ANSI code page, so a user
+// folder whose name that code page cannot spell (e.g. a Chinese name on English
+// Windows) breaks the model path. Move parts to an ASCII folder if users hit it.
 pub fn parts_dir() -> PathBuf {
-  home().join("Library/Application Support/com.linguaclip.app/whisper")
+  if cfg!(windows) {
+    let local = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
+    local.unwrap_or_else(|| home().join("AppData/Local")).join("com.linguaclip.app/whisper")
+  } else {
+    home().join("Library/Application Support/com.linguaclip.app/whisper")
+  }
 }
 
 fn first_file(candidates: Vec<PathBuf>) -> Option<PathBuf> {
@@ -73,7 +95,7 @@ fn first_file(candidates: Vec<PathBuf>) -> Option<PathBuf> {
 }
 
 fn find_whisper() -> Option<PathBuf> {
-  first_file(vec![parts_dir().join(WHISPER_CLI.name)])
+  first_file(vec![parts_dir().join(WHISPER_EXE)])
     .or_else(|| crate::import::find_bin("whisper-cli").ok())
 }
 
@@ -155,12 +177,35 @@ async fn fetch(asset: &Asset, dir: &Path, mut on_bytes: impl FnMut(u64)) -> Resu
   if !last_err.is_empty() {
     return Err(format!("setup:{last_err}"));
   }
+  #[cfg(unix)]
   if asset.name == WHISPER_CLI.name {
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(&part, std::fs::Permissions::from_mode(0o755))
       .map_err(|e| format!("setup:{e}"))?;
   }
-  std::fs::rename(&part, dir.join(asset.name)).map_err(|e| format!("setup:{e}"))
+  let done = dir.join(asset.name);
+  std::fs::rename(&part, &done).map_err(|e| format!("setup:{e}"))?;
+  if asset.name.ends_with(".zip") {
+    unzip(&done, dir)?;
+    let _ = std::fs::remove_file(&done);
+  }
+  Ok(())
+}
+
+// Windows 10+ ships bsdtar, which reads zip files.
+fn unzip(zip: &Path, dir: &Path) -> Result<(), String> {
+  let root = std::env::var_os("SystemRoot").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
+  let out = crate::paths::command(root.join(r"System32\tar.exe"))
+    .arg("-xf")
+    .arg(zip)
+    .arg("-C")
+    .arg(dir)
+    .output()
+    .map_err(|e| format!("setup:unzip {e}"))?;
+  if !out.status.success() {
+    return Err(format!("setup:unzip {}", String::from_utf8_lossy(&out.stderr).trim()));
+  }
+  Ok(())
 }
 
 fn verified(path: &Path, asset: &Asset) -> bool {
@@ -240,7 +285,9 @@ pub struct ImportTools {
 // the (hand-installed) YouTube downloader at all.
 #[tauri::command]
 pub fn import_tools() -> ImportTools {
-  ImportTools { whisper: find().is_some(), youtube: crate::import::find_bin("yt-dlp").is_ok() }
+  // No YouTube on Windows: Chrome there encrypts cookies so yt-dlp cannot sign in.
+  let youtube = !cfg!(windows) && crate::import::find_bin("yt-dlp").is_ok();
+  ImportTools { whisper: find().is_some(), youtube }
 }
 
 #[cfg(test)]
@@ -274,8 +321,9 @@ mod tests {
     std::fs::remove_dir_all(&dir).unwrap();
   }
 
-  // Needs the Release asset to be published: downloads our whisper-cli, checks
-  // its sha256, and runs it with a bare PATH like a Mac without Homebrew.
+  // Downloads this OS's whisper-cli (macOS: our Release asset, must be published;
+  // Windows: whisper.cpp's zip, unpacked), checks its sha256 and runs it — on
+  // macOS with a bare PATH, like a Mac without Homebrew.
   // Run with: cargo test --manifest-path src-tauri/Cargo.toml -- --ignored fetch_whisper
   #[test]
   #[ignore]
@@ -284,13 +332,43 @@ mod tests {
     std::fs::create_dir_all(&dir).unwrap();
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(fetch(&WHISPER_CLI, &dir, |_| {})).unwrap();
-    let out = std::process::Command::new(dir.join(WHISPER_CLI.name))
-      .env_clear()
-      .env("PATH", "/usr/bin:/bin")
-      .arg("--help")
-      .output()
-      .unwrap();
+    let mut cmd = std::process::Command::new(dir.join(WHISPER_EXE));
+    #[cfg(unix)]
+    cmd.env_clear().env("PATH", "/usr/bin:/bin");
+    let out = cmd.arg("--help").output().unwrap();
     assert!(String::from_utf8_lossy(&out.stderr).contains("usage") || String::from_utf8_lossy(&out.stdout).contains("usage"));
+    std::fs::remove_dir_all(&dir).unwrap();
+  }
+
+  // The whole local chain on this OS, as an import runs it: parts (found or
+  // downloaded), audio out of a video, whisper with word timings. On Windows CI
+  // nothing is installed, so this also downloads ~580MB.
+  // Run with: cargo test --manifest-path src-tauri/Cargo.toml -- --ignored transcribes_speech
+  #[test]
+  #[ignore]
+  fn transcribes_speech_end_to_end() {
+    let dir = std::env::temp_dir().join(format!("lc-e2e-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let mut get = |found: Option<PathBuf>, asset: &Asset, installed: &str| {
+      found.unwrap_or_else(|| {
+        rt.block_on(fetch(asset, &dir, |_| {})).unwrap();
+        dir.join(installed)
+      })
+    };
+    let whisper = get(find_whisper(), &WHISPER_CLI, WHISPER_EXE);
+    let model = get(find_model(), &MODEL, MODEL.name);
+    let vad = get(find_vad(), &VAD, VAD.name);
+
+    let video = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/speech.m4v");
+    let wav = dir.join("speech.wav");
+    crate::import::extract_wav(&video, &wav).unwrap();
+    let stem = dir.join("speech");
+    crate::import::transcribe(|_| {}, &whisper, &model, &vad, "en", &wav, &stem).unwrap();
+    let srt = std::fs::read_to_string(stem.with_extension("srt")).unwrap().to_lowercase();
+    assert!(srt.contains("quick brown fox"), "{srt}");
+    let words = crate::import::read_words(&stem.with_extension("json")).unwrap();
+    assert!(words.len() >= 10, "{} words", words.len());
     std::fs::remove_dir_all(&dir).unwrap();
   }
 }

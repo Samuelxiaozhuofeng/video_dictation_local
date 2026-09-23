@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { en } from './i18n.en';
 import { zh } from './i18n.zh';
+import { IS_WINDOWS } from './platform';
 
 // Language state + translation lookup. Works both outside React (event handlers,
 // hooks/useAnkiIntegration.ts, utils/ai.ts call `t()` directly) and inside it
@@ -47,8 +48,15 @@ function subscribe(listener: () => void) {
 // Looks up `key` in the current language and substitutes `{name}`-style
 // placeholders from `vars`. Placeholders with no matching var (e.g. the
 // literal "{word}"/"{context}" documented in the AI prompt hint) are left as-is.
+// Copy is written for the Mac; on Windows the keys are Ctrl / Shift and the
+// Trash is the Recycle Bin, Finder is File Explorer.
+const forPlatform = (s: string) => (IS_WINDOWS
+  ? s.replace(/⌘/g, 'Ctrl+').replace(/⇧/g, 'Shift+').replace(/废纸篓/g, '回收站').replace(/\bTrash\b/g, 'Recycle Bin')
+    .replace(/访达/g, '文件资源管理器').replace(/\bFinder\b/g, 'File Explorer')
+  : s);
+
 export function t(key: DictKey, vars?: Record<string, string | number>): string {
-  const template = dicts[currentLang][key] ?? dicts.en[key] ?? String(key);
+  const template = forPlatform(dicts[currentLang][key] ?? dicts.en[key] ?? String(key));
   if (!vars) return template;
   return template.replace(/\{(\w+)\}/g, (match, name) => (name in vars ? String(vars[name]) : match));
 }

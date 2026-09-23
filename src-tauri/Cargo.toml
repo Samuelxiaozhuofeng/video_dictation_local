@@ -35,6 +35,8 @@ sha2 = "0.10"
 uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 tokio = { version = "1", features = ["time"] }
+# Reads a video's audio track where macOS's afconvert is not around (decode.rs)
+symphonia = { version = "0.5", default-features = false, features = ["aac", "isomp4"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

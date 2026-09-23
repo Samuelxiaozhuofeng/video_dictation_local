@@ -15,7 +15,8 @@
 - 查找顺序：我们下载的目录 → whisper-cli 回落到 Homebrew（`find_bin`），模型回落到 `~/.cache/whisper.cpp`（完整版和 q5_0 都认）。作者本机的老安装不用重下。
 - whisper-cli 由 `scripts/build-whisper-cli.sh` 静态编译（只链接系统框架），挂在 GitHub Release `whisper-cli-1.8.4`。换一版就要改 `WHISPER_CLI` 里的 sha256 和大小。
 - 下载：`.part` 文件断点续传（Range），30 秒没数据算卡死换下一个地址；模型先试 huggingface.co 再试 hf-mirror.com；下完校验大小 + sha256，不对就删掉 `.part` 从头来。一把全局锁，两个导入不会同时写同一个文件。
-- 抽声音用系统自带 `/usr/bin/afconvert`（mp4/mov/m4v 都实测过），失败且装了 ffmpeg 才退回 ffmpeg。
+- 抽声音：Mac 用系统自带 `/usr/bin/afconvert`，Windows 用 `decode.rs`（symphonia，AAC in mp4/mov/m4v；同一段 7 分钟英语，转写结果和 afconvert 版只差标点和断行），失败且装了 ffmpeg 才退回 ffmpeg。
+- Windows：识别程序是 whisper.cpp 官方 `whisper-bin-x64.zip`（CPU 版），下载校验后用系统 `tar.exe` 解压到组件目录的 `Release/`；不做 YouTube（Chrome 在 Windows 上加密 cookies，yt-dlp 读不了），`import_tools` 恒报 youtube=false。
 - 任何失败的卡片都有「重试」：网址回到 download 阶段，本地视频回到 extract 阶段，同一条记录。
 
 ## 运行时事实

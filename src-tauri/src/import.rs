@@ -5,12 +5,14 @@ use std::sync::mpsc;
 use std::thread;
 use tauri::{AppHandle, Emitter};
 
+use crate::paths::{command, home_dir, own_dir as movies_dir};
+
 const EVENT: &str = "import-progress";
 
 // One spoken word with its own start/end, merged back together from whisper's
 // sub-word tokens. This is what lets the front end re-cut long lines by meaning.
 #[derive(Clone, serde::Serialize)]
-struct Word {
+pub(crate) struct Word {
   w: String,
   from: u32,
   to: u32,
@@ -61,15 +63,6 @@ fn tail_chars(s: &str, max: usize) -> String {
   s.chars().skip(count - max).collect()
 }
 
-fn home_dir() -> Result<PathBuf, String> {
-  std::env::var("HOME")
-    .map(PathBuf::from)
-    .map_err(|_| "missing:HOME".to_string())
-}
-
-fn movies_dir() -> Result<PathBuf, String> {
-  Ok(home_dir()?.join("Movies").join("LinguaClip"))
-}
 
 // A Chrome profile we own. Chrome's real profile dir is shielded by macOS app-data
 // protection (yt-dlp just reports "could not find cookies database"), but a dir of
@@ -146,7 +139,7 @@ fn augmented_path() -> std::ffi::OsString {
 
 pub(crate) fn find_bin(name: &str) -> Result<PathBuf, String> {
   for dir in tool_dirs() {
-    let candidate = dir.join(name);
+    let candidate = dir.join(format!("{name}{}", std::env::consts::EXE_SUFFIX));
     if candidate.is_file() {
       return Ok(candidate);
     }
@@ -377,7 +370,7 @@ fn download_video(
   args.push("--progress".into());
   args.push(url.trim().into());
 
-  let mut cmd = Command::new(yt_dlp);
+  let mut cmd = command(yt_dlp);
   cmd.args(&args);
   cmd.current_dir(dir);
   cmd.env("PATH", augmented_path());
@@ -418,27 +411,25 @@ fn download_video(
   Ok(pb)
 }
 
-// macOS's own afconvert reads the audio of every video we accept (mp4/mov/m4v),
-// so strangers need no ffmpeg. ffmpeg, when installed, covers the odd codec
-// afconvert refuses.
-fn extract_wav(video: &Path, wav: &Path) -> Result<(), String> {
+// Needs no ffmpeg: macOS's own afconvert, or our built-in decoder elsewhere,
+// reads the audio of every video we accept (mp4/mov/m4v). ffmpeg, when
+// installed, covers the odd codec those refuse.
+pub(crate) fn extract_wav(video: &Path, wav: &Path) -> Result<(), String> {
   let video_s = video.to_str().ok_or_else(|| "extract:bad path".to_string())?;
   let wav_s = wav.to_str().ok_or_else(|| "extract:bad path".to_string())?;
-  let output = Command::new("/usr/bin/afconvert")
-    .args(["-f", "WAVE", "-d", "LEI16@16000", "-c", "1", video_s, wav_s])
-    .output()
-    .map_err(|e| format!("extract:{e}"))?;
-  let output = match (output.status.success(), find_bin("ffmpeg")) {
-    (false, Ok(ffmpeg)) => Command::new(ffmpeg)
+  if let Err(first) = native_extract(video_s, wav_s) {
+    let Ok(ffmpeg) = find_bin("ffmpeg") else {
+      return Err(format!("extract:{}", tail_chars(&first, 300)));
+    };
+    let output = command(ffmpeg)
       .env("PATH", augmented_path())
       .args(["-y", "-loglevel", "error", "-i", video_s, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav_s])
       .output()
-      .map_err(|e| format!("extract:{e}"))?,
-    _ => output,
-  };
-  if !output.status.success() {
-    let err = String::from_utf8_lossy(&output.stderr);
-    return Err(format!("extract:{}", tail_chars(&err, 300)));
+      .map_err(|e| format!("extract:{e}"))?;
+    if !output.status.success() {
+      let err = String::from_utf8_lossy(&output.stderr);
+      return Err(format!("extract:{}", tail_chars(&err, 300)));
+    }
   }
   if !wav.is_file() {
     return Err("extract:wav not created".into());
@@ -446,9 +437,26 @@ fn extract_wav(video: &Path, wav: &Path) -> Result<(), String> {
   Ok(())
 }
 
-fn transcribe(
-  app: &AppHandle,
-  id: &str,
+#[cfg(target_os = "macos")]
+fn native_extract(video: &str, wav: &str) -> Result<(), String> {
+  let output = command("/usr/bin/afconvert")
+    .args(["-f", "WAVE", "-d", "LEI16@16000", "-c", "1", video, wav])
+    .output()
+    .map_err(|e| e.to_string())?;
+  if output.status.success() {
+    Ok(())
+  } else {
+    Err(String::from_utf8_lossy(&output.stderr).into_owned())
+  }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn native_extract(video: &str, wav: &str) -> Result<(), String> {
+  crate::decode::to_wav(Path::new(video), Path::new(wav))
+}
+
+pub(crate) fn transcribe(
+  mut on_pct: impl FnMut(u32),
   whisper: &Path,
   model: &Path,
   vad: &Path,
@@ -460,7 +468,7 @@ fn transcribe(
   let vad_s = vad.to_str().ok_or_else(|| "transcribe:bad path".to_string())?;
   let wav_s = wav.to_str().ok_or_else(|| "transcribe:bad path".to_string())?;
   let stem_s = stem.to_str().ok_or_else(|| "transcribe:bad path".to_string())?;
-  let mut cmd = Command::new(whisper);
+  let mut cmd = command(whisper);
   cmd.env("PATH", augmented_path());
   cmd.args([
     "-m",
@@ -489,7 +497,7 @@ fn transcribe(
     if let Some(pct) = parse_whisper_pct(line) {
       if last_pct != Some(pct) {
         last_pct = Some(pct);
-        emit(app, ImportProgress::stage(id, "transcribe", Some(pct)));
+        on_pct(pct);
       }
     }
   })
@@ -502,7 +510,7 @@ fn transcribe(
 
 // whisper emits sub-word tokens (" mer" + "cado"); a token that does not start
 // with a space continues the word before it. Punctuation rides along with its word.
-fn read_words(json_path: &Path) -> Result<Vec<Word>, String> {
+pub(crate) fn read_words(json_path: &Path) -> Result<Vec<Word>, String> {
   let raw = std::fs::read_to_string(json_path).map_err(|e| format!("transcribe:{e}"))?;
   let doc: serde_json::Value =
     serde_json::from_str(&raw).map_err(|e| format!("transcribe:{e}"))?;
@@ -619,21 +627,28 @@ fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str, quality: u32)
   let file_stem = video
     .file_stem()
     .ok_or_else(|| "extract:bad path".to_string())?;
-  let stem = dir.join(file_stem);
-  let wav = stem.with_extension("wav");
-  let srt = stem.with_extension("srt");
-  let json = stem.with_extension("json");
+  // whisper-cli on Windows reads its arguments in the ANSI code page, so a
+  // video named in Chinese would come through as "???". Its work files are
+  // named by record id (ASCII); only the finished .srt takes the video's name.
+  // That also keeps two lesson.mp4 imports from sharing work files.
+  let work = dir.join(id);
+  let wav = work.with_extension("wav");
+  let json = work.with_extension("json");
+  let srt = dir.join(file_stem).with_extension("srt");
 
   emit(app, ImportProgress::stage(id, "extract", None));
   extract_wav(&video, &wav)?;
 
   emit(app, ImportProgress::stage(id, "transcribe", Some(0)));
-  let result = transcribe(app, id, &parts.whisper, &parts.model, &parts.vad, lang, &wav, &stem);
+  let on_pct = |pct| emit(app, ImportProgress::stage(id, "transcribe", Some(pct)));
+  let result = transcribe(on_pct, &parts.whisper, &parts.model, &parts.vad, lang, &wav, &work)
+    .and_then(|()| std::fs::rename(work.with_extension("srt"), &srt).map_err(|e| format!("transcribe:{e}")));
   let _ = std::fs::remove_file(&wav);
   if result.is_err() {
     // Whisper may have left a half-written json behind; it holds the whole
     // transcript, so it must not pile up in the user's Movies folder.
     let _ = std::fs::remove_file(&json);
+    let _ = std::fs::remove_file(work.with_extension("srt"));
   }
   result?;
 
@@ -684,6 +699,10 @@ pub fn start_import(
   if id.trim().is_empty() || source.trim().is_empty() {
     return Err("missing id or source".into());
   }
+  // The id names work files on disk, so it must not carry a path.
+  if id.len() > 80 || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+    return Err("bad id".into());
+  }
   let lang = lang.trim().to_string();
   if !matches!(lang.as_str(), "en" | "es" | "ja" | "zh" | "auto") {
     return Err("bad-lang".into());
@@ -720,7 +739,7 @@ pub fn open_youtube_login() -> Result<(), String> {
   std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
   // `-n` forces a second Chrome instance, so the user's own windows and session
   // are untouched; the sign-in lands in our profile dir only.
-  let status = Command::new("open")
+  let status = command("open")
     .args(["-na", CHROME, "--args"])
     .arg(format!("--user-data-dir={}", dir.to_string_lossy()))
     .args([
@@ -752,7 +771,7 @@ fn probe_sizes_blocking(url: String) -> Result<QualitySizes, String> {
     return Err("download:not a YouTube URL".into());
   }
   let yt = find_bin("yt-dlp")?;
-  let mut cmd = Command::new(&yt);
+  let mut cmd = command(&yt);
   cmd.env("PATH", augmented_path());
   cmd.args(yt_cookie_args()?);
   cmd.args(yt_runtime_args()?);
