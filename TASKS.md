@@ -115,4 +115,4 @@
 - [x] DefinitionPanel：每条「＋」、例句、亮起滚动、撤底部按钮
 - [x] tsc / test-dictionary / 浏览器实测
 - [x] codex-review（修：欧路例句嵌在释义里被混进释义；单条带例句的柯林斯被丢）
-- [ ] npm run release
+- [x] npm run release
