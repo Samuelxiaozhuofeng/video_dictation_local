@@ -6,7 +6,7 @@ import { getPracticeConfig } from '../utils/storage';
 import { parseSRT } from '../utils/srtParser';
 import { buildSections } from '../utils/sections';
 import {
-  fileNameFromPath, listenDragDrop, pickSubtitlePath, pickVideoPath, readSubtitleFile, trashFile,
+  fileNameFromPath, listenDragDrop, pickSubtitlePath, pickVideoPath, readSubtitleFile, trashFile, relatedFilePaths,
 } from '../utils/desktop';
 import { formatImportError, isCookieError, openYouTubeLogin, retryImport, startLocalImport, subscribeImportJobs } from '../utils/importJob';
 import { Btn, Card, Stamp, H, inputCls } from './ui';
@@ -272,7 +272,11 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
       return;
     }
     try {
-      if (trash) await trashFile(v.videoPath!);
+      if (trash) {
+        const paths = [v.videoPath!, ...await relatedFilePaths(v.id, v.videoPath!, v.subtitleFileName)];
+        const results = await Promise.allSettled(paths.map(trashFile));
+        if (results[0].status === 'rejected') throw results[0].reason;
+      }
     } catch {
       dialog.alert(t('home.deleteFileFailTitle'), t('home.deleteFileFailBody'));
     } finally {

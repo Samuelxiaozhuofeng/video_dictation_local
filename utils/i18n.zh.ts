@@ -68,7 +68,7 @@ export const zh: Record<keyof typeof en, string> = {
   'home.deleteFailTitle': '删除失败',
   'home.deleteFailBody': '删除记录时出了点问题，请重试。',
   'home.deleteFileTitle': '视频文件也一起删吗？',
-  'home.deleteFileBody': '“{file}”会被移到废纸篓，需要时还能从废纸篓放回。',
+  'home.deleteFileBody': '“{file}”和它的字幕等相关文件会被移到废纸篓，需要时还能从废纸篓放回。',
   'home.deleteFileOk': '移到废纸篓',
   'home.deleteFileKeep': '只删记录，保留文件',
   'home.deleteFileFailTitle': '视频文件没删掉',

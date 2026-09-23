@@ -79,6 +79,23 @@ export async function writeCacheText(id: string, kind: CacheKind, text: string):
   await invoke('write_cache', { id, kind, text });
 }
 
+// Files that belong to a record besides the video: its .srt (generated ones sit
+// in ~/Movies/LinguaClip, hand-picked ones usually beside the video) and our
+// word/cloze caches. Only paths that exist.
+export async function relatedFilePaths(id: string, videoPath: string, subtitleFileName: string): Promise<string[]> {
+  const home = await homeDir();
+  const ours = await join(home, 'Movies', 'LinguaClip');
+  const videoDir = videoPath.slice(0, videoPath.lastIndexOf('/'));
+  const candidates = [
+    await cacheFilePath(id, 'words'),
+    await cacheFilePath(id, 'cloze'),
+    ...(subtitleFileName ? [await join(ours, subtitleFileName), await join(videoDir, subtitleFileName)] : []),
+  ];
+  const unique = [...new Set(candidates)];
+  const found = await Promise.all(unique.map(pathExists));
+  return unique.filter((_, i) => found[i]);
+}
+
 // Moves the file to the macOS Trash (user can put it back).
 export async function trashFile(path: string): Promise<void> {
   await invoke('trash_file', { path });

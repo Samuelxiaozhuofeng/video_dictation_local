@@ -67,7 +67,7 @@ export const en = {
   'home.deleteFailTitle': 'Could not delete',
   'home.deleteFailBody': 'Something went wrong removing this record. Try again.',
   'home.deleteFileTitle': 'Delete the video file too?',
-  'home.deleteFileBody': '"{file}" will be moved to the Trash. You can put it back from there.',
+  'home.deleteFileBody': '"{file}", its subtitles and related files will be moved to the Trash. You can put them back from there.',
   'home.deleteFileOk': 'Move to Trash',
   'home.deleteFileKeep': 'Keep file, remove record only',
   'home.deleteFileFailTitle': 'Video file not deleted',
