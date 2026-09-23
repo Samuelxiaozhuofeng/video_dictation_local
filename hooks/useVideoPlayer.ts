@@ -26,8 +26,10 @@ export interface UseVideoPlayerReturn {
   setProgress: (value: number) => void;
   togglePlay: () => void;
   handleProgressSeek: (e: React.ChangeEvent<HTMLInputElement>, sections: any[], currentSectionIndex: number, onSectionChange: (index: number, subIndex: number) => void) => void;
-  handleReplayCurrent: (autoAdvanceAfter?: boolean) => void;
+  handleReplayCurrent: (autoAdvanceAfter?: boolean, fromRatio?: number) => void;
 }
+
+const PLAY_FROM_LEAD_SEC = 0.35;
 
 export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerReturn {
   const {
@@ -157,9 +159,15 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
     video.play().catch(e => { console.error("Autoplay blocked", e); setIsPlaying(false); });
   }, [currentSubtitleIndex, subtitles, mode, videoRef, learningMode, blurPlaybackMode]);
 
-  const handleReplayCurrent = useCallback((autoAdvanceAfter: boolean = false) => {
-    if (videoRef.current && subtitles[currentSubtitleIndex]) {
-      videoRef.current.currentTime = subtitles[currentSubtitleIndex].startTime;
+  // fromRatio: where in the line to start, 0 = its start. Used by "play from this
+  // word", which only knows how far into the line's letters the word sits; start
+  // a little early so the word's onset isn't clipped. The line still stops at its end.
+  const handleReplayCurrent = useCallback((autoAdvanceAfter: boolean = false, fromRatio: number = 0) => {
+    const sub = subtitles[currentSubtitleIndex];
+    if (videoRef.current && sub) {
+      // ponytail: letter-count estimate, off by up to a word; words.json timings (newer imports only) would be exact.
+      const from = sub.startTime + fromRatio * (sub.endTime - sub.startTime) - (fromRatio > 0 ? PLAY_FROM_LEAD_SEC : 0);
+      videoRef.current.currentTime = Math.max(sub.startTime, from);
       setIsPlaying(true);
       videoRef.current.play().catch(e => { console.error("Play blocked", e); setIsPlaying(false); });
       onShouldAutoAdvanceChange?.(autoAdvanceAfter);

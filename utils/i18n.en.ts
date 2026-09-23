@@ -322,6 +322,7 @@ export const en = {
   'transport.speed': 'Speed',
   'keys.play': 'Play/pause',
   'keys.replay': 'Replay',
+  'keys.playFrom': 'Play from this word',
   'keys.prev': 'Previous line',
   'keys.next': 'Next line',
   'keys.continue': 'Confirm/continue',

@@ -14,11 +14,20 @@ interface Props {
   targetText: string;
   mode: PracticeMode;
   onComplete: (wasCorrect: boolean) => void;
-  onReplay: (autoAdvanceAfter?: boolean) => void;
+  onReplay: (autoAdvanceAfter?: boolean, fromRatio?: number) => void; // fromRatio: 0..1 into the line
   onLookup: (word: string) => void;
   blanks?: number[]; // word indices the user types; omit = every word
   nextLabel?: string; // feedback's forward button; defaults to "next line"
 }
+
+// How far into the line word i starts, by letters: a rough stand-in for time when
+// there are no word timings.
+const letterRatio = (words: string[], i: number): number => {
+  const len = (w: string) => w.replace(/[^\p{L}\p{N}]/gu, '').length || 1;
+  const total = words.reduce((n, w) => n + len(w), 0);
+  const before = words.slice(0, i).reduce((n, w) => n + len(w), 0);
+  return total ? before / total : 0;
+};
 
 // Typing and the answer share one setting, so submitting changes colours, not positions.
 export const LINE = 'flex flex-wrap items-baseline gap-x-[0.25em] font-serif text-[30px] leading-[42px]';
@@ -105,7 +114,8 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
   };
 
   const keyDown = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.shiftKey && e.key === ' ') { e.preventDefault(); e.stopPropagation(); onReplay(false); return; }
+    if (e.shiftKey && e.key === ' ') { e.preventDefault(); e.stopPropagation(); clearReplay(); onReplay(false); return; }
+    if (matches(e, 'playFrom')) { e.preventDefault(); e.stopPropagation(); clearReplay(); onReplay(false, letterRatio(wordTokens.map(w => w.value), i)); return; }
     if (matches(e, 'peek')) { e.preventDefault(); showPeek(i); return; }
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();

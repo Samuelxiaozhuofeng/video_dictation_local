@@ -323,6 +323,7 @@ export const zh: Record<keyof typeof en, string> = {
   'transport.speed': '播放速度',
   'keys.play': '播放/暂停',
   'keys.replay': '重播',
+  'keys.playFrom': '从这个词播',
   'keys.prev': '上一句',
   'keys.next': '下一句',
   'keys.continue': '确认/继续',

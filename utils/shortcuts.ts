@@ -8,13 +8,14 @@ import type { DictKey } from './i18n';
 // key can never swallow what the user types.
 
 export type Combo = { code: string; mod?: boolean; shift?: boolean };
-export type ActionId = 'play' | 'replay' | 'prev' | 'next' | 'continue' | 'peek' | 'anki' | 'breakdown' | 'skipWord';
+export type ActionId = 'play' | 'replay' | 'playFrom' | 'prev' | 'next' | 'continue' | 'peek' | 'anki' | 'breakdown' | 'skipWord';
 
 type Action = { id: ActionId; def: Combo; label: DictKey; fixed?: boolean; dictationOnly?: boolean };
 
 export const ACTIONS: Action[] = [
   { id: 'play', def: { code: 'Space' }, label: 'keys.play', fixed: true },
   { id: 'replay', def: { code: 'Space', shift: true }, label: 'keys.replay', fixed: true },
+  { id: 'playFrom', def: { code: 'KeyJ', mod: true }, label: 'keys.playFrom', dictationOnly: true },
   { id: 'prev', def: { code: 'ArrowUp', mod: true }, label: 'keys.prev' },
   { id: 'next', def: { code: 'ArrowDown', mod: true }, label: 'keys.next' },
   { id: 'continue', def: { code: 'Enter' }, label: 'keys.continue', fixed: true },
