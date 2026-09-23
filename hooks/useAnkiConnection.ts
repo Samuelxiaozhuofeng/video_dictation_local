@@ -16,7 +16,8 @@ export interface UseAnkiConnectionReturn {
   models: string[];
   
   // Actions
-  connect: () => void;
+  // Pass the url when it was just set: state hasn't caught up in this render yet.
+  connect: (targetUrl?: string) => void;
   fetchModelFields: (modelName: string) => Promise<string[]>;
 }
 
@@ -43,8 +44,8 @@ export const useAnkiConnection = (initialUrl: string = 'http://127.0.0.1:8765'):
     }
   }, []);
 
-  const connect = useCallback(() => {
-    fetchAnkiData(url);
+  const connect = useCallback((targetUrl?: string) => {
+    fetchAnkiData(targetUrl ?? url);
   }, [url, fetchAnkiData]);
 
   const fetchModelFields = useCallback(async (modelName: string): Promise<string[]> => {

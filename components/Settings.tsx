@@ -59,7 +59,7 @@ const Settings: React.FC = () => {
         setModelName(savedAnki.card.modelName);
         setFieldMapping(savedAnki.card.fieldMapping || {});
       }
-      ankiConnection.connect();
+      ankiConnection.connect(savedAnki.url);
     }
 
     const savedAI = AI.getAIConfig();
@@ -206,7 +206,7 @@ const Settings: React.FC = () => {
           }}
           status={ankiConnection.status}
           error={ankiConnection.error}
-          onConnect={ankiConnection.connect}
+          onConnect={() => ankiConnection.connect()}
           decks={ankiConnection.decks}
           models={ankiConnection.models}
           deckName={deckName}
