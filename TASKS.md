@@ -12,7 +12,7 @@
 - [x] CI：windows 打 NSIS 安装包 + 跑 cargo test（含下载 whisper 并运行）→ 上传为 artifact
 - [x] Mac 侧回归：cargo test / tsc / 浏览器 / npm run release
 - [x] codex-review
-- [ ] push，看 CI 绿，给用户 Windows 验收路径
+- [x] push，看 CI 绿，给用户 Windows 验收路径
 
 # 开源发布：自带字幕 + 一键下载转录组件
 
