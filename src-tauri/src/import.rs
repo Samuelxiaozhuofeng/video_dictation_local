@@ -144,7 +144,7 @@ fn augmented_path() -> std::ffi::OsString {
   std::env::join_paths(tool_dirs()).unwrap_or_default()
 }
 
-fn find_bin(name: &str) -> Result<PathBuf, String> {
+pub(crate) fn find_bin(name: &str) -> Result<PathBuf, String> {
   for dir in tool_dirs() {
     let candidate = dir.join(name);
     if candidate.is_file() {
@@ -418,28 +418,24 @@ fn download_video(
   Ok(pb)
 }
 
-fn extract_wav(ffmpeg: &Path, video: &Path, wav: &Path) -> Result<(), String> {
+// macOS's own afconvert reads the audio of every video we accept (mp4/mov/m4v),
+// so strangers need no ffmpeg. ffmpeg, when installed, covers the odd codec
+// afconvert refuses.
+fn extract_wav(video: &Path, wav: &Path) -> Result<(), String> {
   let video_s = video.to_str().ok_or_else(|| "extract:bad path".to_string())?;
   let wav_s = wav.to_str().ok_or_else(|| "extract:bad path".to_string())?;
-  let output = Command::new(ffmpeg)
-    .env("PATH", augmented_path())
-    .args([
-      "-y",
-      "-loglevel",
-      "error",
-      "-i",
-      video_s,
-      "-vn",
-      "-ac",
-      "1",
-      "-ar",
-      "16000",
-      "-c:a",
-      "pcm_s16le",
-      wav_s,
-    ])
+  let output = Command::new("/usr/bin/afconvert")
+    .args(["-f", "WAVE", "-d", "LEI16@16000", "-c", "1", video_s, wav_s])
     .output()
     .map_err(|e| format!("extract:{e}"))?;
+  let output = match (output.status.success(), find_bin("ffmpeg")) {
+    (false, Ok(ffmpeg)) => Command::new(ffmpeg)
+      .env("PATH", augmented_path())
+      .args(["-y", "-loglevel", "error", "-i", video_s, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav_s])
+      .output()
+      .map_err(|e| format!("extract:{e}"))?,
+    _ => output,
+  };
   if !output.status.success() {
     let err = String::from_utf8_lossy(&output.stderr);
     return Err(format!("extract:{}", tail_chars(&err, 300)));
@@ -597,6 +593,12 @@ fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str, quality: u32)
   let dir = movies_dir()?;
   std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
 
+  // First import on a new Mac: fetch the transcription parts before anything
+  // else, so a failure here never leaves a half-downloaded video behind.
+  let parts = crate::whisper_setup::ensure(|pct| {
+    emit(app, ImportProgress::stage(id, "setup", Some(pct)));
+  })?;
+
   let video = if is_url(source) {
     if !is_youtube_url(source) {
       return Err("download:not a YouTube URL".into());
@@ -612,18 +614,6 @@ fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str, quality: u32)
     p
   };
 
-  let ffmpeg = find_bin("ffmpeg")?;
-  let whisper = find_bin("whisper-cli")?;
-  let home = home_dir()?;
-  let model = home.join(".cache/whisper.cpp/ggml-large-v3-turbo.bin");
-  let vad = home.join(".cache/whisper.cpp/ggml-silero-v5.1.2.bin");
-  if !model.is_file() {
-    return Err("missing-model:ggml-large-v3-turbo.bin".into());
-  }
-  if !vad.is_file() {
-    return Err("missing-model:ggml-silero-v5.1.2.bin".into());
-  }
-
   // Work files always land in our own folder, never beside a user-picked video
   // (it may already have a hand-made lesson.srt next to it).
   let file_stem = video
@@ -635,10 +625,10 @@ fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str, quality: u32)
   let json = stem.with_extension("json");
 
   emit(app, ImportProgress::stage(id, "extract", None));
-  extract_wav(&ffmpeg, &video, &wav)?;
+  extract_wav(&video, &wav)?;
 
   emit(app, ImportProgress::stage(id, "transcribe", Some(0)));
-  let result = transcribe(app, id, &whisper, &model, &vad, lang, &wav, &stem);
+  let result = transcribe(app, id, &parts.whisper, &parts.model, &parts.vad, lang, &wav, &stem);
   let _ = std::fs::remove_file(&wav);
   if result.is_err() {
     // Whisper may have left a half-written json behind; it holds the whole

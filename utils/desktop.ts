@@ -9,7 +9,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { exists, readTextFile } from '@tauri-apps/plugin-fs';
 
 const VIDEO_FILTER = { name: 'Video', extensions: ['mp4', 'mov', 'm4v'] };
-const SUBTITLE_FILTER = { name: 'Subtitles', extensions: ['srt', 'vtt', 'txt'] };
+const SUBTITLE_FILTER = { name: 'Subtitles', extensions: ['srt'] }; // parseSRT reads nothing else
 
 export function fileNameFromPath(path: string): string {
   const parts = path.split(/[/\\]/);

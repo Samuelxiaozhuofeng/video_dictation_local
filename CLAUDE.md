@@ -13,7 +13,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 npx tauri dev          # 桌面开发：自己拉起 vite:3000（Claude 验功能走浏览器，见「验证流程」）
 npx tsc --noEmit       # 类型检查
-npm run release        # tauri build --bundles app，然后装进 /Applications
+npm run release        # tauri build --bundles app，然后装进 /Applications（带作者 AI 密钥，只给自己用）
+npm run release:public # 不带密钥的公开包 → src-tauri/target/LinguaClip.zip，发 GitHub Release 只用这个
 cargo test --manifest-path src-tauri/Cargo.toml   # Rust 侧（import.rs 有单测）
 node test-resegment.mjs   # 切句逻辑自检（bundle 真模块，不是复制逻辑）
 node test-sections.mjs    # 分段逻辑自检（同上）

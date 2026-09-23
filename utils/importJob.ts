@@ -9,7 +9,7 @@ import * as VideoStorage from './videoStorage';
 
 type ImportProgressPayload = {
   id: string;
-  stage: 'download' | 'extract' | 'transcribe' | 'done' | 'error';
+  stage: 'setup' | 'download' | 'extract' | 'transcribe' | 'done' | 'error';
   percent?: number;
   error?: string;
   videoPath?: string;
@@ -65,6 +65,9 @@ export function formatImportError(raw: string): string {
   }
   if (raw.startsWith('missing:')) {
     return t('import.missingTool', { name: raw.slice('missing:'.length) });
+  }
+  if (raw.startsWith('setup:')) {
+    return t('import.failedSetup', { detail: raw.slice('setup:'.length) });
   }
   if (raw.startsWith('download:')) {
     return t('import.failedDownload', { detail: raw.slice('download:'.length) });
@@ -142,10 +145,10 @@ export function startLocalImport(path: string, lang: string): Promise<void> {
   return startImport(path, lang, false, 1080);
 }
 
-// Retry a download that failed, on the same record: no second card in the history,
-// and the language and quality the user originally picked are reused. Two clicks in
-// the moment before the card repaints would start two yt-dlp runs writing the same
-// file, so a click is ignored while its retry is in flight.
+// Retry a failed import on the same record: no second card in the history, and the
+// language and quality the user originally picked are reused. Two clicks in the
+// moment before the card repaints would start two runs writing the same file, so a
+// click is ignored while its retry is in flight.
 const retrying = new Set<string>();
 
 export async function retryImport(id: string): Promise<void> {
@@ -156,7 +159,8 @@ export async function retryImport(id: string): Promise<void> {
   retrying.add(id);
   const lang = job.lang ?? 'en';
   const quality = (job.quality ?? 1080) as ImportQuality;
-  const next = { stage: 'download' as const, percent: 0, source: job.source, lang, quality };
+  const stage = isYouTubeUrl(job.source) ? 'download' as const : 'extract' as const;
+  const next = { stage, percent: 0, source: job.source, lang, quality };
   await VideoStorage.updateVideoRecord({ ...rec, importJob: next });
   notify();
   try {
@@ -173,6 +177,14 @@ export async function retryImport(id: string): Promise<void> {
   } finally {
     retrying.delete(id);
   }
+}
+
+export type ImportTools = { whisper: boolean; youtube: boolean };
+
+// whisper: the transcription parts are on this Mac (else the first import downloads
+// them). youtube: yt-dlp is installed by hand, so the link box is worth showing.
+export async function importTools(): Promise<ImportTools> {
+  return invoke('import_tools');
 }
 
 export async function probeImportSizes(url: string): Promise<QualitySizes> {

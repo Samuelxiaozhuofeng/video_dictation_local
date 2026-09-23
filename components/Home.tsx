@@ -23,6 +23,7 @@ interface HomeProps {
 }
 
 const VIDEO_EXT = /\.(mp4|mov|m4v)$/i;
+const SRT_EXT = /\.srt$/i;
 
 const Line: React.FC<{ pct: number; className?: string }> = ({ pct, className = '' }) => (
   <div className={`h-[2px] bg-line ${className}`}>
@@ -36,7 +37,7 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
   const [videos, setVideos] = useState<VideoRecord[] | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
-  const [adding, setAdding] = useState<{ path: string | null } | null>(null);
+  const [adding, setAdding] = useState<{ path: string | null; srt?: string | null } | null>(null);
   const [dragOver, setDragOver] = useState(false);
   // Breakdown prep per video: how many lines are still unprepared, and a tick
   // that re-renders running jobs' progress.
@@ -76,7 +77,8 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
     return subscribeImportJobs(load);
   }, []);
 
-  // The whole window takes a dropped video; it opens the add dialog with it filled in.
+  // The whole window takes a dropped video and/or .srt; it opens the add dialog
+  // with them filled in, keeping whichever half is already there.
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let cancelled = false;
@@ -86,7 +88,8 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
       onDrop: (paths) => {
         setDragOver(false);
         const video = paths.find(p => VIDEO_EXT.test(fileNameFromPath(p)));
-        if (video) setAdding({ path: video });
+        const srt = paths.find(p => SRT_EXT.test(fileNameFromPath(p)));
+        if (video || srt) setAdding(prev => ({ path: video ?? prev?.path ?? null, srt: srt ?? prev?.srt ?? null }));
       },
     }).then(fn => {
       if (cancelled) fn();
@@ -166,6 +169,7 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
 
   const jobLabel = (job: NonNullable<VideoRecord['importJob']>) => {
     const pct = job.percent ?? 0;
+    if (job.stage === 'setup') return t('import.stageSetup', { pct });
     if (job.stage === 'download') return t('import.stageDownload', { pct });
     if (job.stage === 'transcribe') return t('import.stageTranscribe', { pct });
     if (job.stage === 'segment') return t('import.stageSegment');
@@ -220,7 +224,7 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
       <p className="mt-1 text-sm text-mute">
         {formatImportError(job.error)}
         {isCookieError(job.error) && <><span className="mx-2 text-faint">·</span><button type="button" onClick={handleYouTubeLogin} className="text-ink hover:underline underline-offset-4">{t('home.ytLogin')}</button></>}
-        {job.stage === 'download' && <><span className="mx-2 text-faint">·</span><button type="button" onClick={() => handleRetry(v)} disabled={retryingId === v.id} className="text-ink hover:underline underline-offset-4 disabled:opacity-40">{t('home.retry')}</button></>}
+        <span className="mx-2 text-faint">·</span><button type="button" onClick={() => handleRetry(v)} disabled={retryingId === v.id} className="text-ink hover:underline underline-offset-4 disabled:opacity-40">{t('home.retry')}</button>
       </p>
     );
   };
@@ -241,7 +245,7 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
           <p className="font-serif text-3xl text-ink">{t('home.dropRelease')}</p>
         </div>
       )}
-      {adding && <AddVideo initialPath={adding.path} onClose={closeAdd} />}
+      {adding && <AddVideo initialPath={adding.path} initialSrt={adding.srt ?? null} onClose={closeAdd} onPractice={rec => onResume(rec, LearningMode.DICTATION)} />}
 
       {videos === null ? (
         <div className="pt-24 flex justify-center text-mute"><Loader2 className="animate-spin" size={20} /></div>

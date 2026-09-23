@@ -1,21 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { FileVideo } from 'lucide-react';
-import { fileNameFromPath, pickVideoPath } from '../utils/desktop';
+import { FileText, FileVideo } from 'lucide-react';
+import { VideoRecord } from '../types';
+import { fileNameFromPath, pickSubtitlePath, pickVideoPath, readSubtitleFile } from '../utils/desktop';
 import {
   IMPORT_QUALITIES,
   ImportQuality,
+  ImportTools,
+  importTools,
   isYouTubeUrl,
   probeImportSizes,
   startLocalImport,
   startUrlImport,
 } from '../utils/importJob';
+import { parseSRT } from '../utils/srtParser';
+import * as VideoStorage from '../utils/videoStorage';
 import { useT } from '../utils/i18n';
 import { dialog } from './Dialog';
 import { Btn, Card, inputCls } from './ui';
 
-// The one way in: a local video (picked or dropped) or a YouTube link, plus the
-// subtitle language. Starting it hands off to the import job; the new video
-// shows up in the list with its own progress.
+// The one way in: a local video (picked or dropped), optionally with its own .srt,
+// or a YouTube link. With a .srt it goes straight to practice. Otherwise starting
+// hands off to the import job (which first downloads the transcription parts on a
+// Mac that lacks them); the new video shows up in the list with its own progress.
+// The link box only shows where yt-dlp is installed by hand.
 
 const LANGS = [
   { value: 'en', key: 'import.langEn' },
@@ -38,9 +45,18 @@ function formatMb(bytes: number): number {
   return Math.max(1, Math.round(bytes / 1_000_000));
 }
 
-const AddVideo: React.FC<{ initialPath: string | null; onClose: () => void }> = ({ initialPath, onClose }) => {
+type Props = {
+  initialPath: string | null;
+  initialSrt: string | null;
+  onClose: () => void;
+  onPractice: (record: VideoRecord) => void | Promise<void>;
+};
+
+const AddVideo: React.FC<Props> = ({ initialPath, initialSrt, onClose, onPractice }) => {
   const t = useT();
   const [path, setPath] = useState<string | null>(initialPath);
+  const [srt, setSrt] = useState<string | null>(initialSrt);
+  const [tools, setTools] = useState<ImportTools | null>(null);
   const [url, setUrl] = useState('');
   const [lang, setLangState] = useState(loadLang);
   const [quality, setQuality] = useState<ImportQuality>(1080);
@@ -49,9 +65,15 @@ const AddVideo: React.FC<{ initialPath: string | null; onClose: () => void }> = 
   const [sizesState, setSizesState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const trimmed = url.trim();
   const valid = isYouTubeUrl(trimmed);
-  const ready = !!path || valid;
+  const ownSubtitles = !!path && !!srt;
+  const ready = !!path || (valid && !!tools?.youtube);
+  const needsSetup = !ownSubtitles && ready && tools?.whisper === false;
 
   useEffect(() => setPath(initialPath), [initialPath]);
+  useEffect(() => setSrt(initialSrt), [initialSrt]);
+  useEffect(() => {
+    importTools().then(setTools).catch(err => console.error(err));
+  }, []);
 
   useEffect(() => {
     if (!valid) {
@@ -110,13 +132,33 @@ const AddVideo: React.FC<{ initialPath: string | null; onClose: () => void }> = 
     if (p) { setPath(p); setUrl(''); }
   };
 
+  const browseSrt = async () => {
+    const p = await pickSubtitlePath();
+    if (p) setSrt(p);
+  };
+
+  // Video + own .srt: a finished record right away, then into practice.
+  const practiceWithSubtitles = async (video: string, srtPath: string) => {
+    const file = await readSubtitleFile(srtPath);
+    const text = await file.text();
+    const count = parseSRT(text).length;
+    if (!count) {
+      dialog.alert(t('app.noSubtitlesTitle'), t('app.noSubtitlesBody', { name: file.name }));
+      return;
+    }
+    const record = await VideoStorage.createVideoRecord(fileNameFromPath(video), file, text, count, { videoPath: video });
+    onClose();
+    await onPractice(record);
+  };
+
   const start = async () => {
     if (!ready || busy) return;
     setBusy(true);
     try {
-      if (path) await startLocalImport(path, lang);
+      if (path && srt) await practiceWithSubtitles(path, srt);
+      else if (path) await startLocalImport(path, lang);
       else await startUrlImport(trimmed, lang, quality);
-      onClose();
+      if (!(path && srt)) onClose();
     } catch (err) {
       console.error(err);
       dialog.alert(t('import.startFailTitle'), t('import.startFailBody'));
@@ -139,11 +181,19 @@ const AddVideo: React.FC<{ initialPath: string | null; onClose: () => void }> = 
             <span className={`min-w-0 truncate text-sm ${path ? 'text-ink' : 'text-faint'}`}>{path ? fileNameFromPath(path) : t('add.dragHint')}</span>
           </div>
 
-          <div className="space-y-2">
+          {!trimmed && (
+            <div className="flex items-center gap-3 min-w-0">
+              <Btn onClick={browseSrt} className="shrink-0"><FileText size={16} /> {srt ? t('add.change') : t('add.pickSubtitle')}</Btn>
+              <span className={`min-w-0 truncate text-sm ${srt ? 'text-ink' : 'text-faint'}`}>{srt ? fileNameFromPath(srt) : t('add.subtitleHint')}</span>
+              {srt && <button type="button" onClick={() => setSrt(null)} className="shrink-0 text-sm text-mute hover:text-ink">{t('add.clearSubtitle')}</button>}
+            </div>
+          )}
+
+          {tools?.youtube && <div className="space-y-2">
             <input
               type="url"
               value={url}
-              onChange={e => { setUrl(e.target.value); if (e.target.value.trim()) setPath(null); }}
+              onChange={e => { setUrl(e.target.value); if (e.target.value.trim()) { setPath(null); setSrt(null); } }}
               placeholder={t('import.placeholder')}
               className={inputCls}
             />
@@ -154,20 +204,22 @@ const AddVideo: React.FC<{ initialPath: string | null; onClose: () => void }> = 
               </select>
             )}
             {valid && sizesState === 'error' && <p className="text-xs text-mute">{t('import.qualitySizeFail')}</p>}
-          </div>
+          </div>}
 
-          <label className="flex items-center justify-between gap-4">
+          {!ownSubtitles && <label className="flex items-center justify-between gap-4">
             <span className="text-sm text-mute">{t('add.lang')}</span>
             <select value={lang} onChange={e => setLang(e.target.value)} className={`${inputCls} !w-40`}>
               {LANGS.map(opt => <option key={opt.value} value={opt.value}>{t(opt.key)}</option>)}
             </select>
-          </label>
+          </label>}
+
+          {needsSetup && <p className="text-sm text-mute">{t('add.setupNote')}</p>}
         </div>
 
         <div className="px-7 py-4 border-t border-line flex items-center justify-end gap-3">
           <div className="flex gap-2">
             <Btn flat onClick={onClose}>{t('dialog.cancel')}</Btn>
-            <Btn tone="accent" disabled={!ready || busy} onClick={start}>{t('add.start')}</Btn>
+            <Btn tone="accent" disabled={!ready || busy} onClick={start}>{t(ownSubtitles ? 'add.startPractice' : needsSetup ? 'add.startSetup' : 'add.start')}</Btn>
           </div>
         </div>
       </Card>

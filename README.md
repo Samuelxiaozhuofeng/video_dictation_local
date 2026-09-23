@@ -19,29 +19,27 @@
 需要：macOS，Apple 芯片（M1 及以后）。
 
 1. 到 [Releases](https://github.com/Samuelxiaozhuofeng/video_dictation_local/releases) 下载 `LinguaClip.zip`，解压后拖进「应用程序」。
-2. App 没有经过苹果付费签名，第一次打开会被拦下（提示「无法验证开发者」或「已损坏」）。打开「终端」运行下面这行，再双击就能打开：
+2. App 没有经过苹果付费签名，第一次打开会被拦下。点「完成」，打开「系统设置 → 隐私与安全性」，拉到底点「仍要打开」。
+   如果提示「已损坏，无法打开」，打开「终端」运行下面这行再双击：
 
    ```bash
    xattr -dr com.apple.quarantine /Applications/LinguaClip.app
    ```
 
-### 自动生成字幕需要的工具
+### 字幕从哪来
 
-字幕在你电脑上用 whisper 本地识别，需要先装好这些工具（需要 [Homebrew](https://brew.sh)）：
+- **有 .srt 字幕**：添加视频时把字幕一起选上（或者和视频一起拖进窗口），直接开练，什么都不用装。
+- **没有字幕**：点「下载组件并生成字幕」。第一次会先下载转录组件（约 580MB，只下一次，放在 `~/Library/Application Support/com.linguaclip.app/whisper`），之后字幕在你电脑上用 whisper 识别，断网也能用。国内网络会自动换国内镜像。
+
+### YouTube 链接（进阶，自己装）
+
+App 不帮你装 YouTube 下载工具。想粘链接直接下载的，用 [Homebrew](https://brew.sh) 装好下面三样，添加视频的弹窗里就会出现网址框：
 
 ```bash
-brew install ffmpeg whisper-cpp yt-dlp node
+brew install yt-dlp ffmpeg node
 ```
 
-再下载识别模型（约 1.6 GB）：
-
-```bash
-mkdir -p ~/.cache/whisper.cpp && cd ~/.cache/whisper.cpp
-curl -LO https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
-curl -LO https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin
-```
-
-`yt-dlp` 和 `node` 只在粘贴 YouTube 链接时用到，第一次会让你在 App 里登录 YouTube。请只下载你有权使用的视频。
+第一次下载会让你在 App 里登录 YouTube。请只下载你有权使用的视频。
 
 ### AI 功能（可选）
 
@@ -78,6 +76,8 @@ npx tauri dev
 - Click-to-look-up words, one-click Anki word and audio cards
 - 4-minute sections with saved progress; videos never leave your machine
 
-**Install:** download `LinguaClip.zip` from Releases, move it to Applications, then run `xattr -dr com.apple.quarantine /Applications/LinguaClip.app` (the app is not notarized). Local subtitle generation needs `brew install ffmpeg whisper-cpp yt-dlp node` plus the two whisper models listed above. AI features take any OpenAI-compatible endpoint and key. Anki cards need the AnkiConnect add-on.
+**Install:** download `LinguaClip.zip` from Releases and move it to Applications. The app is not notarized: on first launch go to System Settings → Privacy & Security → Open Anyway (or run `xattr -dr com.apple.quarantine /Applications/LinguaClip.app`).
+
+**Subtitles:** add a video together with its `.srt` to start right away. Without one, the app downloads its transcription parts once (about 580 MB) and transcribes locally with whisper. Pasting YouTube links is for tinkerers: `brew install yt-dlp ffmpeg node` and the link box appears. AI features take any OpenAI-compatible endpoint and key. Anki cards need the AnkiConnect add-on.
 
 **License:** [AGPL-3.0](LICENSE).

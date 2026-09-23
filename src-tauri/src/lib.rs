@@ -2,6 +2,7 @@ mod anki;
 mod cache;
 mod import;
 mod tts;
+mod whisper_setup;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -27,6 +28,7 @@ pub fn run() {
       anki::anki_request,
       cache::write_cache,
       tts::tts,
+      whisper_setup::import_tools,
       trash_file
     ])
     .run(tauri::generate_context!())

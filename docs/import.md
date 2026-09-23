@@ -1,10 +1,22 @@
-# 自动生成字幕（YouTube 下载 + 本地转录）
+# 字幕从哪来（自带 .srt / 本地转录 / YouTube 下载）
 
-首页「没有字幕？让 app 生成」区块。只给作者本机用，三个工具不随 app 分发。
+「添加视频」弹窗的三条路：
+
+- **视频 + 自带 .srt**：`AddVideo.tsx` 直接 `createVideoRecord` 建好记录，交给 `onPractice` 进练习页，不走导入任务。拖进窗口的 .srt 也会填进弹窗。只收 .srt（`parseSRT` 读不懂别的格式）。
+- **只有视频**：走导入任务。转录组件（whisper-cli + large-v3-turbo q5_0 模型 + VAD 模型，约 580MB）**不打进 App**，第一次导入时由 `src-tauri/src/whisper_setup.rs` 下载到 `~/Library/Application Support/com.linguaclip.app/whisper/`，卡片显示 `setup` 阶段进度。弹窗先用 `import_tools` 命令查组件在不在，不在就写明大小、按钮改成「下载组件并生成字幕」。
+- **YouTube 链接**：只给自己装了 yt-dlp（+ ffmpeg、node）的人。`import_tools` 查不到 yt-dlp 就不显示网址框。
 
 ## 链路
 
 `components/AddVideo.tsx`（主页「添加视频」弹窗，拖入视频也打开它）→ `utils/importJob.ts`（先建一条带 `importJob` 的 VideoRecord 占位，再 `invoke('start_import')`）→ `src-tauri/src/import.rs`（独立线程：yt-dlp → ffmpeg → whisper-cli，`app.emit("import-progress")` 推进度）→ `importJob.ts` 常驻监听（在 `App.tsx` 挂，不在首页挂，否则用户在练习页时会漏事件）写回记录；完成时删 `importJob` 并填 `videoPath / subtitleText / totalSubtitles`。
+
+## 转录组件（whisper_setup.rs）
+
+- 查找顺序：我们下载的目录 → whisper-cli 回落到 Homebrew（`find_bin`），模型回落到 `~/.cache/whisper.cpp`（完整版和 q5_0 都认）。作者本机的老安装不用重下。
+- whisper-cli 由 `scripts/build-whisper-cli.sh` 静态编译（只链接系统框架），挂在 GitHub Release `whisper-cli-1.8.4`。换一版就要改 `WHISPER_CLI` 里的 sha256 和大小。
+- 下载：`.part` 文件断点续传（Range），30 秒没数据算卡死换下一个地址；模型先试 huggingface.co 再试 hf-mirror.com；下完校验大小 + sha256，不对就删掉 `.part` 从头来。一把全局锁，两个导入不会同时写同一个文件。
+- 抽声音用系统自带 `/usr/bin/afconvert`（mp4/mov/m4v 都实测过），失败且装了 ffmpeg 才退回 ffmpeg。
+- 任何失败的卡片都有「重试」：网址回到 download 阶段，本地视频回到 extract 阶段，同一条记录。
 
 ## 运行时事实
 
@@ -14,7 +26,7 @@
 - 登录状态**只有一个来源**：`~/Movies/LinguaClip/.yt-login/` —— app 自己的 Chrome 配置目录，`open_youtube_login` 命令用 `open -na "Google Chrome" --args --user-data-dir=<它>` 开第二个 Chrome 实例让用户登录，之后走 `--cookies-from-browser chrome:<它>`。用户自己的 Chrome 目录被 macOS app 数据保护挡着（报「找不到 cookies 数据库」），所以必须用我们自己的目录。
 - 手工导出的 `~/Movies/LinguaClip/cookies.txt` **已不再读取**（2026-09-22 去掉）。它原本是回落，但一旦用户在 app 里登录过，这条分支就永远够不着——哪怕那个登录已经过期——于是过期登录会悄悄遮蔽一份好用的 cookies.txt。留一个来源就没有遮蔽问题；登录过期的出路是卡片上的「登录 YouTube」按钮，不是换 cookies 文件。老用户目录里的 cookies.txt 不删，只是不再被用到。
 - 判断「登录了没」不能看 Cookies 文件存不存在：Chrome 一启动就建好空库，会误判成已登录。改为在 sqlite 文件里搜 `LOGIN_INFO` 这个 cookie **名字**（名字是明文，值才加密），登录后才出现。见 `db_shows_login()` 和它的测试。**没登录过就一个 cookies 参数都不传**：让 YouTube 自己报「要登录」，`isCookieError()` 认得这句、卡片才会给出登录按钮；硬塞一个空 profile 会让 yt-dlp 报「找不到 cookies 数据库」，那句谁也不认，用户就没出路了。
-- 下载失败的卡片带「重试」按钮（只在 `importJob.stage === 'download'` 且有 error 时出现）：`retryImport(id)` 把 `importJob` 改回 download/0、清掉 error，**沿用同一条记录 id** 再调一次 `start_import`，历史里不会多出一张卡片。为此 `importJob` 记下了当时的 `lang` / `quality`（可选字段；这之前的老卡片没有，重试回落 `en` / 1080）。前端用一个内存 Set 挡住连点，避免两个 yt-dlp 往同一个文件名写。
+- 失败的卡片都带「重试」按钮：`retryImport(id)` 把 `importJob` 改回 download/0（本地视频 extract/0）、清掉 error，**沿用同一条记录 id** 再调一次 `start_import`，历史里不会多出一张卡片。为此 `importJob` 记下了当时的 `lang` / `quality`（可选字段；这之前的老卡片没有，重试回落 `en` / 1080）。前端用一个内存 Set 挡住连点，避免两个 yt-dlp 往同一个文件名写。
 - **不替用户关登录用的 Chrome**：那个实例只要是机器上唯一的 Chrome，用户从程序坞点 Chrome 开的新标签页就会落在它里面，替他关窗会连标签页一起关掉。所以文案改成让用户自己关那个窗口（关窗才会把 cookies 落盘），再回来点「重试」。
 - 产物全部落 `~/Movies/LinguaClip/`：下载的 mp4、`<stem>.srt`；中间 wav 用完即删。**本地视频转录也写这里，不写视频旁边**（用户旁边可能有手做的同名 srt）。
 - yt-dlp 下载封顶：`-f bv*[height<=H]+ba/b[height<=H]`（H 为所选 1080 / 720 / 480），再加 `-S vcodec:h264,res:1080,acodec:m4a --merge-output-format mp4` 在上限内优先苹果能放的编码。Mac 内核放不了 webm，超过 1080p 只提供另一套编码，下完会打不开。`--print after_move:filepath` 本会让 yt-dlp 安静掉，但加了 `--progress --newline`，下载阶段能看到 `[download]` 百分比。

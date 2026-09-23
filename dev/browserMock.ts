@@ -4,6 +4,7 @@
  *
  * - Local files are served by vite's /@fs route (allow-list in vite.config.ts).
  * - File dialogs return `window.__MOCK__.pick` if set, else a fixture clip.
+ * - `window.__MOCK__.tools` sets what import_tools reports (both false by default).
  * - Rust commands are logged to `window.__MOCK__.calls`; fake import progress
  *   with `window.__MOCK__.emit('import-progress', {...})`.
  * - vite aliases @tauri-apps/plugin-http to this file, hence the `fetch` export;
@@ -25,6 +26,8 @@ const mock = {
   // set to (args) => ArrayBuffer to fake Edge TTS; unset = null = system voice
   tts: null as ((args: Args) => unknown) | null,
   calls: [] as { cmd: string; args: unknown }[],
+  // what import_tools reports; default = a stranger's Mac with nothing installed
+  tools: { whisper: false, youtube: false },
   emit,
 };
 (window as any).__MOCK__ = mock;
@@ -67,6 +70,8 @@ async function handle(cmd: string, args: Args): Promise<unknown> {
       if (!res.ok) throw `HTTP ${res.status}: ${text.slice(0, 120) || '(empty body)'}`;
       return text;
     }
+    case 'import_tools':
+      return mock.tools;
     case 'probe_import_sizes':
       return { '1080': null, '720': null, '480': null };
     default:
