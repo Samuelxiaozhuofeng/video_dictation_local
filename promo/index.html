@@ -1,0 +1,232 @@
+<!doctype html>
+<!-- 宣传片本体：画面只由 seek(t) 决定。render.mjs 逐帧调用它截图；直接用浏览器打开可拖进度条预览。 -->
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>LinguaClip 宣传片</title>
+<style>
+  @font-face { font-family: Newsreader; src: url(../node_modules/@fontsource/newsreader/files/newsreader-latin-400-normal.woff2); }
+  @font-face { font-family: Newsreader; font-weight: 500; src: url(../node_modules/@fontsource/newsreader/files/newsreader-latin-500-normal.woff2); }
+  @font-face { font-family: Instrument; src: url(../node_modules/@fontsource/instrument-sans/files/instrument-sans-latin-400-normal.woff2); }
+  :root { --paper: #12262B; --deep: #0B1a1e; --ink: #EFE8DA; --mute: #7F8F8E; --accent: #F2C94C; --line: #26414A; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { background: #000; overflow: hidden; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--deep);
+    font-family: Instrument, 'PingFang SC', sans-serif; color: var(--ink); }
+  #glow { position: absolute; width: 1600px; height: 1600px; left: 160px; top: -260px; border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(242,201,76,.10), rgba(242,201,76,0)); }
+  .layer { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .serif { font-family: Newsreader, 'Songti SC', serif; }
+  .caret { display: inline-block; width: 6px; height: .9em; background: var(--accent); margin-left: 10px; vertical-align: -0.06em; }
+  #title h1 { font-size: 168px; font-weight: 500; letter-spacing: -2px; }
+  #title p, #outro p { margin-top: 26px; font-size: 44px; color: var(--mute); letter-spacing: 2px; }
+  #hook div { font-size: 96px; font-weight: 600; letter-spacing: 4px; line-height: 1.4; position: absolute; }
+  .hl { color: var(--accent); }
+  #win { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; transform-origin: 0 0; }
+  #frame { position: absolute; left: -1px; top: -30px; width: 1442px; height: 931px; border-radius: 14px;
+    background: #0F2125; border: 1px solid #2c464e; box-shadow: 0 60px 140px rgba(0,0,0,.55), 0 10px 30px rgba(0,0,0,.4); }
+  #frame i { position: absolute; top: 10px; width: 12px; height: 12px; border-radius: 50%; }
+  #screen { position: absolute; inset: 0; overflow: hidden; border-radius: 0 0 13px 13px; background: var(--paper); }
+  #screen img { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; }
+  #vid { position: absolute; }
+  #ring { position: absolute; border: 3px solid var(--accent); border-radius: 12px; }
+  #cursor { position: absolute; left: 0; top: 0; width: 26px; transform-origin: 3px 2px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
+  #ripple { position: absolute; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; border: 3px solid var(--accent); }
+  #cap { position: absolute; left: 0; right: 0; top: 0; padding: 62px 0 90px; text-align: center;
+    background: linear-gradient(rgba(11,26,30,.92) 45%, rgba(11,26,30,0)); font-size: 50px; font-weight: 600; letter-spacing: 3px;
+    text-shadow: 0 4px 24px rgba(0,0,0,.8); }
+  #outro h1 { font-size: 150px; font-weight: 500; }
+  #outro small { margin-top: 60px; font-size: 30px; color: var(--mute); letter-spacing: 3px; }
+  #black { position: absolute; inset: 0; background: #000; }
+  #scrub { position: fixed; left: 0; right: 0; bottom: 0; width: 100%; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="glow"></div>
+  <div id="win">
+    <div id="frame"><i style="left:14px;background:#ED6A5E"></i><i style="left:34px;background:#F4BF4F"></i><i style="left:54px;background:#61C554"></i></div>
+    <div id="screen"><img id="imgA"><img id="imgB"><img id="vid"><div id="ring"></div></div>
+    <div id="ripple"></div>
+    <svg id="cursor" viewBox="0 0 26 38"><path d="M3 2 L3 30 L10 23.5 L14.5 34 L19 32 L14.6 21.8 L24 21.8 Z" fill="#fff" stroke="#111" stroke-width="1.8" stroke-linejoin="round"/></svg>
+  </div>
+  <div id="title" class="layer"><h1 class="serif"><span id="titleText"></span><span class="caret" id="titleCaret"></span></h1><p>用你爱看的视频，练出真听力</p></div>
+  <div id="hook" class="layer"><div id="hook1">字幕一关，就听不懂？</div><div id="hook2">那就一句一句，<span class="hl">听写</span>出来。</div></div>
+  <div id="cap"></div>
+  <div id="outro" class="layer"><h1 class="serif">LinguaClip</h1><p>把喜欢的视频，变成你的听力课</p><small>macOS 版 · 视频只留在你自己的电脑里</small></div>
+  <div id="black"></div>
+</div>
+<script>
+const M = await_manifest();
+function await_manifest() { const x = new XMLHttpRequest(); x.open('GET', 'shots/manifest.json', false); x.send(); return JSON.parse(x.responseText); }
+
+const FPS = 60, DURATION = 35;
+const $ = id => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = x => (x = clamp(x), x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const lerp = (a, b, k) => a + (b - a) * k;
+const center = b => [b.x + b.width / 2, b.y + b.height / 2];
+// 在 [a, b] 里淡入淡出（各 f 秒），返回 0..1
+const window_ = (t, a, b, f = .35) => Math.min(ease((t - a) / f), ease((b - t) / f));
+
+// ---------- 时间轴（唯一来源；EVENTS 给 music.mjs 配音效） ----------
+const EVENTS = [];
+const ev = (t, type, extra) => EVENTS.push({ t: +t.toFixed(4), type, ...extra });
+
+// 片头：打字打出 LinguaClip
+const TITLE = 'LinguaClip', TITLE_T0 = .5, TITLE_STEP = .11;
+for (let i = 0; i < TITLE.length; i++) ev(TITLE_T0 + i * TITLE_STEP, 'key');
+
+// App 画面切换 [时间, 图, 淡入秒数]
+const SCREENS = [[0, 'home-empty', 0]];
+const at = (t, name, fade = 0) => SCREENS.push([t, name, fade]);
+// 光标关键帧 [时间, x, y]，点击时间
+const CUR = [[6.6, 1100, 760]], CLICKS = [];
+const move = (t0, t1, box) => { const [x, y] = center(box); CUR.push([t0, ...CUR.at(-1).slice(1)], [t1, x, y]); };
+const click = t => { CLICKS.push(t); ev(t, 'click'); };
+
+ev(3.2, 'whoosh'); ev(6.5, 'whoosh');
+move(7.3, 7.95, M.addBtn); click(8.05); at(8.1, 'add-empty', .18);
+move(8.5, 9.05, M.pickBtn); click(9.15); at(9.2, 'add-picked');
+move(9.5, 10.0, M.startBtn); click(10.1); at(10.2, 'import-20', .15);
+at(10.75, 'import-55', .12); at(11.3, 'import-90', .12); at(11.85, 'home-ready', .25); ev(11.85, 'ding');
+move(12.15, 12.75, M.continueBtn); click(12.85);
+const PRACTICE = 13.0, CLIP_T0 = 2.6, CLIP_STOP = 5.25; // 视频从 2.6s 播到这句说完
+at(PRACTICE, 'listening', .3); ev(PRACTICE - .05, 'whoosh'); ev(PRACTICE, 'speech');
+at(15.6, 'type-000', .15);
+// 逐键：真实截图一张一张翻
+let tt = 16.35;
+M.typing.forEach(({ frame, char }, i) => {
+  tt += char === ' ' ? .2 : .085 + .045 * Math.abs(Math.sin(i * 12.9898)); // 伪随机节奏，每次渲染都一样
+  at(tt, 'type-' + String(frame).padStart(3, '0')); ev(tt, char === ' ' ? 'space' : 'key');
+});
+const ENTER = tt + .45;
+at(ENTER, 'feedback', .12); ev(ENTER, 'enter');
+const LOOK = ENTER + 2.9;
+move(LOOK - .75, LOOK - .1, M.wordBtn); click(LOOK); at(LOOK + .1, 'lookup', .22);
+move(LOOK + .8, LOOK + 1.35, M.ankiBtn); click(LOOK + 1.45); at(LOOK + 1.5, 'anki-added', .1); ev(LOOK + 1.5, 'ding');
+const OUTRO = LOOK + 3.4; ev(OUTRO - .1, 'whoosh'); ev(OUTRO + .2, 'chime');
+
+// 镜头 [时间, 缩放, 画面中心 x, y]（App 窗口坐标）
+const WIN_S = .74;
+const CAM = [
+  [0, .6, 720, 470], [6.6, .6, 720, 470], [7.4, .95, 720, 420], [8.1, .95, 720, 420], [8.6, 1.45, 720, 450],
+  [10.1, 1.45, 720, 450], [10.6, 1.6, 720, 230], [12.9, 1.6, 720, 230], [13.5, .95, 720, 430],
+  [15.3, .95, 720, 430], [16.1, 1.7, 1000, 290], [ENTER + .5, 1.7, 1000, 290], [ENTER + 1.2, 1.95, 1060, 285],
+  [LOOK - 1, 1.95, 1060, 285], [LOOK - .2, 1.4, 1030, 330], [OUTRO, 1.4, 1030, 330],
+];
+const CAPS = [
+  [7.2, 12.5, '拖进任意视频，<span class="hl">字幕自动生成</span>'],
+  [13.2, ENTER - .15, '听一句，<span class="hl">打一句</span>'],
+  [ENTER + .1, LOOK - .35, '对答案：只标出你<span class="hl">听错的词</span>'],
+  [LOOK - .2, OUTRO - .2, '生词点一下就查，<span class="hl">一键进 Anki</span>'],
+];
+
+// ---------- 素材预载 ----------
+const cache = {};
+function load(src) { return cache[src] ||= new Promise(r => { const i = new Image(); i.onload = () => i.decode().then(() => r(i)); i.src = src; }); }
+const shotSrc = n => `shots/${n}.png`;
+const clipSrc = t => `media/clip/${String(Math.min(360, Math.floor(t * 30) + 1)).padStart(4, '0')}.jpg`;
+window.ready = Promise.all([
+  ...SCREENS.map(s => load(shotSrc(s[1]))),
+  ...Array.from({ length: 360 }, (_, i) => load(`media/clip/${String(i + 1).padStart(4, '0')}.jpg`)),
+  document.fonts.ready,
+]);
+
+async function setImg(el, src) { if (el.getAttribute('src') !== src) { el.src = src; await el.decode().catch(() => {}); } }
+function sample(keys, t) { // 关键帧插值
+  let i = keys.findLastIndex(k => k[0] <= t);
+  if (i < 0) return keys[0].slice(1);
+  if (i === keys.length - 1) return keys[i].slice(1);
+  const [a, b] = [keys[i], keys[i + 1]], k = ease((t - a[0]) / (b[0] - a[0]));
+  return a.slice(1).map((v, j) => lerp(v, b[j + 1], k));
+}
+
+// ---------- seek：给一个时间，摆好整张画面 ----------
+async function seek(t) {
+  const jobs = [];
+  $('glow').style.transform = `translate(${Math.sin(t * .3) * 120}px, ${Math.cos(t * .23) * 60}px)`;
+
+  // 片头
+  const titleOn = window_(t, 0, 3.15, .3);
+  $('title').style.opacity = titleOn;
+  $('title').style.transform = `translateY(${(1 - ease(t / .6)) * 20}px) scale(${1 + t * .01})`;
+  const typedN = clamp(Math.floor((t - TITLE_T0) / TITLE_STEP) + 1, 0, TITLE.length);
+  $('titleText').textContent = TITLE.slice(0, typedN);
+  $('titleCaret').style.opacity = typedN < TITLE.length || Math.floor(t * 2.2) % 2 === 0 ? 1 : 0;
+  $('title').querySelector('p').style.opacity = ease((t - 1.9) / .5);
+
+  // 钩子两句
+  const h1 = window_(t, 3.25, 4.95, .3), h2 = window_(t, 4.95, 6.55, .3);
+  $('hook1').style.opacity = h1; $('hook1').style.transform = `translateY(${(1 - h1) * 30}px)`;
+  $('hook2').style.opacity = h2; $('hook2').style.transform = `translateY(${(1 - h2) * 30}px)`;
+
+  // App 窗口 + 镜头
+  const winOn = window_(t, 6.55, OUTRO + .1, .5);
+  const [s, cx, cy] = sample(CAM, t);
+  const fly = (1 - ease((t - 6.55) / .7)) * 140 + (1 - ease((OUTRO + .1 - t) / .5)) * -60;
+  $('win').style.opacity = winOn;
+  $('win').style.transform = `translate(${960 - cx * s}px, ${560 - cy * s + fly}px) scale(${s})`;
+
+  // 屏幕：两张图叠着做淡入
+  let i = SCREENS.findLastIndex(x => x[0] <= t); if (i < 0) i = 0;
+  const [t0, name, fade] = SCREENS[i];
+  const k = fade ? clamp((t - t0) / fade) : 1;
+  jobs.push(setImg($('imgB'), shotSrc(name)));
+  if (k < 1 && i > 0) { jobs.push(setImg($('imgA'), shotSrc(SCREENS[i - 1][1]))); $('imgA').style.opacity = 1; }
+  else $('imgA').style.opacity = 0;
+  $('imgB').style.opacity = ease(k);
+  // 查词面板从右边滑进来
+  $('imgB').style.transform = name === 'lookup' ? `translateX(${(1 - ease(k)) * 60}px)` : '';
+
+  // 真视频盖在截图里的视频框上
+  const practice = t >= PRACTICE;
+  const v = M.video, vid = $('vid');
+  Object.assign(vid.style, { left: v.x + 'px', top: v.y + 'px', width: v.width + 'px', height: v.height + 'px' });
+  vid.style.opacity = practice ? clamp((t - PRACTICE) / .3) : 0;
+  jobs.push(setImg(vid, clipSrc(practice ? Math.min(CLIP_T0 + (t - PRACTICE), CLIP_STOP) : CLIP_T0)));
+
+  // 错词圈出来
+  const w = M.wrongWord, rk = window_(t, ENTER + .5, LOOK - .5, .3), pad = 8 + (1 - rk) * 14;
+  Object.assign($('ring').style, { left: w.x - pad + 'px', top: w.y - pad + 'px', width: w.width + pad * 2 + 'px', height: w.height + pad * 2 + 'px', opacity: rk });
+
+  // 光标 + 点击波纹
+  const [x, y] = sample(CUR, t);
+  const lastClick = CLICKS.findLast(c => c <= t), since = lastClick == null ? 9 : t - lastClick;
+  const press = since < .16 ? .82 : 1;
+  const curOn = window_(t, 7.1, PRACTICE - .05, .25) + window_(t, LOOK - 1, OUTRO - .3, .25);
+  $('cursor').style.opacity = curOn;
+  $('cursor').style.transform = `translate(${x - 3}px, ${y - 2}px) scale(${press / Math.max(s, .6) * .9})`;
+  $('ripple').style.opacity = since < .45 ? (1 - since / .45) * curOn : 0;
+  $('ripple').style.transform = `translate(${x}px, ${y}px) scale(${.3 + since * 2.4})`;
+
+  // 字幕条
+  const cap = CAPS.find(c => t >= c[0] - .3 && t <= c[1] + .3);
+  $('cap').innerHTML = cap ? cap[2] : '';
+  const co = cap ? window_(t, cap[0], cap[1], .3) : 0;
+  $('cap').style.opacity = co; $('cap').style.transform = `translateY(${(1 - co) * 16}px)`;
+
+  // 片尾
+  const oo = ease((t - OUTRO - .2) / .7);
+  $('outro').style.opacity = oo; $('outro').style.transform = `scale(${.96 + oo * .04})`;
+  $('outro').querySelector('small').style.opacity = ease((t - OUTRO - 1.1) / .6);
+  $('black').style.opacity = ease((t - (DURATION - .8)) / .8) + (1 - ease(t / .3));
+
+  await Promise.all(jobs);
+}
+Object.assign(window, { seek, EVENTS, FPS, DURATION });
+
+// 直接打开时：拖动 / 空格播放预览
+if (!navigator.webdriver) {
+  const r = document.createElement('input');
+  Object.assign(r, { id: 'scrub', type: 'range', min: 0, max: DURATION, step: 1 / FPS, value: 0 });
+  document.body.append(r);
+  r.oninput = () => seek(+r.value);
+  let playing = false, start = 0;
+  addEventListener('keydown', e => { if (e.key === ' ') { playing = !playing; start = performance.now() / 1000 - +r.value; tick(); } });
+  const tick = () => { if (!playing) return; r.value = performance.now() / 1000 - start; seek(+r.value); requestAnimationFrame(tick); };
+  window.ready.then(() => seek(0));
+}
+</script>
+</body>
+</html>
