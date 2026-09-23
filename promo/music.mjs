@@ -47,11 +47,12 @@ for (let b = Math.ceil(6.6 / BEAT); b * BEAT < END; b++) {
   if (b % 2 === 0) voice(t, BEAT * 1.8, x => Math.min(1, x / .01) * Math.exp(-x * 1.5) * Math.sin(2 * Math.PI * hz(chordAt(t)[0] - 12) * x), 0.16, 0, music);
 }
 // 踩镲 + 轻拍手：练习段起
-for (let t = Math.ceil(13 / (BEAT / 2)) * BEAT / 2; t < END; t += BEAT / 2) {
+const PRACTICE = EVENTS.find(e => e.type === 'speech')?.t ?? 13;
+for (let t = Math.ceil(PRACTICE / (BEAT / 2)) * BEAT / 2; t < END; t += BEAT / 2) {
   let hp = 0;
   voice(t, 0.05, x => { const n = rnd(); const v = n - hp; hp = n; return v * Math.exp(-x * 90); }, 0.05, .2, music);
   const beat = Math.round(t / BEAT);
-  if (Math.abs(t / BEAT - beat) < 1e-6 && beat % 2 === 1 && t > 16) voice(t, 0.15, x => rnd() * Math.exp(-x * 30), 0.07, -.1, music);
+  if (Math.abs(t / BEAT - beat) < 1e-6 && beat % 2 === 1 && t > PRACTICE + 3) voice(t, 0.15, x => rnd() * Math.exp(-x * 30), 0.07, -.1, music);
 }
 // 片尾长和弦
 for (const m of [...CHORDS[0], 72]) voice(END, 5.2, t => Math.min(1, t / .05) * Math.exp(-t * .7) * Math.sin(2 * Math.PI * hz(m + 12) * t), 0.08, 0, music);
@@ -73,6 +74,8 @@ const SFX = {
   enter: t => { SFX.space(t); voice(t + .02, .9, x => Math.exp(-x * 5) * Math.sin(2 * Math.PI * hz(84) * x), .08); },
   ding: t => [88, 95].forEach((m, i) => voice(t + i * .07, 1.2, x => Math.exp(-x * 4) * Math.sin(2 * Math.PI * hz(m) * x), .07)),
   chime: t => [72, 76, 79, 84, 88].forEach((m, i) => voice(t + i * .09, 2.5, x => Math.exp(-x * 1.6) * Math.sin(2 * Math.PI * hz(m) * x), .05, (i - 2) * .15)),
+  pop: t => voice(t, .12, x => Math.exp(-x * 40) * Math.sin(2 * Math.PI * (900 - 2500 * x) * x), .12),
+  snip: t => { for (const d of [0, .06]) voice(t + d, .05, x => (rnd() * .6 + Math.sin(2 * Math.PI * 2400 * x)) * Math.exp(-x * 120), .14); },
   whoosh: t => { // 带通噪声，音量和亮度先升后降，峰值落在切换那一刻
     let lp = 0; const d = .7;
     voice(t - .45, d, x => { const k = x / d, env = Math.sin(Math.PI * k) ** 2, a = .02 + .25 * env; lp += a * (rnd() - lp); return lp * env; }, 0.9);

@@ -12,5 +12,12 @@
 
 ## 怎么重做
 - 先开 `npm run dev`（项目根），再 `npm run capture` 重拍 App 素材（样片、打的句子在 capture.mjs 顶上）
+- 改时间 / 字幕 / 镜头：只动 `storyboard.js`
 - `npm run video` → `out/LinguaClip宣传片.mp4`；只看某几秒：`node render.mjs 5 14 23` → `out/still-*.png`
 - 直接浏览器打开 index.html（经 render.mjs 那种静态服务）可拖进度条预览
+
+# 第二版：60 秒、讲卖点（只用画面大字）
+- [x] 1. capture.mjs 加拍：YouTube 链接导入、⌘X 偷看、「…」菜单、挖空轻松/适中、拆开教我全流程、收藏页、模糊模式
+- [x] 2. 分镜：产品介绍卡、为什么听写卡、AI 断句动画卡、各功能段、片尾卖点汇总
+- [x] 3. index.html 按新分镜重排（单文件不超 500 行，超了把分镜数据拆出去）
+- [x] 4. 音乐时长跟着变，出片、抽帧检查
