@@ -32,12 +32,12 @@
 
 ## 桌面版的关键约定（改这些地方前先读）
 
-详见 [desktop.md](desktop.md)。一句话版：视频不读进内存，用 `convertFileSrc(path)` 当 `<video src>`；记录里存绝对路径 `videoPath`；拖放走 Tauri 事件不走 HTML5 `onDrop`；Anki 音频卡走 Web Audio 录制。
+详见 [desktop.md](desktop.md)。一句话版：视频不读进内存，用 `convertFileSrc(path)` 当 `<video src>`；记录里存绝对路径 `videoPath`；拖放走 Tauri 事件不走 HTML5 `onDrop`；Anki 卡的音频走 Web Audio 录制。
 
 ## 本地数据（改结构要过设计门）
 
 - IndexedDB `linguaclip_db`：`videos` 表（VideoRecord，含 `videoPath`、字幕全文、进度）；`fileHandles` 表是网页时代遗留，已不读不写，**不要删表、不要动 DB_VERSION**
-- localStorage：`linguaclip_ai_config` / `anki_config` / `audio_padding` / `lang` / `practice_config` / `saved_lines` / `video_progress` / `import_lang`（添加视频弹窗记住的字幕语言）/ `home_view`（首页列表 or 卡片）
+- localStorage：`linguaclip_ai_config` / `linguaclip_anki_config` / `audio_padding` / `lang` / `practice_config` / `saved_lines` / `video_progress` / `import_lang`（添加视频弹窗记住的字幕语言）/ `home_view`（首页列表 or 卡片）
 
 ## 根目录那些 *.md
 

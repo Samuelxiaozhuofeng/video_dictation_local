@@ -26,7 +26,7 @@ export interface UsePracticeActionsParams {
   savedLinesToggleSave: (sub: Subtitle) => void;
   savedLinesDeleteSavedItem: (id: number, e: React.MouseEvent) => void;
   ankiHandleAddToAnki: (sub: Subtitle) => Promise<void>;
-  ankiHandleWordToAnki: (word: string, definition: string, sub: Subtitle, includeAudio?: boolean, example?: string) => Promise<void>;
+  ankiHandleWordToAnki: (word: string, definition: string, sub: Subtitle, example?: string) => Promise<void>;
 
   // Practice session actions
   practiceHandleContinue: (
@@ -123,10 +123,10 @@ export function usePracticeActions(params: UsePracticeActionsParams) {
     await ankiHandleAddToAnki(currentSub);
   }, [subtitles, currentSubtitleIndex, ankiHandleAddToAnki]);
 
-  const handleWordToAnki = useCallback(async (word: string, definition: string, includeAudio: boolean = true, example?: string) => {
+  const handleWordToAnki = useCallback(async (word: string, definition: string, example?: string) => {
     const currentSub = subtitles[currentSubtitleIndex];
     if (!currentSub) return;
-    await ankiHandleWordToAnki(word, definition, currentSub, includeAudio, example);
+    await ankiHandleWordToAnki(word, definition, currentSub, example);
   }, [subtitles, currentSubtitleIndex, ankiHandleWordToAnki]);
 
   const deleteSavedItem = useCallback((id: number, e: React.MouseEvent) => {

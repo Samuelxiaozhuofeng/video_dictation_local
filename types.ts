@@ -74,8 +74,7 @@ export interface AnkiCardTemplateConfig {
 
 export interface AnkiConfig {
   url: string;
-  wordCard: AnkiCardTemplateConfig | null;
-  audioCard: AnkiCardTemplateConfig | null;
+  card: AnkiCardTemplateConfig | null;
 }
 
 // AI Configuration

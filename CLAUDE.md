@@ -20,6 +20,7 @@ node test-resegment.mjs   # 切句逻辑自检（bundle 真模块，不是复制
 node test-sections.mjs    # 分段逻辑自检（同上）
 node test-cloze.mjs       # 挖空逻辑 + 缓存自检（同上）
 node test-dictionary.mjs  # 查词：认语言 + 有道解析 + 欧路挑词（同上）
+node test-anki.mjs        # Anki 旧配置合并成一种卡 + 单词加粗（同上）
 ```
 
 前端没有测试框架，逻辑自检就是根目录那几个 `node` 脚本（`test-tokenizer.js` / `test-flexible-case.js` 是早期的复制逻辑版，参考价值有限）。

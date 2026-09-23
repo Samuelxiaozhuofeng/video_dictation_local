@@ -24,7 +24,7 @@ const Transport: React.FC<{ lineLabel: string; menuItems: MenuItem[]; menuPanel?
   const { isCurrentSaved } = saved;
   const { ankiConfig, ankiStatus } = anki;
 
-  const ankiReady = !!ankiConfig && !!(ankiConfig.audioCard || ankiConfig.wordCard);
+  const ankiReady = !!ankiConfig?.card;
   const recording = ankiStatus === 'recording';
   const cur = videoRef.current ? Storage.formatTimeCode(videoRef.current.currentTime) : '00:00';
   const dur = videoRef.current ? Storage.formatTimeCode(videoRef.current.duration) : '00:00';

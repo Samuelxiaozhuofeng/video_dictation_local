@@ -11,7 +11,7 @@ import { useT } from '../utils/i18n';
 // (and its first two examples) to Anki as an audio card. The AI can point at the
 // meaning this sentence uses (pick); an AI-only answer (data) gets one "+".
 
-export type WordToAnki = (word: string, definition: string, includeAudio?: boolean, example?: string) => void | Promise<void>;
+export type WordToAnki = (word: string, definition: string, example?: string) => void | Promise<void>;
 
 export interface DefinitionState {
   word: string | null;
@@ -100,7 +100,7 @@ const DefinitionPanel: React.FC<{
     if (!fields) return;
     setAdd(a => ({ ...a, busy: id, failed: null }));
     try {
-      await onWordToAnki(def.word, fields.definition, true, fields.example);
+      await onWordToAnki(def.word, fields.definition, fields.example);
       setAdd(a => ({ sent: new Set(a.sent).add(id), busy: null, failed: null }));
     } catch {
       setAdd(a => ({ ...a, busy: null, failed: id }));

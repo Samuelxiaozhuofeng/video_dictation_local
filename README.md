@@ -10,7 +10,7 @@
 - **挖空三档**：轻松（每句只打 2–3 个词）/ 适中（约一半）/ 全写
 - **模糊模式**：字幕先糊住，听不出来再看，适合跟读
 - **拆开教我**：AI 挑出这句里值得学的搭配和语法，先听标准朗读一块块练，再回到原声里把它听出来
-- **点词就查**，一键做成 Anki 单词卡 / 带原声的音频卡
+- **点词就查**，一键做成带原声的 Anki 卡（第一次用点一下就自动建好卡片样式）
 - **按 4 分钟一段练**，进度自动保存，下次接着来
 - **视频只存在你自己的电脑上**：不上传、不用注册
 
@@ -81,7 +81,7 @@ npx tauri dev
 - Sentence-by-sentence dictation; checking highlights only the words you missed
 - Cloze levels (easy / medium / full), blur mode for shadowing
 - "Break it down": AI picks the useful phrases and grammar in a sentence, you hear them in clear TTS first, then catch them in the original audio
-- Click-to-look-up words, one-click Anki word and audio cards
+- Click-to-look-up words, one-click Anki cards with the original audio (card style set up for you)
 - 4-minute sections with saved progress; videos never leave your machine
 
 **Install (Windows):** run `LinguaClip_x.x.x_x64-setup.exe` from Releases; at "Windows protected your PC" choose More info → Run anyway. No YouTube links on Windows.

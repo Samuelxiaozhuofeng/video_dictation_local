@@ -13,23 +13,17 @@ import { useT, useLang, setLang, Lang } from '../utils/i18n';
 
 type AnkiPatch = {
   url?: string;
-  wordDeckName?: string;
-  wordModelName?: string;
-  wordFieldMapping?: Record<string, string>;
-  audioDeckName?: string;
-  audioModelName?: string;
-  audioFieldMapping?: Record<string, string>;
+  deckName?: string;
+  modelName?: string;
+  fieldMapping?: Record<string, string>;
 };
 
 const Settings: React.FC = () => {
   const t = useT();
   const lang = useLang();
-  const [wordDeckName, setWordDeckName] = useState('');
-  const [wordModelName, setWordModelName] = useState('');
-  const [wordFieldMapping, setWordFieldMapping] = useState<Record<string, string>>({});
-  const [audioDeckName, setAudioDeckName] = useState('');
-  const [audioModelName, setAudioModelName] = useState('');
-  const [audioFieldMapping, setAudioFieldMapping] = useState<Record<string, string>>({});
+  const [deckName, setDeckName] = useState('');
+  const [modelName, setModelName] = useState('');
+  const [fieldMapping, setFieldMapping] = useState<Record<string, string>>({});
 
   const [aiModel, setAiModel] = useState('');
   const [aiTemperature, setAiTemperature] = useState(0.7);
@@ -60,15 +54,10 @@ const Settings: React.FC = () => {
     const savedAnki = Anki.getAnkiConfig();
     if (savedAnki) {
       ankiConnection.setUrl(savedAnki.url);
-      if (savedAnki.wordCard) {
-        setWordDeckName(savedAnki.wordCard.deckName);
-        setWordModelName(savedAnki.wordCard.modelName);
-        setWordFieldMapping(savedAnki.wordCard.fieldMapping || {});
-      }
-      if (savedAnki.audioCard) {
-        setAudioDeckName(savedAnki.audioCard.deckName);
-        setAudioModelName(savedAnki.audioCard.modelName);
-        setAudioFieldMapping(savedAnki.audioCard.fieldMapping || {});
+      if (savedAnki.card) {
+        setDeckName(savedAnki.card.deckName);
+        setModelName(savedAnki.card.modelName);
+        setFieldMapping(savedAnki.card.fieldMapping || {});
       }
       ankiConnection.connect();
     }
@@ -93,22 +82,26 @@ const Settings: React.FC = () => {
 
   const buildAnkiConfig = (patch: AnkiPatch = {}): AnkiConfig => {
     const url = patch.url ?? ankiConnection.url;
-    const wd = patch.wordDeckName ?? wordDeckName;
-    const wm = patch.wordModelName ?? wordModelName;
-    const wmap = patch.wordFieldMapping ?? wordFieldMapping;
-    const ad = patch.audioDeckName ?? audioDeckName;
-    const am = patch.audioModelName ?? audioModelName;
-    const amap = patch.audioFieldMapping ?? audioFieldMapping;
-    return {
-      url,
-      wordCard: wd && wm ? { deckName: wd, modelName: wm, fieldMapping: wmap } : null,
-      audioCard: ad && am ? { deckName: ad, modelName: am, fieldMapping: amap } : null,
-    };
+    const d = patch.deckName ?? deckName;
+    const m = patch.modelName ?? modelName;
+    const map = patch.fieldMapping ?? fieldMapping;
+    return { url, card: d && m ? { deckName: d, modelName: m, fieldMapping: map } : null };
   };
 
   const saveAnki = (patch: AnkiPatch = {}) => {
     Anki.saveAnkiConfig(buildAnkiConfig(patch));
     flashSaved();
+  };
+
+  // Throws on failure; SettingsAnki shows the message next to the button.
+  const createLinguaClip = async () => {
+    const card = await Anki.setupLinguaClipCard(ankiConnection.url);
+    setDeckName(card.deckName);
+    setModelName(card.modelName);
+    setFieldMapping(card.fieldMapping);
+    saveAnki(card);
+    ankiConnection.connect(); // pick up the new deck / note type in the dropdowns
+    return card;
   };
 
   const saveAI = (next: Partial<AIConfig> & { prompt?: string } = {}) => {
@@ -216,32 +209,21 @@ const Settings: React.FC = () => {
           onConnect={ankiConnection.connect}
           decks={ankiConnection.decks}
           models={ankiConnection.models}
-          wordDeckName={wordDeckName}
-          setWordDeckName={(v) => {
-            setWordDeckName(v);
-            saveAnki({ wordDeckName: v });
+          deckName={deckName}
+          setDeckName={(v) => {
+            setDeckName(v);
+            saveAnki({ deckName: v });
           }}
-          wordModelName={wordModelName}
-          setWordModelName={(v) => {
-            setWordModelName(v);
-            saveAnki({ wordModelName: v });
+          modelName={modelName}
+          setModelName={(v) => {
+            setModelName(v);
+            saveAnki({ modelName: v });
           }}
-          wordFieldMapping={wordFieldMapping}
-          setWordFieldMapping={setWordFieldMapping}
-          audioDeckName={audioDeckName}
-          setAudioDeckName={(v) => {
-            setAudioDeckName(v);
-            saveAnki({ audioDeckName: v });
-          }}
-          audioModelName={audioModelName}
-          setAudioModelName={(v) => {
-            setAudioModelName(v);
-            saveAnki({ audioModelName: v });
-          }}
-          audioFieldMapping={audioFieldMapping}
-          setAudioFieldMapping={setAudioFieldMapping}
+          fieldMapping={fieldMapping}
+          setFieldMapping={setFieldMapping}
           fetchModelFields={ankiConnection.fetchModelFields}
           saveAnki={saveAnki}
+          createLinguaClip={createLinguaClip}
         />
       )}
 

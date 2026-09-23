@@ -10,30 +10,21 @@ export const getAnkiConfig = (): AnkiConfig | null => {
     if (!stored) return null;
 
     const parsed: any = JSON.parse(stored);
+    if (!parsed || typeof parsed !== 'object') return null;
 
-    // Backwards compatibility: old shape was a single template
-    if (parsed && typeof parsed === 'object' && 'deckName' in parsed && 'modelName' in parsed) {
-      const url = parsed.url || DEFAULT_URL;
-      const template: AnkiCardTemplateConfig = {
-        deckName: parsed.deckName,
-        modelName: parsed.modelName,
-        fieldMapping: parsed.fieldMapping || {},
-      };
+    // Oldest shape: one template at the top level
+    if ('deckName' in parsed && 'modelName' in parsed) {
       return {
-        url,
-        // 默认将旧配置同时作为两种卡片的模板，避免用户升级后不能用
-        wordCard: template,
-        audioCard: template,
+        url: parsed.url || DEFAULT_URL,
+        card: { deckName: parsed.deckName, modelName: parsed.modelName, fieldMapping: parsed.fieldMapping || {} },
       };
     }
 
-    // New shape
-    if (parsed && typeof parsed === 'object' && 'url' in parsed) {
-      return {
-        url: parsed.url || DEFAULT_URL,
-        wordCard: parsed.wordCard || null,
-        audioCard: parsed.audioCard || null,
-      };
+    if ('url' in parsed) {
+      // Before 2026-09 there were word + audio cards; both add buttons already
+      // preferred the audio one, so keep that and nothing changes for the user.
+      const card = parsed.card || parsed.audioCard || parsed.wordCard || null;
+      return { url: parsed.url || DEFAULT_URL, card };
     }
 
     return null;
@@ -96,6 +87,7 @@ export const addNote = async (
   }
 ) => {
   const fields: Record<string, string> = {};
+  const sentence = data.word ? boldWord(data.sentence, data.word) : data.sentence;
   const picture: any[] = [];
   const audio: any[] = [];
 
@@ -103,13 +95,13 @@ export const addNote = async (
   Object.entries(template.fieldMapping).forEach(([ankiField, appKey]) => {
     if (!appKey) return;
 
-    if (appKey === 'sentence') fields[ankiField] = data.sentence;
+    if (appKey === 'sentence') fields[ankiField] = sentence;
     else if (appKey === 'videoName') fields[ankiField] = data.videoName;
     else if (appKey === 'timestamp') fields[ankiField] = data.timestamp;
     else if (appKey === 'word') fields[ankiField] = data.word || '';
     else if (appKey === 'definition') fields[ankiField] = data.definition || '';
     else if (appKey === 'example') fields[ankiField] = data.example || '';
-    else if (appKey === 'context') fields[ankiField] = data.sentence; // Context is usually the full sentence
+    else if (appKey === 'context') fields[ankiField] = sentence; // Context is usually the full sentence
     else if (appKey === 'screenshot' && data.screenshotBase64) {
         picture.push({
             data: data.screenshotBase64.replace(/^data:image\/(png|jpg|jpeg);base64,/, ""),
@@ -139,6 +131,77 @@ export const addNote = async (
   };
 
   return invokeAnki('addNote', { note }, url);
+};
+
+// Wrap the looked-up word in <b> where it sits in the sentence. Whole-word match
+// first (so "a" doesn't light up inside "want"); scripts without spaces (Japanese)
+// fall back to the first plain occurrence.
+export const boldWord = (sentence: string, word: string): string => {
+  const w = word.trim();
+  if (!w) return sentence;
+  const esc = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const whole = new RegExp(`(?<![\\p{L}\\p{N}])${esc}(?![\\p{L}\\p{N}])`, 'iu');
+  const re = whole.test(sentence) ? whole : new RegExp(esc, 'iu');
+  return sentence.replace(re, (m) => `<b>${m}</b>`);
+};
+
+// --- One-click LinguaClip card: a deck + note type made for this app ---
+
+export const LINGUACLIP_NAME = 'LinguaClip';
+
+// Anki field -> app data key. Sentence goes first: Anki refuses notes whose
+// first field is empty, and both add buttons always send a sentence.
+export const LINGUACLIP_FIELDS: Record<string, string> = {
+  Sentence: 'sentence',
+  Audio: 'audio',
+  Image: 'screenshot',
+  Word: 'word',
+  Definition: 'definition',
+  Example: 'example',
+  Video: 'videoName',
+  Time: 'timestamp',
+};
+
+const LINGUACLIP_FRONT = `{{Audio}}
+<div class="shot">{{Image}}</div>
+{{#Word}}<div class="word">{{Word}}</div>{{/Word}}`;
+
+const LINGUACLIP_BACK = `{{FrontSide}}
+<hr id="answer">
+<div class="sentence">{{Sentence}}</div>
+{{#Definition}}<div class="def">{{Definition}}</div>{{/Definition}}
+{{#Example}}<div class="ex">{{Example}}</div>{{/Example}}
+<div class="src">{{Video}}{{#Time}} · {{Time}}{{/Time}}</div>`;
+
+const LINGUACLIP_CSS = `.card { font-family: -apple-system, "PingFang SC", sans-serif; font-size: 20px; line-height: 1.5; text-align: center; color: #1f2328; background: #fff; }
+.nightMode.card, .night_mode .card { color: #e6e1d6; background: #16202a; }
+.shot img { max-width: 100%; max-height: 50vh; border-radius: 6px; }
+.word { margin-top: 12px; font-size: 30px; font-weight: 600; }
+.sentence { font-size: 22px; }
+.sentence b { color: #d9a441; }
+.def, .ex { margin-top: 12px; font-size: 16px; text-align: left; }
+.ex { opacity: .75; }
+.src { margin-top: 16px; font-size: 12px; opacity: .5; }`;
+
+// Create the LinguaClip deck and note type if missing (an existing note type
+// is used as-is, so edits the user made in Anki survive), then return the card
+// config pointing at them.
+export const setupLinguaClipCard = async (url: string): Promise<AnkiCardTemplateConfig> => {
+  await invokeAnki('createDeck', { deck: LINGUACLIP_NAME }, url);
+  const models: string[] = await getModelNames(url);
+  if (!models.includes(LINGUACLIP_NAME)) {
+    await invokeAnki('createModel', {
+      modelName: LINGUACLIP_NAME,
+      inOrderFields: Object.keys(LINGUACLIP_FIELDS),
+      css: LINGUACLIP_CSS,
+      isCloze: false,
+      cardTemplates: [{ Name: LINGUACLIP_NAME, Front: LINGUACLIP_FRONT, Back: LINGUACLIP_BACK }],
+    }, url);
+  }
+  const fields: string[] = await getModelFieldNames(LINGUACLIP_NAME, url);
+  const fieldMapping: Record<string, string> = {};
+  fields.forEach((f) => { if (LINGUACLIP_FIELDS[f]) fieldMapping[f] = LINGUACLIP_FIELDS[f]; });
+  return { deckName: LINGUACLIP_NAME, modelName: LINGUACLIP_NAME, fieldMapping };
 };
 
 // Re-export types for convenience in hooks/components

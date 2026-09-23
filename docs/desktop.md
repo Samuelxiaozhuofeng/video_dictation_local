@@ -18,7 +18,7 @@
 ## Anki
 
 - `utils/anki.ts` 的 `fetch` 来自 `@tauri-apps/plugin-http`（绕过 AnkiConnect 的 CORS）。http 权限放行 `http://127.0.0.1:*` 与 `http://localhost:*`（任意端口，仅本机）。
-- 音频卡：`hooks/useAnkiIntegration.ts` 对 `<video>` 建一次 `AudioContext` + `createMediaElementSource`（WeakMap 缓存，重复建会抛错），source 同时接回 `ctx.destination`（不然用户听不到声）；录制时临时接一个 `MediaStreamAudioDestinationNode` 喂 `MediaRecorder`。mimeType 探测 `audio/webm` → `audio/mp4`，扩展名随之传给 `addNote`。
+- Anki 卡的音频：`hooks/useAnkiIntegration.ts` 对 `<video>` 建一次 `AudioContext` + `createMediaElementSource`（WeakMap 缓存，重复建会抛错），source 同时接回 `ctx.destination`（不然用户听不到声）；录制时临时接一个 `MediaStreamAudioDestinationNode` 喂 `MediaRecorder`。mimeType 探测 `audio/webm` → `audio/mp4`，扩展名随之传给 `addNote`。
 
 ## 权限（`src-tauri/capabilities/default.json`）
 

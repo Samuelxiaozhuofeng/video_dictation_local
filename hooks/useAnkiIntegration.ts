@@ -21,7 +21,7 @@ export interface UseAnkiIntegrationReturn {
   setAnkiConfig: (config: Anki.AnkiConfig | null) => void;
   setAnkiStatus: (status: AnkiStatus) => void;
   handleAddToAnki: (subtitle: Subtitle) => Promise<void>;
-  handleWordToAnki: (word: string, definition: string, subtitle: Subtitle, includeAudio?: boolean, example?: string) => Promise<void>;
+  handleWordToAnki: (word: string, definition: string, subtitle: Subtitle, example?: string) => Promise<void>;
   reloadConfig: () => void;
 }
 
@@ -163,7 +163,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
   }, [videoRef]);
 
   // Capture media (screenshot and/or audio) for a subtitle
-  const captureMedia = useCallback(async (currentSub: Subtitle, template: AnkiCardTemplateConfig | null, includeAudio: boolean = true) => {
+  const captureMedia = useCallback(async (currentSub: Subtitle, template: AnkiCardTemplateConfig | null) => {
       let screenshotBase64 = undefined;
       let audioBase64 = undefined;
       let audioExt = undefined;
@@ -190,9 +190,9 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
           }
       }
 
-      // 2. Capture Audio (only if includeAudio is true). A card whose audio
-      // field comes out empty is worse than no card: the caller stops and says why.
-      if (includeAudio && needsAudio) {
+      // 2. Capture Audio. A card whose audio field comes out empty is worse
+      // than no card: the caller stops and says why.
+      if (needsAudio) {
           let result: { base64: string; ext: string } | null = null;
           try {
               result = await captureAudioClip(currentSub.startTime, currentSub.endTime);
@@ -217,9 +217,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
     }
     if (ankiStatus !== 'idle') return;
 
-    // 优先使用 Audio 卡片模板，其次回退到 Word 模板
-    const template: AnkiCardTemplateConfig | null =
-      ankiConfig.audioCard || ankiConfig.wordCard || null;
+    const template = ankiConfig.card;
 
     if (!template) {
       dialog.alert(t('anki.noCardTitle'), t('anki.noCardBody'));
@@ -232,7 +230,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
 
     let media: Awaited<ReturnType<typeof captureMedia>>;
     try {
-        media = await captureMedia(subtitle, template, true);
+        media = await captureMedia(subtitle, template);
     } catch (e) {
         setAnkiStatus('error');
         if (e instanceof AudioCaptureError) alertAudioFailed(e);
@@ -262,20 +260,13 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
   }, [ankiConfig, ankiStatus, captureMedia, videoFileName]);
 
   // Add word with definition to Anki
-  const handleWordToAnki = useCallback(async (word: string, definition: string, subtitle: Subtitle, includeAudio: boolean = true, example?: string) => {
+  const handleWordToAnki = useCallback(async (word: string, definition: string, subtitle: Subtitle, example?: string) => {
       if (!ankiConfig) {
         dialog.alert(t('anki.notConnectedTitle'), t('anki.notConnectedBody'));
         throw new Error('Anki not configured');
       }
 
-      // 只有 Only Word（includeAudio === false）使用 Word 卡片模板；
-      // 其余（With Audio 等）优先使用 Audio 模板
-      let template: AnkiCardTemplateConfig | null;
-      if (includeAudio) {
-        template = ankiConfig.audioCard || ankiConfig.wordCard || null;
-      } else {
-        template = ankiConfig.wordCard || ankiConfig.audioCard || null;
-      }
+      const template = ankiConfig.card;
 
       if (!template) {
         dialog.alert(t('anki.noCardTitle'), t('anki.noCardBody'));
@@ -284,7 +275,7 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
 
       let media: Awaited<ReturnType<typeof captureMedia>>;
       try {
-          media = await captureMedia(subtitle, template, includeAudio);
+          media = await captureMedia(subtitle, template);
       } catch (e) {
           if (e instanceof AudioCaptureError) alertAudioFailed(e);
           throw e;

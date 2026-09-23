@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
-import { APP_DATA_FIELDS } from '../types';
+import { APP_DATA_FIELDS, AnkiCardTemplateConfig } from '../types';
 import { AnkiConnectionStatus } from '../hooks/useAnkiConnection';
 import { Btn, Card, Field, inputCls } from './ui';
 import { useT, DictKey } from '../utils/i18n';
@@ -29,23 +29,15 @@ interface SettingsAnkiProps {
   onConnect: () => void;
   decks: string[];
   models: string[];
-  wordDeckName: string;
-  setWordDeckName: (value: string) => void;
-  wordModelName: string;
-  setWordModelName: (value: string) => void;
-  wordFieldMapping: Mapping;
-  setWordFieldMapping: React.Dispatch<React.SetStateAction<Mapping>>;
-  audioDeckName: string;
-  setAudioDeckName: (value: string) => void;
-  audioModelName: string;
-  setAudioModelName: (value: string) => void;
-  audioFieldMapping: Mapping;
-  setAudioFieldMapping: React.Dispatch<React.SetStateAction<Mapping>>;
+  deckName: string;
+  setDeckName: (value: string) => void;
+  modelName: string;
+  setModelName: (value: string) => void;
+  fieldMapping: Mapping;
+  setFieldMapping: React.Dispatch<React.SetStateAction<Mapping>>;
   fetchModelFields: (modelName: string) => Promise<string[]>;
-  saveAnki: (patch?: {
-    wordFieldMapping?: Mapping;
-    audioFieldMapping?: Mapping;
-  }) => void;
+  saveAnki: (patch?: { fieldMapping?: Mapping }) => void;
+  createLinguaClip: () => Promise<AnkiCardTemplateConfig>;
 }
 
 function pruneMapping(prev: Mapping, fields: string[]): Mapping {
@@ -95,53 +87,46 @@ const SettingsAnki: React.FC<SettingsAnkiProps> = ({
   onConnect,
   decks,
   models,
-  wordDeckName,
-  setWordDeckName,
-  wordModelName,
-  setWordModelName,
-  wordFieldMapping,
-  setWordFieldMapping,
-  audioDeckName,
-  setAudioDeckName,
-  audioModelName,
-  setAudioModelName,
-  audioFieldMapping,
-  setAudioFieldMapping,
+  deckName,
+  setDeckName,
+  modelName,
+  setModelName,
+  fieldMapping,
+  setFieldMapping,
   fetchModelFields,
   saveAnki,
+  createLinguaClip,
 }) => {
   const t = useT();
-  const [wordModelFields, setWordModelFields] = useState<string[]>([]);
-  const [audioModelFields, setAudioModelFields] = useState<string[]>([]);
+  const [modelFields, setModelFields] = useState<string[]>([]);
+  const [creating, setCreating] = useState<'idle' | 'busy' | 'done' | string>('idle');
 
   useEffect(() => {
-    if (wordModelName && status === 'success') {
-      fetchModelFields(wordModelName).then((fields) => {
-        setWordModelFields(fields);
-        setWordFieldMapping((prev) => pruneMapping(prev, fields));
+    if (modelName && status === 'success') {
+      fetchModelFields(modelName).then((fields) => {
+        setModelFields(fields);
+        setFieldMapping((prev) => pruneMapping(prev, fields));
       });
     }
-  }, [wordModelName, status, fetchModelFields, setWordFieldMapping]);
+  }, [modelName, status, fetchModelFields, setFieldMapping]);
 
-  useEffect(() => {
-    if (audioModelName && status === 'success') {
-      fetchModelFields(audioModelName).then((fields) => {
-        setAudioModelFields(fields);
-        setAudioFieldMapping((prev) => pruneMapping(prev, fields));
-      });
-    }
-  }, [audioModelName, status, fetchModelFields, setAudioFieldMapping]);
-
-  const updateWordMapping = (ankiField: string, appDataKey: string) => {
-    const next = { ...wordFieldMapping, [ankiField]: appDataKey };
-    setWordFieldMapping(next);
-    saveAnki({ wordFieldMapping: next });
+  const updateMapping = (ankiField: string, appDataKey: string) => {
+    const next = { ...fieldMapping, [ankiField]: appDataKey };
+    setFieldMapping(next);
+    saveAnki({ fieldMapping: next });
   };
 
-  const updateAudioMapping = (ankiField: string, appDataKey: string) => {
-    const next = { ...audioFieldMapping, [ankiField]: appDataKey };
-    setAudioFieldMapping(next);
-    saveAnki({ audioFieldMapping: next });
+  const create = async () => {
+    setCreating('busy');
+    try {
+      const card = await createLinguaClip();
+      // An existing LinguaClip note type whose fields the user renamed in Anki
+      // may leave the must-have ones unmatched: say so instead of "done".
+      const got = Object.values(card.fieldMapping);
+      setCreating(got.includes('sentence') && got.includes('audio') ? 'done' : 'partial');
+    } catch (e) {
+      setCreating(e instanceof Error ? e.message : String(e));
+    }
   };
 
   return (
@@ -173,48 +158,37 @@ const SettingsAnki: React.FC<SettingsAnkiProps> = ({
       )}
 
       {status === 'success' && (
-        <div className="space-y-8">
-          <div>
-            <h3 className="font-serif text-lg mb-4">{t('settingsAnki.wordCard')}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <Field label={t('settingsAnki.targetDeck')}>
-                <select value={wordDeckName} onChange={(e) => setWordDeckName(e.target.value)} className={inputCls}>
-                  <option value="">{t('settingsAnki.selectDeck')}</option>
-                  {decks.map((d) => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </Field>
-              <Field label={t('settingsAnki.noteType')}>
-                <select value={wordModelName} onChange={(e) => setWordModelName(e.target.value)} className={inputCls}>
-                  <option value="">{t('settingsAnki.selectNoteType')}</option>
-                  {models.map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </Field>
-            </div>
-            {wordModelName && wordModelFields.length > 0 && (
-              <FieldMap fields={wordModelFields} mapping={wordFieldMapping} onChange={updateWordMapping} />
-            )}
+        <div>
+          <h3 className="font-serif text-lg mb-4">{t('settingsAnki.card')}</h3>
+          <Card flat tone="shade" className="px-4 py-3 mb-4 flex flex-col md:flex-row gap-3 md:items-center">
+            <p className="flex-1 text-sm">{t('settingsAnki.createHint')}</p>
+            <Btn type="button" tone="accent" onClick={create} disabled={creating === 'busy'}>
+              {creating === 'busy' && <RefreshCw className="w-4 h-4 animate-spin" />}
+              {t('settingsAnki.create')}
+            </Btn>
+          </Card>
+          {creating === 'done' && <p className="text-sm mb-4">{t('settingsAnki.created')}</p>}
+          {creating === 'partial' && <p className="text-sm mb-4">{t('settingsAnki.createdPartial')}</p>}
+          {!['idle', 'busy', 'done', 'partial'].includes(creating) && (
+            <p className="text-sm mb-4">{t('settingsAnki.createFailed')} <span className="text-xs text-mute break-all">{creating}</span></p>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <Field label={t('settingsAnki.targetDeck')}>
+              <select value={deckName} onChange={(e) => setDeckName(e.target.value)} className={inputCls}>
+                <option value="">{t('settingsAnki.selectDeck')}</option>
+                {decks.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </Field>
+            <Field label={t('settingsAnki.noteType')}>
+              <select value={modelName} onChange={(e) => setModelName(e.target.value)} className={inputCls}>
+                <option value="">{t('settingsAnki.selectNoteType')}</option>
+                {models.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </Field>
           </div>
-
-          <div className="border-t border-line pt-6">
-            <h3 className="font-serif text-lg mb-4">{t('settingsAnki.audioCard')}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <Field label={t('settingsAnki.targetDeck')}>
-                <select value={audioDeckName} onChange={(e) => setAudioDeckName(e.target.value)} className={inputCls}>
-                  <option value="">{t('settingsAnki.selectDeck')}</option>
-                  {decks.map((d) => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </Field>
-              <Field label={t('settingsAnki.noteType')}>
-                <select value={audioModelName} onChange={(e) => setAudioModelName(e.target.value)} className={inputCls}>
-                  <option value="">{t('settingsAnki.selectNoteType')}</option>
-                  {models.map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </Field>
-            </div>
-            {audioModelName && audioModelFields.length > 0 && (
-              <FieldMap fields={audioModelFields} mapping={audioFieldMapping} onChange={updateAudioMapping} />
-            )}
-          </div>
+          {modelName && modelFields.length > 0 && (
+            <FieldMap fields={modelFields} mapping={fieldMapping} onChange={updateMapping} />
+          )}
         </div>
       )}
     </div>

@@ -116,3 +116,19 @@
 - [x] tsc / test-dictionary / 浏览器实测
 - [x] codex-review（修：欧路例句嵌在释义里被混进释义；单条带例句的柯林斯被丢）
 - [x] npm run release
+
+# Anki：只剩一种卡 + 一键创建 LinguaClip 卡（2026-09-24 用户拍板）
+
+- 设置 → Anki 只有「卡片」一套（牌组 / 笔记类型 / 字段）；播放条加整句、查词 ＋ 都用它，默认带音频
+- 老配置沿用原「音频卡片」（没有就用「单词卡片」）
+- 「一键创建 LinguaClip 卡」：建 LinguaClip 牌组 + 笔记类型（已有就直接用，不覆盖），字段自动对上
+- 卡面：正面原声 + 截图（单词卡多一个单词）；背面句子（单词加粗）、释义、例句；空的整块不显示
+
+- [x] 产品门 pm + 用户拍板（先听后看、自动建牌组）
+- [x] anki.ts：配置合一 + 兼容旧格式 + 一键创建 + 加粗
+- [x] useAnkiIntegration / 调用链去掉 includeAudio
+- [x] Settings / SettingsAnki 合成一块 + 按钮；文案两份；README / docs
+- [x] test-anki.mjs + tsc
+- [x] 浏览器实测（真 Anki）
+- [x] codex-review（修：Anki 里已有且改过字段名的 LinguaClip 卡，一键创建后提示手动补「句子」「音频」）
+- [x] npm run release
