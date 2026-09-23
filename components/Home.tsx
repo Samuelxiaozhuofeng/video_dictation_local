@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, MoreHorizontal, Loader2 } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Plus, MoreHorizontal, Loader2, LayoutGrid, List } from 'lucide-react';
 import { LearningMode, VideoRecord } from '../types';
 import * as VideoStorage from '../utils/videoStorage';
 import { getPracticeConfig } from '../utils/storage';
@@ -7,22 +7,28 @@ import { parseSRT } from '../utils/srtParser';
 import { buildSections } from '../utils/sections';
 import { fileNameFromPath, listenDragDrop, trashFile, relatedFilePaths } from '../utils/desktop';
 import { formatImportError, isCookieError, openYouTubeLogin, retryImport, subscribeImportJobs } from '../utils/importJob';
-import { Btn, Menu, MenuItem } from './ui';
+import { Btn, Menu, MenuItem, Seg } from './ui';
+import VideoCover from './VideoCover';
 import { dialog } from './Dialog';
 import { useT, useLang } from '../utils/i18n';
 import AddVideo from './AddVideo';
 import { canCloze } from '../utils/aiDrills';
 import { cancelPrep, getPrepJob, prepStatus, prepareBreakdowns, subscribePrep } from '../utils/breakdownPrep';
+import { cancelCloze, clozeStatus, getClozeJob, linesOf, prepareCloze, subscribeCloze } from '../utils/clozePrep';
 
 // Home does two things: pick up the video you were on, and add a new one.
-// The most recent video leads; the rest are quiet rows. Everything else
-// (mode switch, breakdown prep, delete) waits behind hover or the "…" menu.
+// As a list the most recent video leads and the rest are quiet rows; as cards
+// every video gets a cover frame. Everything else (mode switch, AI prep,
+// delete) waits behind hover or the "…" menu.
 
 interface HomeProps {
   onResume: (record: VideoRecord, mode: LearningMode) => void | Promise<void>;
 }
 
 const VIDEO_EXT = /\.(mp4|mov|m4v)$/i;
+const VIEW_KEY = 'linguaclip_home_view';
+type View = 'list' | 'cards';
+type PrepInfo = { eligible: number; missing: number };
 const SRT_EXT = /\.srt$/i;
 
 const Line: React.FC<{ pct: number; className?: string }> = ({ pct, className = '' }) => (
@@ -39,10 +45,19 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [adding, setAdding] = useState<{ path: string | null; srt?: string | null } | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  // Breakdown prep per video: how many lines are still unprepared, and a tick
-  // that re-renders running jobs' progress.
-  const [prep, setPrep] = useState<Map<string, { eligible: number; missing: number }>>(new Map());
+  // AI prep per video (breakdowns, blanks): how many lines are still unprepared,
+  // read from the saved caches so it survives a restart, and a tick that
+  // re-renders running jobs' progress.
+  const [prep, setPrep] = useState<Map<string, PrepInfo>>(new Map());
+  const [cloze, setCloze] = useState<Map<string, PrepInfo>>(new Map());
   const [prepTick, setPrepTick] = useState(0);
+  const [view, setViewState] = useState<View>(() => {
+    try { return localStorage.getItem(VIEW_KEY) === 'cards' ? 'cards' : 'list'; } catch { return 'list'; }
+  });
+  const setView = (v: View) => {
+    setViewState(v);
+    try { localStorage.setItem(VIEW_KEY, v); } catch { /* per-device convenience only */ }
+  };
   const hasAi = canCloze();
 
   // Where each record sits in sections rather than in percent: "part 3 of 12"
@@ -101,15 +116,28 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
     };
   }, []);
 
-  useEffect(() => subscribePrep(() => setPrepTick(n => n + 1)), []);
+  useEffect(() => {
+    const bump = () => setPrepTick(n => n + 1);
+    const offs = [subscribePrep(bump), subscribeCloze(bump)];
+    return () => offs.forEach(off => off());
+  }, []);
+  // A running job ticks faster than a read of every cache finishes, so reads are
+  // never cancelled (that starved the shelf until the job stopped): each one
+  // lands unless a newer read already has.
+  const statusSeq = useRef({ started: 0, applied: 0 });
   useEffect(() => {
     if (!hasAi || !videos) return;
-    let cancelled = false;
-    const ready = videos.filter(v => !v.importJob && v.subtitleText && !getPrepJob(v.id));
-    Promise.all(ready.map(async v => [v.id, await prepStatus(v.id, v.subtitleText, lang)] as const))
-      .then(rows => { if (!cancelled) setPrep(new Map(rows)); })
+    const seq = statusSeq.current;
+    const mine = ++seq.started;
+    const ready = videos.filter(v => !v.importJob && v.subtitleText);
+    Promise.all(ready.map(async v => [v.id, await prepStatus(v.id, v.subtitleText, lang), await clozeStatus(v.id, v.subtitleText)] as const))
+      .then(rows => {
+        if (mine < seq.applied) return;
+        seq.applied = mine;
+        setPrep(new Map(rows.map(([id, b]) => [id, b])));
+        setCloze(new Map(rows.map(([id, , c]) => [id, c])));
+      })
       .catch(() => {});
-    return () => { cancelled = true; };
   }, [videos, lang, hasAi, prepTick]);
 
   const closeAdd = useCallback(() => setAdding(null), []);
@@ -145,7 +173,7 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
       { ok: t('home.deleteFileOk'), cancel: t('home.deleteFileKeep'), danger: true },
     );
     setDeletingId(v.id);
-    await cancelPrep(v.id);
+    await Promise.all([cancelPrep(v.id), cancelCloze(v.id)]);
     try {
       await VideoStorage.deleteVideoRecord(v.id);
       setVideos(prev => (prev ? prev.filter(x => x.id !== v.id) : prev));
@@ -189,18 +217,42 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
     return { text: t('home.linesCount', { current: pos.line, total: pos.lines }), pct };
   };
 
+  // One "…" entry per kind of AI prep: running, start, top up, or done.
+  const prepItem = (job: { done: number; total: number } | undefined, info: PrepInfo | undefined, kind: 'Breakdown' | 'Cloze', start: () => Promise<unknown>): MenuItem | null => {
+    if (job) return { label: t(`home.prep${kind}Running`, { done: job.done, total: job.total || '…' }), onClick: () => {}, disabled: true };
+    if (!info || info.eligible === 0) return null;
+    if (info.missing === 0) return { label: t(`home.prep${kind}Ready`), onClick: () => {}, disabled: true };
+    return {
+      label: info.missing < info.eligible ? t(`home.prep${kind}More`, { n: info.missing }) : t(`home.prep${kind}`),
+      title: t(`home.prep${kind}Title`),
+      onClick: () => { start().catch(err => console.error(err)); },
+    };
+  };
+
+  // " · Broken down · Blanks 3/5": where each kind of AI prep stands.
+  const prepLine = (v: VideoRecord) => {
+    if (!hasAi || v.importJob) return null;
+    const parts: string[] = [];
+    const one = (job: { done: number; total: number } | undefined, info: PrepInfo | undefined, kind: 'Breakdown' | 'Cloze') => {
+      if (job) parts.push(t(`home.prep${kind}Running`, { done: job.done, total: job.total || '…' }));
+      else if (info && info.eligible > 0 && info.missing < info.eligible) {
+        parts.push(info.missing === 0 ? t(`home.prep${kind}Done`) : t(`home.prep${kind}Part`, { done: info.eligible - info.missing, total: info.eligible }));
+      }
+    };
+    one(getPrepJob(v.id), prep.get(v.id), 'Breakdown');
+    one(getClozeJob(v.id), cloze.get(v.id), 'Cloze');
+    return parts.length ? <span> · {parts.join(' · ')}</span> : null;
+  };
+
   const menuFor = (v: VideoRecord): MenuItem[] => {
     const items: MenuItem[] = [];
     if (!v.importJob) {
       items.push({ label: t('home.practiceAs', { mode: modeName(otherMode(v)) }), onClick: () => onResume(v, otherMode(v)) });
-      const prepJob = hasAi ? getPrepJob(v.id) : undefined;
-      const info = hasAi && !prepJob ? prep.get(v.id) : undefined;
-      if (prepJob) {
-        items.push({ label: t('home.prepBreakdownRunning', { done: prepJob.done, total: prepJob.total || '…' }), onClick: () => {}, disabled: true });
-      } else if (info && info.eligible > 0) {
-        items.push(info.missing > 0
-          ? { label: info.missing < info.eligible ? t('home.prepBreakdownMore', { n: info.missing }) : t('home.prepBreakdown'), title: t('home.prepBreakdownTitle'), onClick: () => { prepareBreakdowns(v.id, v.subtitleText, lang).catch(err => console.error(err)); } }
-          : { label: t('home.prepBreakdownReady'), onClick: () => {}, disabled: true });
+      if (hasAi) {
+        const b = prepItem(getPrepJob(v.id), prep.get(v.id), 'Breakdown', () => prepareBreakdowns(v.id, v.subtitleText, lang));
+        const c = prepItem(getClozeJob(v.id), cloze.get(v.id), 'Cloze', () => prepareCloze(v.id, linesOf(v.subtitleText)));
+        if (b) items.push(b);
+        if (c) items.push(c);
       }
       items.push('divider');
     }
@@ -229,17 +281,12 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
     );
   };
 
-  const prepLine = (v: VideoRecord) => {
-    const job = hasAi && !v.importJob ? getPrepJob(v.id) : undefined;
-    return job ? <span> · {t('home.prepBreakdownRunning', { done: job.done, total: job.total || '…' })}</span> : null;
-  };
-
   const addBtn = <Btn size="sm" flat className="-mr-3" onClick={() => setAdding({ path: null })}><Plus size={15} /> {t('home.addVideo')}</Btn>;
   const lead = videos?.find(v => !v.importJob);
   const rest = (videos ?? []).filter(v => v !== lead);
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className={`${view === 'cards' ? 'max-w-5xl' : 'max-w-3xl'} mx-auto`}>
       {dragOver && (
         <div className="fixed inset-3 z-[70] rounded-2xl border-2 border-dashed border-accent bg-paper/90 flex items-center justify-center pointer-events-none fade-in">
           <p className="font-serif text-3xl text-ink">{t('home.dropRelease')}</p>
@@ -257,10 +304,48 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
         </div>
       ) : (
         <>
+          <div className="pt-4 flex items-center justify-end gap-3">
+            <Seg<View> size="sm" value={view} onChange={setView} options={[
+              { value: 'list', label: <List size={14} />, title: t('home.viewList') },
+              { value: 'cards', label: <LayoutGrid size={14} />, title: t('home.viewCards') },
+            ]} />
+            {addBtn}
+          </div>
+
+          {view === 'cards' ? (
+            <ul className="pt-6 pb-12 grid grid-cols-2 md:grid-cols-3 gap-x-5 gap-y-8">
+              {videos.map(v => {
+                const w = v.importJob ? null : where(v);
+                return (
+                  <li key={v.id} className="group relative min-w-0 focus-within:z-10 hover:z-10">
+                    <button type="button" disabled={!!v.importJob} onClick={() => onResume(v, lastMode(v))} className="block w-full text-left disabled:cursor-default">
+                      <VideoCover path={v.videoPath}>
+                        {v.importJob && !v.importJob.error && (
+                          <span className="absolute inset-x-0 bottom-0 px-3 py-2 text-xs text-ink bg-black/60">{jobLabel(v.importJob)}</span>
+                        )}
+                      </VideoCover>
+                      <p className={`mt-3 font-serif text-lg leading-snug line-clamp-2 break-words transition-colors ${v.importJob ? 'text-ink/70' : 'group-hover:text-white'}`}>{v.displayName}</p>
+                    </button>
+                    {v.importJob ? (
+                      jobStatus(v) ?? <Line pct={v.importJob.percent ?? 0} className="mt-2" />
+                    ) : (
+                      <>
+                        <p className="mt-1 text-sm text-mute truncate">{w!.text}{prepLine(v)}</p>
+                        <Line pct={w!.pct} className="mt-2" />
+                      </>
+                    )}
+                    <div className="absolute top-2 right-2 rounded-lg bg-page/80 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                      {more(v)}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (<>
           {lead && (() => {
             const w = where(lead);
             return (
-              <section className="pt-6 pb-12">
+              <section className="pt-2 pb-12">
                 <button type="button" onClick={() => onResume(lead, lastMode(lead))} className="block text-left font-serif text-[40px] leading-[1.15] hover:text-white transition-colors break-words">
                   {lead.displayName}
                 </button>
@@ -273,15 +358,12 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
                     {t('home.continueMode', { mode: modeName(lastMode(lead)) })}
                   </Btn>
                   {more(lead, 'lg')}
-                  <span className="flex-1" />
-                  {addBtn}
                 </div>
               </section>
             );
           })()}
 
           <section className="border-t border-line">
-            {!lead && <div className="h-14 flex items-center justify-end">{addBtn}</div>}
             {rest.length === 0 ? (
               <p className="py-6 text-sm text-faint">{t('home.onlyOne')}</p>
             ) : (
@@ -322,6 +404,7 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
               </ul>
             )}
           </section>
+          </>)}
         </>
       )}
     </div>

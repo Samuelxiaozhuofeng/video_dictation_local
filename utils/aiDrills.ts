@@ -1,6 +1,6 @@
 import { fetch } from '@tauri-apps/plugin-http';
 import { ClozeLevel } from '../types';
-import { getAIConfig, getEndpoint, normalizeBaseUrl, readJsonBody } from './aiConfig';
+import { readJsonBody } from './aiConfig';
 import { getRouter } from './resegment';
 import { tokenizeText, getWordTokens } from './textTokenizer';
 
@@ -111,12 +111,7 @@ export function pickBlanks(ranked: number[] | null | undefined, wordCount: numbe
 type Router = { baseUrl: string; apiKey: string; model: string };
 
 export function clozeRouter(): Router | null {
-  const viaSegment = getRouter();
-  if (viaSegment) return viaSegment;
-  const endpoint = getEndpoint();
-  const model = getAIConfig().model?.trim();
-  if (!endpoint || !model) return null;
-  return { baseUrl: normalizeBaseUrl(endpoint.baseUrl), apiKey: endpoint.apiKey, model };
+  return getRouter();
 }
 
 export function canCloze(): boolean {

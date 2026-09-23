@@ -13,7 +13,7 @@
 | 位置 | 管什么 |
 |---|---|
 | `App.tsx` | 页面状态机（首页 / 练习 / 收藏 / 设置）、开始练习与续练、全局快捷键表 |
-| `components/Home.tsx` | 拖入 / 选文件、历史记录货架 |
+| `components/Home.tsx` + `VideoCover.tsx` | 拖入 / 选文件、历史记录货架（列表 / 卡片，卡片封面是现抓的视频一帧，不存盘） |
 | `components/Studio.tsx` + `Transport.tsx` + `DictationLine.tsx` / `BlurLine.tsx` | 练习页：视频、字幕条、遥控条 |
 | `components/Settings*.tsx` | 通用 / AI 查词 / Anki 设置 |
 | `hooks/` | 播放控制、练习会话、收藏、Anki 集成、快捷键 |
@@ -21,7 +21,8 @@
 | `utils/desktop.ts` | **所有 Tauri 调用的唯一入口**：系统对话框、读字幕、路径是否存在、asset URL、拖放监听 |
 | `utils/videoStorage.ts` + `fileSystemAccess.ts` | 练习记录（IndexedDB） |
 | `utils/anki.ts` | AnkiConnect 请求（经 Tauri http 插件代发） |
-| `utils/ai.ts` | Gemini 查词 |
+| `utils/aiConfig.ts` + `ai.ts` | AI 设置（用户自填 OpenAI 兼容地址 + key + 模型，无默认地址、无内置通道）与查词 |
+| `utils/breakdownPrep.ts` + `clozePrep.ts` | 拆句 / 挖空的后台任务（首页「…」、导入后自动做、练习页共用同一个任务），结果存 `~/Movies/LinguaClip/<id>.breakdown/cloze.json` |
 | `components/AddVideo.tsx`（添加视频弹窗）+ `utils/importJob.ts` + `src-tauri/src/import.rs` + `whisper_setup.rs` | 自带字幕 / 本地转录（首次自动下载转录组件）/ YouTube 下载，见 [import.md](import.md) |
 | `utils/i18n.*.ts` | 中 / 英文案，两份都要改 |
 | `src-tauri/src/paths.rs` + `utils/platform.ts` | Mac / Windows 差异：自有目录（~/Movies 或 ~/Videos 下的 LinguaClip）、起子进程不弹黑窗、快捷键和「废纸篓」文案 |
@@ -35,7 +36,7 @@
 ## 本地数据（改结构要过设计门）
 
 - IndexedDB `linguaclip_db`：`videos` 表（VideoRecord，含 `videoPath`、字幕全文、进度）；`fileHandles` 表是网页时代遗留，已不读不写，**不要删表、不要动 DB_VERSION**
-- localStorage：`linguaclip_ai_config` / `anki_config` / `audio_padding` / `lang` / `practice_config` / `saved_lines` / `video_progress` / `import_lang`（添加视频弹窗记住的字幕语言）
+- localStorage：`linguaclip_ai_config` / `anki_config` / `audio_padding` / `lang` / `practice_config` / `saved_lines` / `video_progress` / `import_lang`（添加视频弹窗记住的字幕语言）/ `home_view`（首页列表 or 卡片）
 
 ## 根目录那些 *.md
 

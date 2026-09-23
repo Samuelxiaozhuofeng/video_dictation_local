@@ -2,7 +2,11 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { VideoRecord } from '../types';
 import { fileNameFromPath } from './desktop';
-import { t } from './i18n';
+import { getLang, t } from './i18n';
+import { getAIConfig } from './aiConfig';
+import { canCloze } from './aiDrills';
+import { prepareBreakdowns } from './breakdownPrep';
+import { linesOf, prepareCloze } from './clozePrep';
 import { parseSRT } from './srtParser';
 import { resegment, Word } from './resegment';
 import * as VideoStorage from './videoStorage';
@@ -228,6 +232,10 @@ async function applyProgress(payload: ImportProgressPayload): Promise<void> {
       totalSubtitles: parseSRT(subtitleText).length,
       lastPracticed: Date.now(),
     });
+    // Opted-in AI prep starts in the background; the shelf shows its progress.
+    const ai = getAIConfig();
+    if (ai.autoBreakdown && canCloze()) prepareBreakdowns(rec.id, subtitleText, getLang()).catch(err => console.error(err));
+    if (ai.autoCloze && canCloze()) prepareCloze(rec.id, linesOf(subtitleText)).catch(err => console.error(err));
     return;
   }
 

@@ -1,5 +1,5 @@
 import { fetch } from '@tauri-apps/plugin-http';
-import { getAIConfig, normalizeBaseUrl, readJsonBody } from './aiConfig';
+import { getAIConfig, getEndpoint, readJsonBody } from './aiConfig';
 
 // Whisper breaks a transcript wherever its decoder happened to stop, which
 // regularly lands you a 12-second, 30-word line. Dictation on a line that long
@@ -9,28 +9,21 @@ import { getAIConfig, normalizeBaseUrl, readJsonBody } from './aiConfig';
 
 export type Word = { w: string; from: number; to: number };
 
-const FALLBACK_MODEL = 'cpa/gemini-3.8-flash-high';
 const TARGET_WORDS = 10;   // what we ask each line to be
 const MAX_WORDS = 16;      // hard ceiling we enforce ourselves
 const BATCH_WORDS = 250;   // one model call; keeps it counting reliably
 const TAIL_MS = 400;       // whisper's end times run a touch early
 const REQUEST_TIMEOUT_MS = 90_000;
 
-const BASE_URL = process.env.ROUTER9_BASE_URL || '';
-const BASE_KEY = process.env.ROUTER9_BASE_KEY || '';
-
-// The user's own AI settings win; the build-time router stays as a fallback so
-// existing installs keep working without touching Settings.
+// Only the user's own AI settings: the segment model if set, else the main one.
 type Router = { baseUrl: string; apiKey: string; model: string };
 
 export function getRouter(): Router | null {
   const config = getAIConfig();
-  const model = config.segmentModel?.trim();
-  if (model && config.apiKey) {
-    return { baseUrl: normalizeBaseUrl(config.baseUrl), apiKey: config.apiKey, model };
-  }
-  if (BASE_URL && BASE_KEY) return { baseUrl: BASE_URL, apiKey: BASE_KEY, model: FALLBACK_MODEL };
-  return null;
+  const endpoint = getEndpoint();
+  const model = config.segmentModel?.trim() || config.model?.trim();
+  if (!endpoint || !model) return null;
+  return { ...endpoint, model };
 }
 
 export function canResegment(): boolean {

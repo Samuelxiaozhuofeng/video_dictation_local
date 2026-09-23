@@ -1,0 +1,67 @@
+import React, { useEffect, useState } from 'react';
+import { Film } from 'lucide-react';
+import { videoSrcFromPath } from '../utils/desktop';
+
+// A shelf card's cover: one frame grabbed from the video itself, nothing saved
+// to disk. Frames are grabbed one video at a time and kept for this session.
+
+const frames = new Map<string, Promise<string | null>>();
+let queue: Promise<unknown> = Promise.resolve();
+
+function grabFrame(path: string): Promise<string | null> {
+  return new Promise(resolve => {
+    const v = document.createElement('video');
+    const done = (url: string | null) => {
+      window.clearTimeout(timer);
+      v.removeAttribute('src');
+      v.load();
+      resolve(url);
+    };
+    const timer = window.setTimeout(() => done(null), 15_000);
+    v.crossOrigin = 'anonymous'; // same as the player: a tainted canvas cannot export
+    v.muted = true;
+    v.preload = 'auto';
+    v.onloadedmetadata = () => { v.currentTime = Math.min(5, (v.duration || 0) * 0.1); };
+    v.onseeked = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = 480;
+        c.height = Math.round(480 * (v.videoHeight / v.videoWidth)) || 270;
+        c.getContext('2d')!.drawImage(v, 0, 0, c.width, c.height);
+        done(c.toDataURL('image/jpeg', 0.75));
+      } catch {
+        done(null);
+      }
+    };
+    v.onerror = () => done(null);
+    v.src = videoSrcFromPath(path);
+  });
+}
+
+function coverOf(path: string): Promise<string | null> {
+  let hit = frames.get(path);
+  if (!hit) {
+    hit = queue.then(() => grabFrame(path));
+    queue = hit;
+    frames.set(path, hit);
+  }
+  return hit;
+}
+
+const VideoCover: React.FC<{ path?: string; children?: React.ReactNode }> = ({ path, children }) => {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    setSrc(null);
+    if (path) coverOf(path).then(url => { if (live) setSrc(url); });
+    return () => { live = false; };
+  }, [path]);
+  return (
+    <div className="relative aspect-video rounded-lg overflow-hidden bg-shade flex items-center justify-center">
+      {src ? <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" /> : <Film size={22} className="text-faint" />}
+      {children}
+    </div>
+  );
+};
+
+export default VideoCover;

@@ -1,6 +1,6 @@
 import path from 'path';
 import os from 'os';
-import { defineConfig, loadEnv, type Plugin } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 // Browser dev only: the Tauri http plugin skips CORS, a browser doesn't, so
@@ -38,8 +38,7 @@ const corsProxy: Plugin = {
   },
 };
 
-export default defineConfig(({ command, mode }) => {
-    const env = loadEnv(mode, '.', '');
+export default defineConfig(({ command }) => {
     // `npm run dev` in a plain browser (no `tauri dev`): dev/browserMock.ts
     // fakes the shell and local files are served over /@fs, so stay on
     // localhost and keep the yt-dlp login cookies out of reach.
@@ -61,13 +60,6 @@ export default defineConfig(({ command, mode }) => {
       },
       plugins: [react(), ...(browserDev ? [corsProxy] : [])],
       define: {
-        // API Key is now optional - users can input their own in Settings
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
-        // Re-cutting long subtitle lines goes through the local router; without
-        // these the app just keeps whisper's own line breaks.
-        'process.env.ROUTER9_BASE_URL': JSON.stringify(env.ROUTER9_BASE_URL || ''),
-        'process.env.ROUTER9_BASE_KEY': JSON.stringify(env.ROUTER9_BASE_KEY || ''),
         __DEV_HOME__: JSON.stringify(browserDev ? home : ''),
       },
       resolve: {

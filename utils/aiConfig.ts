@@ -7,14 +7,10 @@ import { AIConfig } from '../types';
 
 const STORAGE_KEY_AI = 'linguaclip_ai_config';
 
-// Gemini speaks OpenAI's protocol at this path, so one code path covers both
-// Google's keys and any other compatible provider the user points us at.
-export const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
-
 export const DEFAULT_PROMPT = `Define the word "{word}" as it is used in this sentence: "{context}". Provide a brief definition and its part of speech.`;
 
 const DEFAULTS: AIConfig = {
-  model: 'gemini-2.5-flash',
+  model: '',
   temperature: 0.7,
   promptTemplate: DEFAULT_PROMPT,
   apiKey: '',
@@ -35,8 +31,9 @@ export const saveAIConfig = (config: AIConfig) => {
   localStorage.setItem(STORAGE_KEY_AI, JSON.stringify(config));
 };
 
+// No default endpoint: the user brings their own provider, address and key.
 export const normalizeBaseUrl = (url?: string): string =>
-  (url?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, '');
+  (url?.trim() ?? '').replace(/\/+$/, '');
 
 // Some gateways glue a trailing SSE "data: [DONE]" onto an otherwise normal
 // JSON body, which makes res.json() throw a bare "string did not match the
@@ -50,8 +47,9 @@ export type Endpoint = { baseUrl: string; apiKey: string };
 
 export const getEndpoint = (): Endpoint | null => {
   const config = getAIConfig();
-  if (!config.apiKey) return null;
-  return { baseUrl: normalizeBaseUrl(config.baseUrl), apiKey: config.apiKey };
+  const baseUrl = normalizeBaseUrl(config.baseUrl);
+  if (!config.apiKey || !baseUrl) return null;
+  return { baseUrl, apiKey: config.apiKey };
 };
 
 // The fetched list is remembered so the picker still has options the next time

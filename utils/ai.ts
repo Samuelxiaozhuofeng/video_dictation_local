@@ -2,7 +2,7 @@ import { fetch } from '@tauri-apps/plugin-http';
 import { t } from './i18n';
 import { getAIConfig, getEndpoint, readJsonBody, DEFAULT_PROMPT } from './aiConfig';
 
-export { getAIConfig, saveAIConfig, listModels, getCachedModels, DEFAULT_PROMPT, DEFAULT_BASE_URL } from './aiConfig';
+export { getAIConfig, saveAIConfig, listModels, getCachedModels, DEFAULT_PROMPT } from './aiConfig';
 
 export interface WordDefinition {
     word: string;
@@ -31,8 +31,8 @@ const readJson = (content: string): WordDefinition => {
 export const getWordDefinition = async (word: string, context: string): Promise<WordDefinition> => {
     try {
         const endpoint = getEndpoint();
-        if (!endpoint) throw new Error('API Key missing');
         const config = getAIConfig();
+        if (!endpoint || !config.model?.trim()) throw new Error('API Key missing');
 
         const prompt = (config.promptTemplate || DEFAULT_PROMPT)
             .replace('{word}', word)

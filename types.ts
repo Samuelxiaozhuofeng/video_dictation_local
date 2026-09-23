@@ -53,6 +53,7 @@ export interface PracticeConfig {
   learningMode?: LearningMode; // Default learning mode for new videos
   blurPlaybackMode?: BlurPlaybackMode; // Default playback mode for blur mode
   clozeLevel?: ClozeLevel; // Dictation blank density; default 'full'
+  videoShare?: number; // % of the practice page's width given to the video; default 60
 }
 
 export interface VideoSection {
@@ -83,8 +84,10 @@ export interface AIConfig {
   temperature: number;
   promptTemplate?: string;
   apiKey?: string;      // User's own key for the OpenAI-compatible endpoint
-  baseUrl?: string;     // OpenAI-compatible base URL; empty = Gemini's compat endpoint
+  baseUrl?: string;     // OpenAI-compatible base URL; required
   segmentModel?: string; // model used to re-cut transcript lines on import
+  autoBreakdown?: boolean; // prepare breakdowns as soon as an import finishes
+  autoCloze?: boolean;     // prepare cloze blanks as soon as an import finishes
 }
 
 // Audio Padding Configuration

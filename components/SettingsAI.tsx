@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import * as AI from '../utils/ai';
 import { Btn, Field, inputCls } from './ui';
 import { useT } from '../utils/i18n';
@@ -17,7 +16,18 @@ interface SettingsAIProps {
   setAiBaseUrl: (value: string) => void;
   aiSegmentModel: string;
   setAiSegmentModel: (value: string) => void;
+  aiAutoBreakdown: boolean;
+  setAiAutoBreakdown: (value: boolean) => void;
+  aiAutoCloze: boolean;
+  setAiAutoCloze: (value: boolean) => void;
 }
+
+const Check: React.FC<{ checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }> = ({ checked, onChange, label, disabled }) => (
+  <label className={`flex items-center gap-2.5 text-sm ${disabled ? 'opacity-40' : 'cursor-pointer'}`}>
+    <input type="checkbox" checked={checked && !disabled} disabled={disabled} onChange={(e) => onChange(e.target.checked)} className="w-4 h-4 accent-accent" />
+    {label}
+  </label>
+);
 
 
 // A plain <select> rather than an <input list> datalist: the app's WKWebView
@@ -64,11 +74,16 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
   setAiBaseUrl,
   aiSegmentModel,
   setAiSegmentModel,
+  aiAutoBreakdown,
+  setAiAutoBreakdown,
+  aiAutoCloze,
+  setAiAutoCloze,
 }) => {
   const t = useT();
   const [models, setModels] = useState<string[]>(() => AI.getCachedModels());
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState('');
+  const aiReady = !!(aiApiKey && aiBaseUrl.trim() && (aiModel.trim() || aiSegmentModel.trim()));
 
   const fetchModels = async () => {
     setFetching(true);
@@ -87,24 +102,7 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
     <div className="space-y-6">
       <Field
         label={t('settingsAI.apiKey')}
-        hint={
-          <>
-            {t('settingsAI.apiKeyHintPre')}{' '}
-            <a
-              href="https://aistudio.google.com/app/apikey"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline text-accent"
-              onClick={(e) => {
-                e.preventDefault();
-                void openUrl('https://aistudio.google.com/app/apikey');
-              }}
-            >
-              {t('settingsAI.apiKeyHintLink')}
-            </a>
-            {t('settingsAI.apiKeyHintPost')}
-          </>
-        }
+        hint={t('settingsAI.apiKeyHint')}
       >
         <input
           type="password"
@@ -121,7 +119,7 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
           value={aiBaseUrl}
           onChange={(e) => setAiBaseUrl(e.target.value)}
           className={`${inputCls} font-mono`}
-          placeholder={AI.DEFAULT_BASE_URL}
+          placeholder="https://api.openai.com/v1"
         />
       </Field>
 
@@ -129,7 +127,7 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
         <Field
           label={t('settingsAI.model')}
           right={
-            <Btn type="button" size="sm" flat disabled={!aiApiKey || fetching} onClick={() => void fetchModels()}>
+            <Btn type="button" size="sm" flat disabled={!aiApiKey || !aiBaseUrl.trim() || fetching} onClick={() => void fetchModels()}>
               {fetching ? t('settingsAI.fetching') : t('settingsAI.fetchModels')}
             </Btn>
           }
@@ -145,7 +143,7 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
             value={aiModel}
             onChange={setAiModel}
             models={models}
-            placeholder="gemini-2.5-flash"
+            placeholder="model-id"
             pickLabel={t('settingsAI.pickModel')}
           />
         </Field>
@@ -175,6 +173,15 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
           pickLabel={t('settingsAI.pickModel')}
         />
       </Field>
+
+      <div>
+        <span className="block text-sm font-medium mb-2.5">{t('settingsAI.afterImport')}</span>
+        <div className="space-y-2">
+          <Check checked={aiAutoBreakdown} onChange={setAiAutoBreakdown} disabled={!aiReady} label={t('settingsAI.autoBreakdown')} />
+          <Check checked={aiAutoCloze} onChange={setAiAutoCloze} disabled={!aiReady} label={t('settingsAI.autoCloze')} />
+        </div>
+        <span className="block mt-1.5 text-xs text-mute leading-relaxed">{aiReady ? t('settingsAI.afterImportHint') : t('settingsAI.afterImportNeedAi')}</span>
+      </div>
 
       <Field
         label={t('settingsAI.promptTemplate')}

@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, X, Pin, PinOff, Check, PlusCircle, Volume2 } from 'lucide-react';
+import { Loader2, X, Check, PlusCircle, Volume2 } from 'lucide-react';
 import * as AI from '../utils/ai';
-import { Btn, Stamp } from './ui';
+import { Btn, Card, Stamp } from './ui';
 import { useT } from '../utils/i18n';
 
-// Single word-definition surface for both learning modes. Opens on the right when a
-// word is looked up; "pin" keeps it open across lines. Holds the only copy of the
-// "send this word to Anki" buttons.
+// Single word-definition surface for both learning modes: a centred popup over the
+// practice page, closed by Esc, the X or a click outside. Holds the only copy of
+// the "send this word to Anki" buttons.
 
 export type WordToAnki = (word: string, definition: string, includeAudio?: boolean) => void | Promise<void>;
 
@@ -66,22 +66,16 @@ const AnkiWordButtons: React.FC<{ word: string; data: AI.WordDefinition; onWordT
 
 const DefinitionPanel: React.FC<{
   def: DefinitionState;
-  pinned: boolean;
-  onTogglePin: () => void;
   onClose: () => void;
   onWordToAnki?: WordToAnki;
-}> = ({ def, pinned, onTogglePin, onClose, onWordToAnki }) => {
+}> = ({ def, onClose, onWordToAnki }) => {
   const t = useT();
   return (
-  <aside className="fixed inset-y-0 right-0 z-40 w-full sm:w-[360px] bg-page border-l border-line shadow-lift flex flex-col slide-in" aria-label={t('definition.ariaLabel')}>
-    <div className="h-14 px-4 flex items-center justify-between border-b border-line">
+  <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-4 fade-in" onMouseDown={onClose}>
+  <Card className="w-full max-w-md max-h-[80vh] shadow-lift flex flex-col" role="dialog" aria-label={t('definition.ariaLabel')} onMouseDown={e => e.stopPropagation()}>
+    <div className="h-14 px-5 flex items-center justify-between border-b border-line">
       <span className="font-serif text-lg">{t('definition.heading')}</span>
-      <div className="flex gap-2">
-        <Btn square size="sm" flat onClick={onTogglePin} className={pinned ? '!bg-accent-soft !text-accent' : ''} title={pinned ? t('definition.unpin') : t('definition.pin')}>
-          {pinned ? <PinOff size={16} /> : <Pin size={16} />}
-        </Btn>
-        <Btn square size="sm" flat onClick={onClose} title={t('common.close')}><X size={16} /></Btn>
-      </div>
+      <Btn square size="sm" flat onClick={onClose} title={t('common.close')}><X size={16} /></Btn>
     </div>
 
     <div className="flex-1 overflow-y-auto p-5">
@@ -105,7 +99,8 @@ const DefinitionPanel: React.FC<{
         <p className="text-sm text-mute">{t('definition.emptyHint')}</p>
       )}
     </div>
-  </aside>
+  </Card>
+  </div>
   );
 };
 

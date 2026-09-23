@@ -13,8 +13,8 @@ import SavedDrawer from './SavedDrawer';
 import DefinitionPanel, { DefinitionState, emptyDefinition } from './DefinitionPanel';
 import { tokenizeText, getWordTokens } from '../utils/textTokenizer';
 import { useT } from '../utils/i18n';
-import { canCloze, loadOrBuildCloze, pickBlanks } from '../utils/aiDrills';
-import { readCacheText, writeCacheText } from '../utils/desktop';
+import { canCloze, pickBlanks } from '../utils/aiDrills';
+import { getClozeJob, prepareCloze, subscribeCloze } from '../utils/clozePrep';
 import { IS_WINDOWS } from '../utils/platform';
 import { matches, formatCombo, useShortcuts } from '../utils/shortcuts';
 
@@ -46,42 +46,30 @@ const Studio: React.FC = () => {
     () => pickBlanks(rankedLines?.[lineIndex] ?? null, wordN, effectiveLevel),
     [rankedLines, lineIndex, wordN, effectiveLevel],
   );
-  const clozeJob = useRef<{ key: string; promise: Promise<(number[] | null)[]> } | null>(null);
-
   useEffect(() => {
     setRankedLines(null);
     setClozeProgress(null);
-    clozeJob.current = null;
   }, [clozeKey]);
 
+  // Joins the video's shared job if the shelf already started one; progress is
+  // read off that job, so a finished job clears "preparing" for good.
   useEffect(() => {
     if (isBlur || effectiveLevel === 'full' || rankedLines || lineTexts.length === 0) return;
     let cancelled = false;
-    const jobKey = clozeKey;
-    if (!clozeJob.current || clozeJob.current.key !== jobKey) {
-      // Progress is gated on this exact job, not its key: a replaced job for the
-      // same video (StrictMode re-run, switching away and back) can report after
-      // the live one finished and leave "preparing 1/1" stuck on screen.
-      const job = { key: jobKey, promise: Promise.resolve<(number[] | null)[]>([]) };
-      clozeJob.current = job;
-      job.promise = loadOrBuildCloze({
-        lineTexts,
-        recordId: videoId,
-        subtitleText: lineTexts.join('\n'),
-        readText: id => readCacheText(id, 'cloze'),
-        writeText: (id, text) => writeCacheText(id, 'cloze', text),
-        onProgress: (done, total) => { if (clozeJob.current === job) setClozeProgress({ done, total }); },
-      });
-    }
-    clozeJob.current.promise.then(ranked => {
+    const sync = () => {
+      const job = videoId ? getClozeJob(videoId) : undefined;
+      if (!cancelled) setClozeProgress(job && job.total ? { done: job.done, total: job.total } : null);
+    };
+    const unsubscribe = subscribeCloze(sync);
+    prepareCloze(videoId, lineTexts).then(ranked => {
       if (cancelled) return;
       setRankedLines(ranked);
       setClozeProgress(null);
     }).catch(() => {
       if (!cancelled) setClozeProgress(null);
     });
-    return () => { cancelled = true; };
-  }, [isBlur, effectiveLevel, rankedLines, lineTexts, clozeKey]);
+    return () => { cancelled = true; unsubscribe(); };
+  }, [isBlur, effectiveLevel, rankedLines, lineTexts, clozeKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Break it down: the points on a clean voice, then the whole line on the video's ---
   // Only while typing a dictation line: leaving INPUT (feedback, a seek, a new
@@ -137,6 +125,13 @@ const Studio: React.FC = () => {
     return () => window.clearTimeout(id);
   }, [bdHint]);
 
+  // Video : practice-column split, as a share of the row (the gap comes off both).
+  const [videoShare, setVideoShareState] = useState(() => Storage.getPracticeConfig().videoShare ?? 60);
+  const setVideoShare = (share: number) => {
+    setVideoShareState(share);
+    Storage.savePracticeConfig({ ...Storage.getPracticeConfig(), videoShare: share });
+  };
+
   const setLevel = (level: ClozeLevel) => {
     if (level !== 'full' && !hasClozeAi) return;
     setClozeLevel(level);
@@ -145,7 +140,6 @@ const Studio: React.FC = () => {
 
   // --- Word lookup (shared by both modes) ---
   const [def, setDef] = useState<DefinitionState>(emptyDefinition);
-  const [pinned, setPinned] = useState(false);
   const lookupSeq = useRef(0);
 
   const lookup = async (word: string) => {
@@ -158,22 +152,22 @@ const Studio: React.FC = () => {
       if (seq === lookupSeq.current) setDef({ word, data: null, loading: false, failed: true, error: (e as Error).message });
     }
   };
-  const closeDef = () => { lookupSeq.current++; setDef(emptyDefinition); setPinned(false); };
+  const closeDef = () => { lookupSeq.current++; setDef(emptyDefinition); };
 
-  useEffect(() => { if (!pinned) { lookupSeq.current++; setDef(emptyDefinition); } }, [currentSubtitleIndex, currentSectionIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(closeDef, [currentSubtitleIndex, currentSectionIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Esc closes whichever panel is open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (showSavedList) actions.onToggleSavedList(false);
-      else if (def.word || pinned) closeDef();
+      else if (def.word) closeDef();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showSavedList, def.word, pinned, actions]);
+  }, [showSavedList, def.word, actions]);
 
-  const defOpen = pinned || def.word !== null;
+  const defOpen = def.word !== null;
   const showCenterPlay = !isPlaying && mode === PracticeMode.LISTENING && ankiStatus !== 'recording' && !showSectionComplete && !showComplete;
 
   // The two lines just before this one, fading back like a transcript.
@@ -190,7 +184,14 @@ const Studio: React.FC = () => {
       title: !hasClozeAi ? t('studio.breakdownNeedKey') : bd.tooShort ? t('studio.breakdownTooShort') : t('studio.breakdownTitle'),
     });
   }
-  const menuPanel = isBlur ? (
+  const ratioRow = (
+    <MenuRow label={t('studio.ratioLabel')}>
+      <Seg size="sm" className="w-full [&>button]:flex-1" value={videoShare} onChange={setVideoShare} options={
+        [70, 60, 50, 40].map(v => ({ value: v, label: `${v / 10}:${10 - v / 10}` }))
+      } />
+    </MenuRow>
+  );
+  const modeRow = isBlur ? (
     <MenuRow label={t('studio.playbackLabel')}>
       <Seg size="sm" className="w-full [&>button]:flex-1" value={blurPlaybackMode} onChange={actions.onSetBlurPlaybackMode} options={[
         { value: BlurPlaybackMode.SENTENCE_BY_SENTENCE, label: t('studio.stepLabel'), title: t('studio.stepTitle') },
@@ -206,6 +207,7 @@ const Studio: React.FC = () => {
       ]} />
     </MenuRow>
   );
+  const menuPanel = <>{modeRow}{ratioRow}</>;
 
   return (
     <div className="relative h-full flex flex-col bg-paper">
@@ -228,7 +230,7 @@ const Studio: React.FC = () => {
       {/* --- Video left, transcript right: tops aligned, the pair centred in the window --- */}
       <div className="relative flex-1 min-h-0 flex flex-col justify-center px-6 lg:px-11 pb-8">
        <div className="min-h-0 flex flex-col lg:flex-row lg:items-start gap-8 lg:gap-12">
-        <div className="relative min-w-0 flex-1">
+        <div className="relative min-w-0 flex-1 lg:[flex:var(--share)_1_0]" style={{ '--share': videoShare } as React.CSSProperties}>
           {videoSrc ? (
             <video ref={videoRef} crossOrigin="anonymous" src={videoSrc} onLoadedMetadata={() => actions.onReplayCurrent()} className="block w-full h-auto max-h-[calc(100vh-190px)] object-contain object-left-top" />
           ) : (
@@ -241,7 +243,7 @@ const Studio: React.FC = () => {
           )}
         </div>
 
-        <section className="shrink-0 lg:w-[440px] flex flex-col gap-5 lg:max-h-[calc(100vh-190px)] lg:overflow-y-auto" aria-label={t('studio.lineCount', { current: currentSubtitleIndex + 1, total: subtitles.length })}>
+        <section style={{ '--share': 100 - videoShare } as React.CSSProperties} className="min-w-0 lg:[flex:var(--share)_1_0] flex flex-col gap-5 lg:max-h-[calc(100vh-190px)] lg:overflow-y-auto" aria-label={t('studio.lineCount', { current: currentSubtitleIndex + 1, total: subtitles.length })}>
           {past.map((i, k) => (
             <p key={subtitles[i].id} className={`font-serif text-xl leading-[28px] ${k === past.length - 1 ? 'opacity-40' : 'opacity-20'}`}>{subtitles[i].text}</p>
           ))}
@@ -330,7 +332,7 @@ const Studio: React.FC = () => {
 
       {showSavedList && <SavedDrawer />}
       {defOpen && (
-        <DefinitionPanel def={def} pinned={pinned} onTogglePin={() => setPinned(p => !p)} onClose={closeDef} onWordToAnki={actions.onWordToAnki} />
+        <DefinitionPanel def={def} onClose={closeDef} onWordToAnki={actions.onWordToAnki} />
       )}
     </div>
   );

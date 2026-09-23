@@ -4,7 +4,7 @@ import * as Anki from '../utils/anki';
 import * as AI from '../utils/ai';
 import * as Storage from '../utils/storage';
 import { useAnkiConnection } from '../hooks/useAnkiConnection';
-import { H, Stamp } from './ui';
+import { Seg, Stamp } from './ui';
 import SettingsGeneral from './SettingsGeneral';
 import SettingsAI from './SettingsAI';
 import SettingsAnki from './SettingsAnki';
@@ -31,16 +31,19 @@ const Settings: React.FC = () => {
   const [audioModelName, setAudioModelName] = useState('');
   const [audioFieldMapping, setAudioFieldMapping] = useState<Record<string, string>>({});
 
-  const [aiModel, setAiModel] = useState('gemini-2.5-flash');
+  const [aiModel, setAiModel] = useState('');
   const [aiTemperature, setAiTemperature] = useState(0.7);
   const [aiPrompt, setAiPrompt] = useState(AI.DEFAULT_PROMPT);
   const [aiApiKey, setAiApiKey] = useState('');
   const [aiBaseUrl, setAiBaseUrl] = useState('');
   const [aiSegmentModel, setAiSegmentModel] = useState('');
+  const [aiAutoBreakdown, setAiAutoBreakdown] = useState(false);
+  const [aiAutoCloze, setAiAutoCloze] = useState(false);
 
   const [sectionLength, setSectionLength] = useState(Storage.DEFAULT_SECTION_LENGTH);
   const [audioPadding, setAudioPadding] = useState<AudioPaddingConfig>({ startPadding: 100, endPadding: 200 });
 
+  const [tab, setTab] = useState<'practice' | 'ai' | 'shortcuts' | 'anki'>('practice');
   const [savedFlash, setSavedFlash] = useState(false);
   const flashTimer = useRef<number>(0);
   const ankiConnection = useAnkiConnection();
@@ -77,6 +80,8 @@ const Settings: React.FC = () => {
     setAiApiKey(savedAI.apiKey || '');
     setAiBaseUrl(savedAI.baseUrl || '');
     setAiSegmentModel(savedAI.segmentModel || '');
+    setAiAutoBreakdown(!!savedAI.autoBreakdown);
+    setAiAutoCloze(!!savedAI.autoCloze);
 
     const savedPractice = Storage.getPracticeConfig();
     setSectionLength(savedPractice.sectionLength);
@@ -114,14 +119,22 @@ const Settings: React.FC = () => {
       apiKey: next.apiKey ?? aiApiKey,
       baseUrl: next.baseUrl ?? aiBaseUrl,
       segmentModel: next.segmentModel ?? aiSegmentModel,
+      autoBreakdown: next.autoBreakdown ?? aiAutoBreakdown,
+      autoCloze: next.autoCloze ?? aiAutoCloze,
     });
     flashSaved();
   };
 
   return (
-    <div className="divide-y divide-line">
-      <section className="pb-10">
-        <H>{t('settings.practice')}</H>
+    <div>
+      <Seg<typeof tab> className="mb-8" value={tab} onChange={setTab} options={[
+        { value: 'practice', label: t('settings.practice') },
+        { value: 'ai', label: 'AI' },
+        { value: 'shortcuts', label: t('shortcuts.title') },
+        { value: 'anki', label: 'Anki' },
+      ]} />
+
+      {tab === 'practice' && (
         <SettingsGeneral
           lang={lang}
           setLang={(v: Lang) => {
@@ -131,7 +144,7 @@ const Settings: React.FC = () => {
           sectionLength={sectionLength}
           setSectionLength={(v) => {
             setSectionLength(v);
-            Storage.savePracticeConfig({ sectionLength: v });
+            Storage.savePracticeConfig({ ...Storage.getPracticeConfig(), sectionLength: v });
             flashSaved();
           }}
           audioPadding={audioPadding}
@@ -141,15 +154,11 @@ const Settings: React.FC = () => {
             flashSaved();
           }}
         />
-      </section>
+      )}
 
-      <section className="py-10">
-        <H>{t('shortcuts.title')}</H>
-        <SettingsShortcuts onSaved={flashSaved} />
-      </section>
+      {tab === 'shortcuts' && <SettingsShortcuts onSaved={flashSaved} />}
 
-      <section className="py-10">
-        <H>AI</H>
+      {tab === 'ai' && (
         <SettingsAI
           aiModel={aiModel}
           setAiModel={(v) => {
@@ -181,11 +190,20 @@ const Settings: React.FC = () => {
             setAiSegmentModel(v);
             saveAI({ segmentModel: v });
           }}
+          aiAutoBreakdown={aiAutoBreakdown}
+          setAiAutoBreakdown={(v) => {
+            setAiAutoBreakdown(v);
+            saveAI({ autoBreakdown: v });
+          }}
+          aiAutoCloze={aiAutoCloze}
+          setAiAutoCloze={(v) => {
+            setAiAutoCloze(v);
+            saveAI({ autoCloze: v });
+          }}
         />
-      </section>
+      )}
 
-      <section className="py-10">
-        <H>Anki</H>
+      {tab === 'anki' && (
         <SettingsAnki
           url={ankiConnection.url}
           setUrl={(v) => {
@@ -224,7 +242,7 @@ const Settings: React.FC = () => {
           fetchModelFields={ankiConnection.fetchModelFields}
           saveAnki={saveAnki}
         />
-      </section>
+      )}
 
       {savedFlash && (
         <div className="fixed bottom-6 right-6 z-50">
