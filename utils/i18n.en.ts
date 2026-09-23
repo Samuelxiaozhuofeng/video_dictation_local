@@ -38,7 +38,7 @@ export const en = {
   'home.nothingHereYet': 'Nothing here yet',
   'home.nothingHereHint': 'Add a video and the app writes its subtitles, cut into short lines. You can also drop one onto the window.',
   'home.linesCount': '{current} / {total} lines',
-  'home.partOf': 'Part {current} of {total}',
+  'home.partOf': 'Part {current} / {total}',
   'home.deleteTitle': 'Delete this video?',
   'home.deleteBody': '"{name}" and its progress will be removed. Saved lines stay.',
   'home.deleteOk': 'Delete',

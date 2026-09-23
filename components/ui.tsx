@@ -103,7 +103,7 @@ export function Seg<T extends string | number>({
 // Section heading used across settings / library pages.
 export const H: React.FC<{ children: React.ReactNode; sub?: React.ReactNode; badge?: React.ReactNode; className?: string }> = ({ children, sub, badge, className = '' }) => (
   <div className={`mb-5 ${className}`}>
-    <h2 className="font-serif text-[28px] font-normal leading-tight flex items-center gap-3">{children}{badge}</h2>
+    <h2 className="font-serif text-[30px] font-normal leading-tight flex items-center gap-3">{children}{badge}</h2>
     {sub && <p className="mt-1 text-sm text-mute">{sub}</p>}
   </div>
 );
@@ -113,7 +113,7 @@ export const Field: React.FC<{ label: React.ReactNode; hint?: React.ReactNode; r
 }) => (
   <label className={`block ${className}`}>
     <span className="flex items-baseline justify-between mb-1.5">
-      <span className="text-[13px] font-medium">{label}</span>
+      <span className="text-sm font-medium">{label}</span>
       {right && <span className="text-xs text-mute">{right}</span>}
     </span>
     {children}

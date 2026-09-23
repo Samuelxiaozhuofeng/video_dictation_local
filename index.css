@@ -23,7 +23,7 @@ html, body { background: var(--paper); color: var(--ink); font-variant-numeric: 
 
 /* A raised surface: dialogs, drawers, menus. No card-in-card: rows inside use hairlines. */
 .card { background: var(--page); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.35); }
-.flat { background: var(--shade); border: 1px solid var(--line); border-radius: 8px; }
+.flat { background-color: var(--shade); border: 1px solid var(--line); border-radius: 8px; }
 
 /* Pressable: a touch lighter on hover. */
 .press { transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease; }
@@ -45,7 +45,12 @@ input[type="range"]::-moz-range-track { height: 2px; background: var(--line); }
 input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -6px; border-radius: 50%; background: var(--ink); border: none; }
 input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--ink); border: none; }
 
-select { border-radius: 8px; }
+/* Native select, redrawn: same hairline chevron as the icons. */
+select {
+  border-radius: 8px; -webkit-appearance: none; appearance: none; padding-right: 2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237F8F8E' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 0.6rem center;
+}
 select option { background: var(--page); color: var(--ink); }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }

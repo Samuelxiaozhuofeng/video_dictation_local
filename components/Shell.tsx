@@ -21,7 +21,7 @@ const Shell: React.FC<{ active: AppState; onNav: (s: AppState) => void; children
               key={state}
               onClick={() => onNav(state)}
               aria-current={active === state ? 'page' : undefined}
-              className={`h-8 px-2.5 text-[13px] transition-colors
+              className={`h-8 px-2.5 text-sm transition-colors
                 ${active === state ? 'text-ink' : 'text-mute hover:text-ink'}`}
             >
               {label}

@@ -39,7 +39,7 @@ export const zh: Record<keyof typeof en, string> = {
   'home.nothingHereYet': '这里还空着',
   'home.nothingHereHint': '添加一个视频，App 会自动生成字幕并切成短句。也可以直接把视频拖进窗口。',
   'home.linesCount': '{current} / {total} 句',
-  'home.partOf': '第 {current}/{total} 段',
+  'home.partOf': '{current} / {total} 段',
   'home.deleteTitle': '删除这个视频？',
   'home.deleteBody': '“{name}”和它的进度都会被删除，收藏的句子会保留。',
   'home.deleteOk': '删除',

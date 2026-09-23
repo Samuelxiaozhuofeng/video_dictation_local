@@ -130,7 +130,7 @@ const AddVideo: React.FC<{ initialPath: string | null; onClose: () => void }> = 
       <Card className="w-full max-w-lg" role="dialog" aria-modal="true" aria-label={t('add.title')} onClick={e => e.stopPropagation()}>
         <div className="px-7 pt-7 pb-6 space-y-6">
           <div>
-            <h3 className="font-serif text-[28px] leading-tight">{t('add.title')}</h3>
+            <h3 className="font-serif text-[30px] leading-tight">{t('add.title')}</h3>
             <p className="mt-1 text-sm text-mute">{t('home.dropHint')}</p>
           </div>
 

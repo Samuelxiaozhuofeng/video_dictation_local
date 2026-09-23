@@ -53,7 +53,7 @@ node test-cloze.mjs       # 挖空逻辑 + 缓存自检（同上）
 - **导入任务的监听挂在 `App.tsx`，不是首页**：用户在练习页时首页已卸载，挂错地方会漏进度事件。
 - **文案两份都要改**：`utils/i18n.zh.ts` 和 `utils/i18n.en.ts`。
 - **视频扩展名有两处**：`components/Home.tsx` 的 `VIDEO_EXT` 和 `utils/desktop.ts` 的 `VIDEO_FILTER`，必须一致。
-- **UI 原语全在 `components/ui.tsx`**，风格是笔记本纸感（安静、浅色），新界面用这些原语，不要另起一套。
+- **UI 原语全在 `components/ui.tsx`**，风格是深海夜读（深底、一个暖黄主色 + 灰阶，别加第二种颜色），新界面用这些原语，不要另起一套。
 
 ## 碰数据前
 

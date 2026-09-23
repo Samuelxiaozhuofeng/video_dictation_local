@@ -66,7 +66,7 @@ const FieldMap: React.FC<{
   const t = useT();
   return (
     <div className="space-y-3">
-      <p className="text-[13px] font-medium">{t('settingsAnki.fieldMapping')}</p>
+      <p className="text-sm font-medium">{t('settingsAnki.fieldMapping')}</p>
       {fields.map((field) => (
         <div key={field} className="flex items-center gap-3">
           <span className="w-1/3 font-mono text-sm truncate" title={field}>{field}</span>

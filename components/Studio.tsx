@@ -6,7 +6,7 @@ import * as Storage from '../utils/storage';
 import { usePracticeContext } from '../hooks/usePracticeContext';
 import { useBreakdown } from '../hooks/useBreakdown';
 import { Btn, Card, Seg, MenuItem } from './ui';
-import DictationLine from './DictationLine';
+import DictationLine, { LINE } from './DictationLine';
 import BlurLine from './BlurLine';
 import Transport from './Transport';
 import SavedDrawer from './SavedDrawer';
@@ -187,7 +187,7 @@ const Studio: React.FC = () => {
   return (
     <div className="relative h-full flex flex-col bg-paper">
       {/* --- Top strip --- */}
-      <header className="shrink-0 h-14 pl-[80px] pr-4 flex items-center justify-between gap-3 text-[13px] text-mute" data-tauri-drag-region="deep">
+      <header className="shrink-0 h-14 pl-[80px] pr-4 flex items-center justify-between gap-3 text-sm text-mute" data-tauri-drag-region="deep">
         <div className="flex items-center gap-2 min-w-0">
           <Btn square size="sm" flat onClick={actions.onExit} title={t('studio.backToVideos')} aria-label={t('studio.backToVideos')}><ArrowLeft size={16} /></Btn>
           <span className="truncate min-w-0" title={videoName}>{videoName}</span>
@@ -220,15 +220,11 @@ const Studio: React.FC = () => {
 
         <section className="shrink-0 lg:w-[440px] flex flex-col gap-5 lg:max-h-[calc(100vh-190px)] lg:overflow-y-auto" aria-label={t('studio.lineCount', { current: currentSubtitleIndex + 1, total: subtitles.length })}>
           {past.map((i, k) => (
-            <div key={subtitles[i].id} className={`flex gap-4 items-baseline ${k === past.length - 1 ? 'opacity-40' : 'opacity-20'}`}>
-              <span className="w-6 shrink-0 text-xs">{i + 1}</span>
-              <span className="font-serif text-[19px] leading-[26px]">{subtitles[i].text}</span>
-            </div>
+            <p key={subtitles[i].id} className={`font-serif text-xl leading-[28px] ${k === past.length - 1 ? 'opacity-40' : 'opacity-20'}`}>{subtitles[i].text}</p>
           ))}
 
-          <div className="flex gap-4 items-start mt-1">
-            <span className="w-6 shrink-0 pt-3 text-xs text-ink">{currentSubtitleIndex + 1}</span>
-            <div className="min-w-0 flex-1">
+          <div className="mt-1">
+            <div className="min-w-0">
               {!currentSub ? (
                 <span className="font-serif italic text-mute text-xl">{t('studio.endOfPart')}</span>
               ) : isBlur ? (
@@ -315,7 +311,7 @@ const MenuRow: React.FC<{ label: string; hint?: string; children: React.ReactNod
   <div className="px-3.5 py-2 flex flex-col gap-2">
     <span className="text-xs text-mute">{label}</span>
     {children}
-    {hint && <span className="text-[11px] text-faint leading-snug max-w-[14rem]">{hint}</span>}
+    {hint && <span className="text-xs text-faint leading-snug max-w-[14rem]">{hint}</span>}
   </div>
 );
 
@@ -324,9 +320,9 @@ const ListeningGhost: React.FC<{ text: string; blanks: number[] }> = ({ text, bl
   const words = getWordTokens(tokenizeText(text));
   const set = new Set(blanks);
   return (
-    <div className="flex flex-wrap gap-x-2.5 gap-y-2 font-serif text-[30px] leading-[42px]">
+    <div className={LINE}>
       {words.map((w, i) => set.has(i) ? (
-        <span key={i} className="inline-block h-[40px] border-b-[1.5px] border-line" style={{ width: `${Math.max(2, w.value.length) * 0.46}em` }} />
+        <span key={i} className="inline-block relative top-2 h-[30px] border-b-[1.5px] border-ink/25" style={{ width: `${Math.max(2, w.value.length) * 0.46}em` }} />
       ) : (
         <span key={i} className="text-ink/50">{w.value}</span>
       ))}
@@ -338,13 +334,13 @@ const Overlay: React.FC<{ title: string; body: string; stats?: [string, string][
   <div className="absolute inset-0 z-20 bg-black/60 flex items-center justify-center p-4">
     <Card className="w-full max-w-md fade-in">
       <div className="px-7 pt-7 pb-5 space-y-3">
-        <h2 className="font-serif text-[32px] leading-tight">{title}</h2>
+        <h2 className="font-serif text-[30px] leading-tight">{title}</h2>
         <p className="text-sm text-mute leading-relaxed">{body}</p>
         {stats && (
           <div className="flex gap-10 pt-3">
             {stats.map(([n, label]) => (
               <div key={label}>
-                <div className="font-serif text-[36px] leading-none">{n}</div>
+                <div className="font-serif text-[30px] leading-none">{n}</div>
                 <div className="text-xs text-mute mt-1.5">{label}</div>
               </div>
             ))}

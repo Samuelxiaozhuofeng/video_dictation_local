@@ -6,7 +6,7 @@
 - 打包：`npx tauri build` → `src-tauri/target/release/bundle/macos/LinguaClip.app`
 - 类型检查：`npx tsc --noEmit`
 - 前端：React 19 + Vite 6 + Tailwind 3（本地打包，见 `tailwind.config.js`），字体走 `@fontsource`，断网可用
-- 界面风格：笔记本纸感（安静、浅色），原语全在 `components/ui.tsx`；快捷键提示用 ⌘ ⇧ 符号
+- 界面风格：深海夜读（深墨青底 + 奶油字，唯一主色暖黄；句子 Newsreader 衬线、界面 Instrument Sans），令牌在 `tailwind.config.js` / `index.css`，原语全在 `components/ui.tsx`（含「…」菜单 `Menu`）；快捷键提示用 ⌘ ⇧ 符号
 
 ## 目录
 
@@ -22,7 +22,7 @@
 | `utils/videoStorage.ts` + `fileSystemAccess.ts` | 练习记录（IndexedDB） |
 | `utils/anki.ts` | AnkiConnect 请求（经 Tauri http 插件代发） |
 | `utils/ai.ts` | Gemini 查词 |
-| `components/ImportBox.tsx` + `utils/importJob.ts` + `src-tauri/src/import.rs` | YouTube 下载 / 本地转录出字幕，见 [import.md](import.md) |
+| `components/AddVideo.tsx`（添加视频弹窗）+ `utils/importJob.ts` + `src-tauri/src/import.rs` | YouTube 下载 / 本地转录出字幕，见 [import.md](import.md) |
 | `utils/i18n.*.ts` | 中 / 英文案，两份都要改 |
 | `src-tauri/` | Rust 壳子；`tauri.conf.json` 窗口与 asset 协议，`capabilities/default.json` 权限 |
 
@@ -33,7 +33,7 @@
 ## 本地数据（改结构要过设计门）
 
 - IndexedDB `linguaclip_db`：`videos` 表（VideoRecord，含 `videoPath`、字幕全文、进度）；`fileHandles` 表是网页时代遗留，已不读不写，**不要删表、不要动 DB_VERSION**
-- localStorage：`linguaclip_ai_config` / `anki_config` / `audio_padding` / `lang` / `practice_config` / `saved_lines` / `video_progress`
+- localStorage：`linguaclip_ai_config` / `anki_config` / `audio_padding` / `lang` / `practice_config` / `saved_lines` / `video_progress` / `import_lang`（添加视频弹窗记住的字幕语言）
 
 ## 根目录那些 *.md
 

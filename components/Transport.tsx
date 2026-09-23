@@ -36,7 +36,7 @@ const Transport: React.FC<{ lineLabel: string; menuItems: MenuItem[]; menuPanel?
   const af = ankiFace();
 
   return (
-    <footer className={`relative shrink-0 h-14 px-4 flex items-center gap-4 text-xs text-mute transition-colors ${recording ? 'bg-accent-soft' : ''}`}>
+    <footer className={`relative shrink-0 h-14 px-6 lg:px-11 flex items-center gap-4 text-xs text-mute transition-colors ${recording ? 'bg-accent-soft' : ''}`}>
       {/* Progress: a hairline across the top edge, seekable */}
       <div className="absolute left-0 right-0 top-0 h-3 -translate-y-1/2 flex items-center group" title={`${cur} / ${dur}`}>
         <div className="w-full h-[2px] bg-shade group-hover:h-1 transition-all">
@@ -46,7 +46,7 @@ const Transport: React.FC<{ lineLabel: string; menuItems: MenuItem[]; menuPanel?
           className="absolute inset-0 !h-full opacity-0 cursor-pointer" aria-label={t('transport.seek')} />
       </div>
 
-      <div className="flex items-center gap-0.5 shrink-0">
+      <div className="flex items-center gap-0.5 shrink-0 -ml-2">
         <Btn square size="sm" flat onClick={() => actions.onSkip('prev')} title={t('transport.previousLine')}><SkipBack size={16} /></Btn>
         <Btn square size="sm" flat onClick={() => actions.onReplayCurrent()} title={t('transport.replayLine')}><RotateCcw size={16} /></Btn>
         <Btn square size="sm" flat onClick={actions.onTogglePlay} title={isPlaying ? t('transport.pauseSpace') : t('transport.playSpace')} className="!text-ink">
@@ -59,7 +59,7 @@ const Transport: React.FC<{ lineLabel: string; menuItems: MenuItem[]; menuPanel?
         {recording && <span className="blink text-accent">{t('transport.recordingBanner')}</span>}
       </div>
 
-      <div className="flex items-center gap-0.5 shrink-0">
+      <div className="flex items-center gap-0.5 shrink-0 -mr-2">
         <span className="px-2">{lineLabel}</span>
         <Btn square size="sm" flat onClick={actions.onToggleSaveCurrent} title={isCurrentSaved ? t('transport.unsaveLine') : t('transport.saveLine')} className={isCurrentSaved ? '!text-accent' : ''}>
           <Bookmark size={16} fill={isCurrentSaved ? 'currentColor' : 'none'} />
@@ -73,7 +73,7 @@ const Transport: React.FC<{ lineLabel: string; menuItems: MenuItem[]; menuPanel?
           {volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
         </Btn>
         <Menu up items={menuItems} footer={
-          <div className="mt-1.5 pt-3 px-3.5 pb-2 border-t border-line grid grid-cols-2 gap-x-5 gap-y-1.5 text-[11px]">
+          <div className="mt-1.5 pt-3 px-3.5 pb-2 border-t border-line grid grid-cols-2 gap-x-5 gap-y-1.5 text-xs">
             {[
               ...(learningMode === LearningMode.DICTATION ? t('transport.legendDictation') : t('transport.legend')).split(' · '),
               ...(learningMode === LearningMode.DICTATION ? [t('transport.legendTyping')] : []),

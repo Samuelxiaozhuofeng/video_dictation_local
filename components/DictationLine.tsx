@@ -19,6 +19,9 @@ interface Props {
   nextLabel?: string; // feedback's forward button; defaults to "next line"
 }
 
+// Typing and the answer share one setting, so submitting changes colours, not positions.
+export const LINE = 'flex flex-wrap items-baseline gap-x-[0.25em] font-serif text-[30px] leading-[42px]';
+
 const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay, onLookup, blanks, nextLabel }) => {
   const t = useT();
   const tokens = useMemo(() => tokenizeText(targetText), [targetText]);
@@ -140,11 +143,10 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
     return (
       <div className="w-full flex flex-col items-start gap-5">
         {/* The answer: click any word to look it up */}
-        <p className="font-serif text-[30px] leading-[42px]">
-          {targetText.split(/(\s+)/).map((part, i) =>
-            part.trim() === '' ? <span key={i}>{part}</span> : (
-              <button key={i} type="button" onClick={e => { e.currentTarget.blur(); lookup(part); }} className="rounded hover:mark-yellow px-0.5 -mx-0.5" title={t('common.lookup')}>{part}</button>
-            ))}
+        <p className={LINE}>
+          {targetText.split(/\s+/).filter(Boolean).map((part, i) => (
+            <button key={i} type="button" onClick={e => { e.currentTarget.blur(); lookup(part); }} className="rounded hover:mark-yellow" title={t('common.lookup')}>{part}</button>
+          ))}
         </p>
 
         {/* Yours, word by word */}
@@ -163,7 +165,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
                   </span>
                 ) : (
                   // Left blank: the same empty slot you saw while typing.
-                  <span title={t('dictation.expected', { word: r.targetWord })} className="inline-block align-baseline border-b-[1.5px] border-line" style={{ width: `${Math.max(2, r.targetWord.length) * 0.46}em`, height: '1em' }} />
+                  <span title={t('dictation.expected', { word: r.targetWord })} className="inline-block relative top-1 border-b-[1.5px] border-ink/25" style={{ width: `${Math.max(2, r.targetWord.length) * 0.46}em`, height: '1em' }} />
                 )}
                 <span className="text-mute">{g.punct}</span>
               </span>
@@ -179,7 +181,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
   // INPUT mode
   return (
     <div className="w-full">
-      <form onSubmit={submit} className="flex flex-wrap items-end gap-x-2.5 gap-y-2 font-serif text-[30px] leading-[42px]">
+      <form onSubmit={submit} className={LINE}>
         {groups.map(g => {
           const punct = g.punct && <span className="text-mute select-none">{g.punct}</span>;
           if (g.wi < 0) return <span key={g.key}>{punct}</span>;
@@ -190,10 +192,9 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
           }
           const ok = !!inputs[i] && isInputCorrectFlexibleCase(inputs[i], tk.value);
           return (
-            <span key={g.key} className="relative inline-flex items-end">
+            <span key={g.key} className="relative inline-flex items-baseline">
               {/* The slot grows with what you type; once the word is right it shrinks to fit, so the line reads like prose. */}
               <span className="inline-grid" style={{ minWidth: ok ? 0 : `${Math.max(2, tk.value.length) * 0.46 + 0.3}em` }}>
-                <span className="invisible whitespace-pre col-start-1 row-start-1 h-[42px]">{inputs[i] || ''}</span>
                 <input
                   ref={el => { refs.current[i] = el; }}
                   type="text"
@@ -202,9 +203,11 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
                   onChange={e => change(i, e.target.value)}
                   onKeyDown={e => keyDown(i, e)}
                   onPaste={paste}
-                  className={`col-start-1 row-start-1 w-full min-w-0 h-[42px] p-0 bg-transparent border-0 border-b-[1.5px] rounded-none font-serif text-ink caret-accent outline-none focus:outline-none focus-visible:outline-none ${ok ? 'border-transparent' : 'border-line focus:border-accent'}`}
+                  // A 34px box keeps the underline just under the letters (not under the descenders), so a comma or full stop sits on it.
+                  className={`col-start-1 row-start-1 w-full min-w-0 h-[34px] p-0 bg-transparent border-0 border-b-[1.5px] rounded-none font-serif text-ink caret-accent outline-none focus:outline-none focus-visible:outline-none ${ok ? 'border-transparent' : 'border-ink/25 focus:border-accent'}`}
                   autoComplete="off" autoCorrect="off" spellCheck={false}
                 />
+                <span className="invisible h-0 overflow-hidden whitespace-pre col-start-1 row-start-1">{inputs[i] || ''}</span>
               </span>
               {punct}
               {peek === i && (
