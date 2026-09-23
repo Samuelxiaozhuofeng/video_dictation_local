@@ -153,6 +153,7 @@ const Settings: React.FC = () => {
             Storage.saveAudioPaddingConfig(v);
             flashSaved();
           }}
+          onSaved={flashSaved}
         />
       )}
 

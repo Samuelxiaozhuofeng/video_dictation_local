@@ -21,7 +21,8 @@
 | `utils/desktop.ts` | **所有 Tauri 调用的唯一入口**：系统对话框、读字幕、路径是否存在、asset URL、拖放监听 |
 | `utils/videoStorage.ts` + `fileSystemAccess.ts` | 练习记录（IndexedDB） |
 | `utils/anki.ts` | AnkiConnect 请求（经 Tauri http 插件代发） |
-| `utils/aiConfig.ts` + `ai.ts` | AI 设置（用户自填 OpenAI 兼容地址 + key + 模型，无默认地址、无内置通道）与查词 |
+| `utils/aiConfig.ts` + `ai.ts` | AI 设置（用户自填 OpenAI 兼容地址 + key + 模型，无默认地址、无内置通道）与 AI 查词 |
+| `utils/dictionary.ts` | 词典查词（不用 AI）：按整段字幕认语言（英 / 西 / 法 / 德），查有道 JSON 或剑桥 / 欧路网页（借鉴 ODH）；每门语言用哪本存 localStorage `linguaclip_dict_choice`。查词顺序在 `Studio.tsx` 的 `lookup`：词典优先，查不到或英文界面且配了 AI 时走 AI |
 | `utils/breakdownPrep.ts` + `clozePrep.ts` | 拆句 / 挖空的后台任务（首页「…」、导入后自动做、练习页共用同一个任务），结果存 `~/Movies/LinguaClip/<id>.breakdown/cloze.json` |
 | `components/AddVideo.tsx`（添加视频弹窗）+ `utils/importJob.ts` + `src-tauri/src/import.rs` + `whisper_setup.rs` | 自带字幕 / 本地转录（首次自动下载转录组件）/ YouTube 下载，见 [import.md](import.md) |
 | `utils/i18n.*.ts` | 中 / 英文案，两份都要改 |

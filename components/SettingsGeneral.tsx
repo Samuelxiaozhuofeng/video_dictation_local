@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AudioPaddingConfig } from '../types';
 import { Field, Seg } from './ui';
 import { useT, Lang } from '../utils/i18n';
+import { DICT_OPTIONS, DictLang, getDictChoice, saveDictChoice } from '../utils/dictionary';
 
 interface SettingsGeneralProps {
   lang: Lang;
@@ -10,7 +11,29 @@ interface SettingsGeneralProps {
   setSectionLength: (value: number) => void;
   audioPadding: AudioPaddingConfig;
   setAudioPadding: (value: AudioPaddingConfig) => void;
+  onSaved: () => void;
 }
+
+const DictionaryPicker: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
+  const t = useT();
+  const [choice, setChoice] = useState(getDictChoice);
+  return (
+    <Field label={t('settingsGeneral.dictionary')} hint={t('settingsGeneral.dictionaryHint')}>
+      <div className="space-y-2.5">
+        {(Object.keys(DICT_OPTIONS) as DictLang[]).map(lang => (
+          <div key={lang} className="flex items-center gap-4">
+            <span className="w-20 text-sm text-mute">{t(`dict.${lang}`)}</span>
+            <Seg
+              options={DICT_OPTIONS[lang].map(v => ({ value: v, label: t(`dict.${v}`) }))}
+              value={choice[lang]}
+              onChange={v => { saveDictChoice(lang, v); setChoice(getDictChoice()); onSaved(); }}
+            />
+          </div>
+        ))}
+      </div>
+    </Field>
+  );
+};
 
 // Always shown as "中文" / "English" in their own language, regardless of the current UI language.
 const LANG_OPTS: { value: Lang; label: string }[] = [
@@ -25,6 +48,7 @@ const SettingsGeneral: React.FC<SettingsGeneralProps> = ({
   setSectionLength,
   audioPadding,
   setAudioPadding,
+  onSaved,
 }) => {
   const t = useT();
   const SECTION_OPTS = [
@@ -52,6 +76,8 @@ const SettingsGeneral: React.FC<SettingsGeneralProps> = ({
       >
         <Seg options={SECTION_OPTS} value={sectionLength} onChange={setSectionLength} className="flex-wrap" />
       </Field>
+
+      <DictionaryPicker onSaved={onSaved} />
 
       <Field
         label={t('settingsGeneral.startPadding')}

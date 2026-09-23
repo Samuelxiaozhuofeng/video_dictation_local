@@ -144,12 +144,12 @@ export const en = {
   'settingsAI.pickModel': 'Choose a model',
   'settingsAI.fetchFirst': 'Click "Fetch models" first',
   'settingsAI.model': 'Model',
-  'settingsAI.modelHint': 'Choose the model balancing speed vs quality of definitions.',
+  'settingsAI.modelHint': 'Choose the model balancing speed vs quality of AI explanations.',
   'settingsAI.temperature': 'Temperature',
   'settingsAI.temperatureHint': 'Lower values are more deterministic; higher values are more creative.',
   'settingsAI.promptTemplate': 'Prompt template',
   'settingsAI.reset': 'Reset',
-  'settingsAI.promptHint': 'Use {word} and {context} as placeholders. The response must still be compatible with the expected JSON schema (word, definition, partOfSpeech).',
+  'settingsAI.promptHint': 'Used to ask AI when you look up a word (and when the dictionary has no entry). Use {word} and {context} as placeholders. The response must still be compatible with the expected JSON schema (word, definition, partOfSpeech).',
   'settingsAI.promptPlaceholder': 'Enter prompt...',
 
   // --- SettingsAnki.tsx ---
@@ -172,17 +172,32 @@ export const en = {
   'settingsAnki.fieldScreenshot': 'Screenshot (Image)',
   'settingsAnki.fieldAudio': 'Audio (Clip)',
   'settingsAnki.fieldWord': 'Selected Word',
-  'settingsAnki.fieldDefinition': 'Word Definition (AI)',
+  'settingsAnki.fieldDefinition': 'Word Definition',
   'settingsAnki.fieldContext': 'Context (Sentence)',
 
   // --- DefinitionPanel.tsx ---
   'definition.ariaLabel': 'Word definition',
   'definition.heading': 'Definition',
-  'definition.asking': 'AI is looking it up…',
+  'definition.asking': 'Looking it up…',
   'definition.sendToAnki': 'Send to Anki',
   'definition.wordOnly': 'Word only',
   'definition.withAudio': 'With audio',
   'definition.emptyHint': 'Click a word in the subtitle to look it up.',
+  'definition.notFound': 'Not in the dictionary. Set up AI in Settings → AI to look up more.',
+  'definition.noDictLang': 'No dictionary for this language yet. Set up AI in Settings → AI to look words up.',
+  'definition.dictOffline': "Couldn't reach the dictionary. Check your connection and try again.",
+  'definition.explain': 'Explain in this sentence',
+  'definition.explaining': 'AI is explaining it in this sentence…',
+  'definition.inSentence': 'In this sentence',
+  'dict.youdao': 'Youdao',
+  'dict.cambridge': 'Cambridge',
+  'dict.eudic': 'Eudic',
+  'dict.en': 'English',
+  'dict.es': 'Spanish',
+  'dict.fr': 'French',
+  'dict.de': 'German',
+  'settingsGeneral.dictionary': 'Dictionary',
+  'settingsGeneral.dictionaryHint': "Which dictionary to use when you click a word; the video's language is detected from its subtitles. Dictionaries give Chinese definitions, so with an English interface and AI set up, words go straight to AI.",
 
   // --- BlurLine.tsx ---
   'blur.reveal': 'Reveal',
@@ -275,7 +290,7 @@ export const en = {
   'anki.refusedTitle': 'Anki refused the card',
 
   // --- utils/ai.ts ---
-  'ai.noKeyError': 'Fill in the API address, API key and model in Settings → AI to look up words.',
+  'ai.noKeyError': 'Fill in the API address, API key and model in Settings → AI to use AI explanations.',
   'ai.genericError': "Couldn't get a definition. Check your key and connection, then try again.",
   'home.addVideo': 'Add video',
   'home.continueMode': 'Continue · {mode}',

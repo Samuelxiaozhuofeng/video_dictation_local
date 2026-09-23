@@ -12,7 +12,8 @@ import Transport from './Transport';
 import SavedDrawer from './SavedDrawer';
 import DefinitionPanel, { DefinitionState, emptyDefinition } from './DefinitionPanel';
 import { tokenizeText, getWordTokens } from '../utils/textTokenizer';
-import { useT } from '../utils/i18n';
+import { useT, getLang } from '../utils/i18n';
+import { detectLang, lookupWord, DictEntry } from '../utils/dictionary';
 import { canCloze, pickBlanks } from '../utils/aiDrills';
 import { getClozeJob, prepareCloze, subscribeCloze } from '../utils/clozePrep';
 import { IS_WINDOWS } from '../utils/platform';
@@ -142,14 +143,47 @@ const Studio: React.FC = () => {
   const [def, setDef] = useState<DefinitionState>(emptyDefinition);
   const lookupSeq = useRef(0);
 
+  const dictLang = useMemo(() => detectLang(lineTexts), [lineTexts]);
+
+  // Dictionary first. AI answers instead when the dictionary has nothing (or no
+  // dictionary covers the language), and first when the UI is English, since
+  // the dictionaries only give Chinese.
   const lookup = async (word: string) => {
     const seq = ++lookupSeq.current;
-    setDef({ word, data: null, loading: true, failed: false });
+    const mine = () => seq === lookupSeq.current;
+    const context = currentSub?.text ?? '';
+    const ai = AI.aiReady();
+    setDef({ ...emptyDefinition, word, loading: true });
+    let dict: DictEntry[] | null = null;
+    let offline = false;
+    if (dictLang && !(ai && getLang() === 'en')) {
+      try { dict = await lookupWord(word, dictLang); } catch (e) { offline = true; console.error('Dictionary lookup failed:', e); }
+    }
+    if (!mine()) return;
+    if (dict) return setDef({ ...emptyDefinition, word, dict, context });
+    if (!ai) {
+      const error = t(offline ? 'definition.dictOffline' : dictLang ? 'definition.notFound' : 'definition.noDictLang');
+      return setDef({ ...emptyDefinition, word, failed: true, error });
+    }
     try {
-      const data = await AI.getWordDefinition(word, currentSub?.text ?? '');
-      if (seq === lookupSeq.current) setDef({ word, data, loading: false, failed: false });
+      const data = await AI.getWordDefinition(word, context);
+      if (mine()) setDef({ ...emptyDefinition, word, data });
     } catch (e) {
-      if (seq === lookupSeq.current) setDef({ word, data: null, loading: false, failed: true, error: (e as Error).message });
+      if (mine()) setDef({ ...emptyDefinition, word, failed: true, error: (e as Error).message });
+    }
+  };
+
+  // "Explain in this sentence" under a dictionary entry.
+  const explain = async () => {
+    const seq = lookupSeq.current;
+    const { word, context } = def;
+    if (!word) return;
+    setDef(d => ({ ...d, aiLoading: true, aiError: undefined }));
+    try {
+      const data = await AI.getWordDefinition(word, context ?? '');
+      if (seq === lookupSeq.current) setDef(d => ({ ...d, data, aiLoading: false }));
+    } catch (e) {
+      if (seq === lookupSeq.current) setDef(d => ({ ...d, aiLoading: false, aiError: (e as Error).message }));
     }
   };
   const closeDef = () => { lookupSeq.current++; setDef(emptyDefinition); };
@@ -332,7 +366,7 @@ const Studio: React.FC = () => {
 
       {showSavedList && <SavedDrawer />}
       {defOpen && (
-        <DefinitionPanel def={def} onClose={closeDef} onWordToAnki={actions.onWordToAnki} />
+        <DefinitionPanel def={def} onClose={closeDef} onWordToAnki={actions.onWordToAnki} onExplain={AI.aiReady() ? explain : undefined} />
       )}
     </div>
   );

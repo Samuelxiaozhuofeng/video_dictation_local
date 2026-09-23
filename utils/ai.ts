@@ -28,6 +28,9 @@ const readJson = (content: string): WordDefinition => {
     return { word: parsed.word ?? '', definition: parsed.definition, partOfSpeech: parsed.partOfSpeech ?? '' };
 };
 
+// Word lookup can use AI: the same check getWordDefinition makes before asking.
+export const aiReady = (): boolean => !!getEndpoint() && !!getAIConfig().model?.trim();
+
 export const getWordDefinition = async (word: string, context: string): Promise<WordDefinition> => {
     try {
         const endpoint = getEndpoint();

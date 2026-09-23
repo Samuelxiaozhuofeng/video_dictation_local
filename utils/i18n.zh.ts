@@ -145,12 +145,12 @@ export const zh: Record<keyof typeof en, string> = {
   'settingsAI.pickModel': '选择模型',
   'settingsAI.fetchFirst': '先点右上角「拉取模型」',
   'settingsAI.model': '模型',
-  'settingsAI.modelHint': '在查词速度和释义质量之间选一个平衡点。',
+  'settingsAI.modelHint': '在 AI 解释的速度和质量之间选一个平衡点。',
   'settingsAI.temperature': '随机度',
   'settingsAI.temperatureHint': '数值越低，结果越稳定；数值越高，结果越有创意。',
   'settingsAI.promptTemplate': '提示词模板',
   'settingsAI.reset': '重置',
-  'settingsAI.promptHint': '用 {word} 和 {context} 作为占位符。返回结果仍需符合约定的 JSON 结构（word、definition、partOfSpeech）。',
+  'settingsAI.promptHint': '查词弹窗里的「结合这句解释」，以及词典查不到时，用这段提示词问 AI。用 {word} 和 {context} 作为占位符。返回结果仍需符合约定的 JSON 结构（word、definition、partOfSpeech）。',
   'settingsAI.promptPlaceholder': '输入提示词...',
 
   // --- SettingsAnki.tsx ---
@@ -173,17 +173,32 @@ export const zh: Record<keyof typeof en, string> = {
   'settingsAnki.fieldScreenshot': '截图（图片）',
   'settingsAnki.fieldAudio': '音频（片段）',
   'settingsAnki.fieldWord': '选中的单词',
-  'settingsAnki.fieldDefinition': '单词释义（AI）',
+  'settingsAnki.fieldDefinition': '单词释义',
   'settingsAnki.fieldContext': '上下文（句子）',
 
   // --- DefinitionPanel.tsx ---
   'definition.ariaLabel': '单词释义',
   'definition.heading': '释义',
-  'definition.asking': 'AI 正在查词…',
+  'definition.asking': '正在查词…',
   'definition.sendToAnki': '发送到 Anki',
   'definition.wordOnly': '仅单词',
   'definition.withAudio': '带音频',
   'definition.emptyHint': '点击字幕里的单词即可查词。',
+  'definition.notFound': '词典里没有这个词。在 设置 → AI 配好 AI，可以查更多。',
+  'definition.noDictLang': '这门语言暂时没有词典。在 设置 → AI 配好 AI 就能查。',
+  'definition.dictOffline': '连不上词典，检查一下网络后重试。',
+  'definition.explain': '结合这句解释',
+  'definition.explaining': 'AI 正在结合这句解释…',
+  'definition.inSentence': '在这句里',
+  'dict.youdao': '有道',
+  'dict.cambridge': '剑桥',
+  'dict.eudic': '欧路',
+  'dict.en': '英语',
+  'dict.es': '西班牙语',
+  'dict.fr': '法语',
+  'dict.de': '德语',
+  'settingsGeneral.dictionary': '查词词典',
+  'settingsGeneral.dictionaryHint': '点字幕里的单词时用哪本词典，视频语言按字幕自动认。日语、中文等没有词典，配了 AI 会直接问 AI。',
 
   // --- BlurLine.tsx ---
   'blur.reveal': '显示',
@@ -276,7 +291,7 @@ export const zh: Record<keyof typeof en, string> = {
   'anki.refusedTitle': 'Anki 拒绝了这张卡片',
 
   // --- utils/ai.ts ---
-  'ai.noKeyError': '在 设置 → AI 中填好 API 地址、API Key 和模型才能查词。',
+  'ai.noKeyError': '在 设置 → AI 中填好 API 地址、API Key 和模型才能用 AI 解释。',
   'ai.genericError': '没能获取到释义，检查一下密钥和网络后重试。',
   'home.addVideo': '添加视频',
   'home.continueMode': '继续{mode}',
