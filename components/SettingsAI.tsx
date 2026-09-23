@@ -45,14 +45,14 @@ const ModelPicker: React.FC<{
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className={`${inputCls} font-mono`}
+      className={`${inputCls} min-w-0 font-mono`}
       placeholder={placeholder}
     />
     {models.length > 0 && (
       <select
         value={models.includes(value) ? value : ''}
         onChange={(e) => onChange(e.target.value)}
-        className={`${inputCls} w-32 shrink-0`}
+        className={`${inputCls} !w-36 shrink-0`}
       >
         <option value="">{pickLabel}</option>
         {models.map((m) => <option key={m} value={m}>{m}</option>)}
