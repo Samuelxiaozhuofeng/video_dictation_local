@@ -83,7 +83,7 @@ const Studio: React.FC = () => {
   // --- Break it down: the points on a clean voice, then the whole line on the video's ---
   // Only while typing a dictation line: leaving INPUT (feedback, a seek, a new
   // line) drops any breakdown, so a late AI answer cannot start one elsewhere.
-  const bd = useBreakdown(!isBlur && mode === PracticeMode.INPUT ? currentSub : undefined);
+  const bd = useBreakdown(!isBlur && mode === PracticeMode.INPUT ? currentSub : undefined, videoId);
   const bdActive = bd.state.status === 'active' ? bd.state : null;
   const bdStep = bdActive ? bdActive.steps[bdActive.step] : null;
   const bdLast = !!bdActive && bdActive.step === bdActive.steps.length - 1;

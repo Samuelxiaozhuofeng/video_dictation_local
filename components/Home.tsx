@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FileVideo, FileText, Pencil, EyeOff, Trash2, Clock, Loader2, Upload, KeyRound, RotateCw } from 'lucide-react';
+import { FileVideo, FileText, Pencil, EyeOff, Trash2, Clock, Loader2, Upload, KeyRound, RotateCw, Scissors, Check } from 'lucide-react';
 import { LearningMode, VideoRecord } from '../types';
 import * as VideoStorage from '../utils/videoStorage';
 import { getPracticeConfig } from '../utils/storage';
@@ -13,6 +13,8 @@ import { Btn, Card, Stamp, H, inputCls } from './ui';
 import { dialog } from './Dialog';
 import { useT, useLang } from '../utils/i18n';
 import ImportBox from './ImportBox';
+import { canCloze } from '../utils/aiDrills';
+import { cancelPrep, getPrepJob, prepStatus, prepareBreakdowns, subscribePrep } from '../utils/breakdownPrep';
 
 interface HomeProps {
   onResume: (record: VideoRecord, mode: LearningMode) => void | Promise<void>;
@@ -184,6 +186,11 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
   const [videos, setVideos] = useState<VideoRecord[] | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  // Breakdown prep per card: how many lines are still unprepared, and a tick
+  // that re-renders running jobs' progress.
+  const [prep, setPrep] = useState<Map<string, { eligible: number; missing: number }>>(new Map());
+  const [prepTick, setPrepTick] = useState(0);
+  const hasAi = canCloze();
 
   // Where each record sits in sections rather than in percent: "part 3 of 12"
   // is something you can finish, where "24%" of a long video never moves.
@@ -216,6 +223,21 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
     load();
     return subscribeImportJobs(load);
   }, []);
+
+  useEffect(() => subscribePrep(() => setPrepTick(n => n + 1)), []);
+  useEffect(() => {
+    if (!hasAi || !videos) return;
+    let cancelled = false;
+    const ready = videos.filter(v => !v.importJob && v.subtitleText && !getPrepJob(v.id));
+    Promise.all(ready.map(async v => [v.id, await prepStatus(v.id, v.subtitleText, lang)] as const))
+      .then(rows => { if (!cancelled) setPrep(new Map(rows)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [videos, lang, hasAi, prepTick]);
+
+  const handlePrep = (v: VideoRecord) => {
+    prepareBreakdowns(v.id, v.subtitleText, lang).catch(err => console.error(err));
+  };
 
   // Reimplements utils/videoStorage.ts's formatLastPracticed with translated output
   // (that file is out of i18n scope, so the formatting logic lives here instead).
@@ -263,6 +285,7 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
       { ok: t('home.deleteFileOk'), cancel: t('home.deleteFileKeep'), danger: true },
     );
     setDeletingId(v.id);
+    await cancelPrep(v.id);
     try {
       await VideoStorage.deleteVideoRecord(v.id);
       setVideos(prev => (prev ? prev.filter(x => x.id !== v.id) : prev));
@@ -313,6 +336,8 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
               const job = v.importJob;
               const pos = shelfPosition.get(v.id);
               const inParts = !!pos && pos.parts > 1;
+              const prepJob = hasAi && !job ? getPrepJob(v.id) : undefined;
+              const prepInfo = hasAi && !job && !prepJob ? prep.get(v.id) : undefined;
               return (
                 <Card key={v.id} className="p-5 flex flex-col gap-4">
                   <div className="flex items-start justify-between gap-3">
@@ -352,16 +377,34 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-mute">
                         <span>{t('home.linesCount', { current: pos?.line ?? v.currentSubtitleIndex, total: pos?.lines ?? v.totalSubtitles })}</span>
                         <span className="inline-flex items-center gap-1"><Clock size={12} /> {formatRelativeTime(v.lastPracticed)}</span>
+                        {prepInfo && prepInfo.eligible > 0 && prepInfo.missing === 0 && (
+                          <span className="inline-flex items-center gap-1 text-green"><Check size={12} /> {t('home.prepBreakdownReady')}</span>
+                        )}
                       </div>
+                      {prepJob && (
+                        <div className="flex flex-col gap-1.5">
+                          <p className="text-xs text-mute inline-flex items-center gap-1.5">
+                            <Loader2 size={12} className="animate-spin" /> {t('home.prepBreakdownRunning', { done: prepJob.done, total: prepJob.total || '…' })}
+                          </p>
+                          <Progress pct={prepJob.total ? (prepJob.done / prepJob.total) * 100 : 0} />
+                        </div>
+                      )}
                     </>
                   )}
                   <div className="flex items-center justify-between gap-3 pt-4 border-t border-line border-dashed">
                     {job ? <span /> : (
                       <ModeButtons last={v.learningMode ?? LearningMode.DICTATION} onPick={m => onResume(v, m)} />
                     )}
-                    <Btn square flat tone="white" onClick={() => handleDelete(v)} disabled={deletingId === v.id} title={t('home.deleteRecordTitle')} className="hover:!bg-rose-soft hover:!text-rose">
-                      {deletingId === v.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                    </Btn>
+                    <div className="flex items-center gap-2">
+                      {prepInfo && prepInfo.missing > 0 && (
+                        <Btn flat tone="white" onClick={() => handlePrep(v)} title={t('home.prepBreakdownTitle')}>
+                          <Scissors size={14} /> {prepInfo.missing < prepInfo.eligible ? t('home.prepBreakdownMore', { n: prepInfo.missing }) : t('home.prepBreakdown')}
+                        </Btn>
+                      )}
+                      <Btn square flat tone="white" onClick={() => handleDelete(v)} disabled={deletingId === v.id} title={t('home.deleteRecordTitle')} className="hover:!bg-rose-soft hover:!text-rose">
+                        {deletingId === v.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                      </Btn>
+                    </div>
                   </div>
                 </Card>
               );

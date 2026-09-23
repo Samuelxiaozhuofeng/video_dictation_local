@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Subtitle } from '../types';
-import { BreakdownStep, askBreakdown, buildSteps, spaceWords } from '../utils/aiDrills';
+import { BREAKDOWN_MIN_WORDS, BreakdownStep, askBreakdown, buildSteps, spaceWords } from '../utils/aiDrills';
+import { cachedBreakdown } from '../utils/breakdownPrep';
 import { Clip, loadClip, playClip, releaseClip, stopClip } from '../utils/speech';
 import { getLang } from '../utils/i18n';
 
 // "Break it down" for the current line: the AI picks 1–3 points, each practised
 // on a clean read-aloud clip, then the whole line on the video's own audio.
 // It never touches progress: the line index only moves when the user finishes
-// the last step and Studio calls onContinue.
-
-const MIN_WORDS = 5;
+// the last step and Studio calls onContinue. A line prepared from the shelf
+// (utils/breakdownPrep.ts) skips the AI wait; only its clips are made here.
 
 export type BreakdownState =
   | { status: 'idle' }
@@ -17,7 +17,7 @@ export type BreakdownState =
   | { status: 'failed'; lineId: number }
   | { status: 'active'; lineId: number; steps: BreakdownStep[]; clips: Clip[]; step: number; reviewing: boolean };
 
-export function useBreakdown(currentSub: Subtitle | undefined) {
+export function useBreakdown(currentSub: Subtitle | undefined, recordId: string | null) {
   const [state, setState] = useState<BreakdownState>({ status: 'idle' });
   const seq = useRef(0);
   const clips = useRef<Clip[]>([]);
@@ -34,14 +34,15 @@ export function useBreakdown(currentSub: Subtitle | undefined) {
   useEffect(() => { reset(); }, [lineId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => reset, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const tooShort = !!currentSub && spaceWords(currentSub.text).length < MIN_WORDS;
+  const tooShort = !!currentSub && spaceWords(currentSub.text).length < BREAKDOWN_MIN_WORDS;
 
   const start = async () => {
     if (!currentSub || tooShort) return;
     const id = currentSub.id;
     const mine = ++seq.current;
     setState({ status: 'loading', lineId: id });
-    const result = await askBreakdown(spaceWords(currentSub.text), getLang());
+    const prepared = recordId ? await cachedBreakdown(recordId, currentSub.text) : null;
+    const result = prepared ?? await askBreakdown(spaceWords(currentSub.text), getLang());
     if (mine !== seq.current) return;
     if (!result) { setState({ status: 'failed', lineId: id }); return; }
     const steps = buildSteps(currentSub.text, result.points);

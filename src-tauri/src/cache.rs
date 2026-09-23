@@ -18,7 +18,7 @@ fn valid_id(id: &str) -> bool {
 }
 
 fn valid_kind(kind: &str) -> bool {
-  kind == "words" || kind == "cloze"
+  kind == "words" || kind == "cloze" || kind == "breakdown"
 }
 
 fn cache_path(id: &str, kind: &str) -> Result<PathBuf, String> {
@@ -65,9 +65,10 @@ mod tests {
   }
 
   #[test]
-  fn only_words_and_cloze_kinds() {
+  fn only_known_cache_kinds() {
     assert!(valid_kind("words"));
     assert!(valid_kind("cloze"));
+    assert!(valid_kind("breakdown"));
     assert!(!valid_kind("json"));
     assert!(!valid_kind("cloze.json"));
     assert!(!valid_kind("../cloze"));

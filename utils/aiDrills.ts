@@ -110,7 +110,7 @@ export function pickBlanks(ranked: number[] | null | undefined, wordCount: numbe
 
 type Router = { baseUrl: string; apiKey: string; model: string };
 
-function clozeRouter(): Router | null {
+export function clozeRouter(): Router | null {
   const viaSegment = getRouter();
   if (viaSegment) return viaSegment;
   const endpoint = getEndpoint();
@@ -240,6 +240,8 @@ export async function loadOrBuildCloze(opts: {
 // One short line, and the user is sitting there waiting on it.
 const BREAKDOWN_TIMEOUT_MS = 30_000;
 const MAX_POINT_WORDS = 6;
+// Shorter lines are just dictated whole; no point asking about them.
+export const BREAKDOWN_MIN_WORDS = 5;
 
 export type BreakdownPoint = { from: number; to: number; note: string }; // words[from..to], inclusive
 export type Breakdown = { lang: string; points: BreakdownPoint[] };
@@ -289,21 +291,26 @@ export function buildSteps(lineText: string, points: BreakdownPoint[]): Breakdow
   ];
 }
 
-function breakdownPrompt(words: string[], lang: 'zh' | 'en'): string {
-  const listing = words.map((w, i) => `${i}\t${w}`).join('\n');
+// The rules shared by the one-line prompt and the batch one (utils/breakdownPrep.ts).
+export function breakdownRules(lang: 'zh' | 'en'): string {
   const noteLang = lang === 'zh' ? '简体中文' : 'English';
   const example = lang === 'zh'
     ? '"was looking for：过去进行时 + look for（寻找），和后面的 when I saw 连用，表示「正在找的时候，突然看到」"'
     : '"was looking for: past continuous + look for (search for); paired with the later when I saw, it means \'in the middle of searching, suddenly saw\'"';
+  return `- lang：这句话所用语言的 ISO 639-1 两字母小写代码（en、es、fr…）。
+- from / to：这个点在句中连续的第一个和最后一个词的序号（含两端），最多 ${MAX_POINT_WORDS} 个词，不能是整句。按句中顺序排列，互不重叠。
+- 如果一个结构在句中是断开的（如 was …ing … when …），只选其中最核心的连续几个词，在 note 里把整个结构讲清楚。
+- note：用一两句简短的${noteLang}讲这个点的意思和用法，讲到语法结构这一层，例如 ${example}。
+- JSON 以外不要输出任何文字。`;
+}
+
+function breakdownPrompt(words: string[], lang: 'zh' | 'en'): string {
+  const listing = words.map((w, i) => `${i}\t${w}`).join('\n');
   return `下面是一句口语转录，按「序号<TAB>词」列出，共 ${words.length} 个词。
 
 挑出这句里最值得学的 1 到 3 个点：固定搭配、短语动词、从句、时态或其他语法结构。
 只输出 JSON，格式：{"lang":"en","points":[{"from":1,"to":3,"note":"…"},{"from":6,"to":9,"note":"…"}]}
-- lang：这句话所用语言的 ISO 639-1 两字母小写代码（en、es、fr…）。
-- from / to：这个点在句中连续的第一个和最后一个词的序号（含两端），最多 ${MAX_POINT_WORDS} 个词，不能是整句。按句中顺序排列，互不重叠。
-- 如果一个结构在句中是断开的（如 was …ing … when …），只选其中最核心的连续几个词，在 note 里把整个结构讲清楚。
-- note：用一两句简短的${noteLang}讲这个点的意思和用法，讲到语法结构这一层，例如 ${example}。
-- JSON 以外不要输出任何文字。
+${breakdownRules(lang)}
 
 ${listing}`;
 }

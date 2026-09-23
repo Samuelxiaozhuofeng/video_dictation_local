@@ -58,7 +58,7 @@ export async function listenDragDrop(handler: DragDropHandler): Promise<Unlisten
   });
 }
 
-export type CacheKind = 'words' | 'cloze';
+export type CacheKind = 'words' | 'cloze' | 'breakdown';
 
 export async function cacheFilePath(id: string, kind: CacheKind): Promise<string> {
   const home = await homeDir();
@@ -81,7 +81,7 @@ export async function writeCacheText(id: string, kind: CacheKind, text: string):
 
 // Files that belong to a record besides the video: its .srt (generated ones sit
 // in ~/Movies/LinguaClip, hand-picked ones usually beside the video) and our
-// word/cloze caches. Only paths that exist.
+// word/cloze/breakdown caches. Only paths that exist.
 export async function relatedFilePaths(id: string, videoPath: string, subtitleFileName: string): Promise<string[]> {
   const home = await homeDir();
   const ours = await join(home, 'Movies', 'LinguaClip');
@@ -89,6 +89,7 @@ export async function relatedFilePaths(id: string, videoPath: string, subtitleFi
   const candidates = [
     await cacheFilePath(id, 'words'),
     await cacheFilePath(id, 'cloze'),
+    await cacheFilePath(id, 'breakdown'),
     ...(subtitleFileName ? [await join(ours, subtitleFileName), await join(videoDir, subtitleFileName)] : []),
   ];
   const unique = [...new Set(candidates)];
