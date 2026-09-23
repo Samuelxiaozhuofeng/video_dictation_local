@@ -18,14 +18,16 @@ const FIXTURE = `${__DEV_HOME__}/Movies/LinguaClip/Me at the zoo [jNQXAC9IVRw]`;
 const fsUrl = (path: string) => '/@fs' + path.split('/').map(encodeURIComponent).join('/');
 const cache = new Map<string, string>(); // write_cache stays in memory
 
+type Args = Record<string, any>;
+
 const mock = {
   pick: null as string | null,
+  // set to (args) => ArrayBuffer to fake Edge TTS; unset = null = system voice
+  tts: null as ((args: Args) => unknown) | null,
   calls: [] as { cmd: string; args: unknown }[],
   emit,
 };
 (window as any).__MOCK__ = mock;
-
-type Args = Record<string, any>;
 
 async function handle(cmd: string, args: Args): Promise<unknown> {
   switch (cmd) {
@@ -57,6 +59,8 @@ async function handle(cmd: string, args: Args): Promise<unknown> {
       return null;
     case 'trash_file':
       return null; // recorded in __MOCK__.calls; real files untouched
+    case 'tts':
+      return mock.tts ? mock.tts(args) : null;
     case 'probe_import_sizes':
       return { '1080': null, '720': null, '480': null };
     default:

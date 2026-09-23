@@ -80,21 +80,22 @@ const Studio: React.FC = () => {
     return () => { cancelled = true; };
   }, [isBlur, effectiveLevel, rankedLines, lineTexts, clozeKey]);
 
-  // --- Break it down: practise the line's tail first, growing back to the whole line ---
+  // --- Break it down: the points on a clean voice, then the whole line on the video's ---
   // Only while typing a dictation line: leaving INPUT (feedback, a seek, a new
   // line) drops any breakdown, so a late AI answer cannot start one elsewhere.
-  const bd = useBreakdown(videoId, fullSubtitles, !isBlur && mode === PracticeMode.INPUT ? currentSub : undefined);
+  const bd = useBreakdown(!isBlur && mode === PracticeMode.INPUT ? currentSub : undefined);
   const bdActive = bd.state.status === 'active' ? bd.state : null;
   const bdStep = bdActive ? bdActive.steps[bdActive.step] : null;
   const bdLast = !!bdActive && bdActive.step === bdActive.steps.length - 1;
   // The last step is the whole line: finishing it moves on like a normal line.
   const bdNext = () => { if (!bd.next()) { bd.cancel(); actions.onContinue(); } };
+  const bdReplay = () => { if (!bd.play()) actions.onReplayCurrent(); };
 
   useEffect(() => {
-    actions.onSetStepStart(bdStep ? bdStep.startSec : null);
-    if (bdStep) actions.onPlayFrom(bdStep.startSec);
+    actions.onSetStepReplay(bdStep && !bdLast ? () => bd.play() : null);
+    if (bdStep) bdReplay();
   }, [bdStep]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => () => actions.onSetStepStart(null), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => actions.onSetStepReplay(null), []); // eslint-disable-line react-hooks/exhaustive-deps
   // A correct line is replaying on its way to the next one; stop it so that
   // auto-advance does not swallow the breakdown the user just asked for.
   const startBreakdown = () => { if (isPlaying) actions.onTogglePlay(); bd.start(); };
@@ -230,6 +231,7 @@ const Studio: React.FC = () => {
               <div className="w-full flex flex-col items-center gap-3">
                 <div className="flex items-center gap-2">
                   <Stamp tone="green-soft"><Scissors size={12} /> {t('studio.breakdownStep', { current: bdActive.step + 1, total: bdActive.steps.length })}</Stamp>
+                  <span className="text-[11px] text-mute">{bdLast ? t('studio.breakdownOriginal') : t('studio.breakdownClean')}</span>
                   <Btn size="sm" flat onClick={bd.cancel} title={t('studio.breakdownQuitTitle')}>{t('studio.breakdownQuit')}</Btn>
                 </div>
                 <DictationLine
@@ -237,13 +239,13 @@ const Studio: React.FC = () => {
                   targetText={bdStep.text}
                   mode={bdActive.reviewing ? PracticeMode.FEEDBACK : PracticeMode.INPUT}
                   onComplete={() => (bdActive.reviewing ? bdNext() : bd.review())}
-                  onReplay={allRight => { if (allRight) bd.review(); actions.onPlayFrom(bdStep.startSec); }}
+                  onReplay={allRight => { if (allRight) bd.review(); bdReplay(); }}
                   onLookup={lookup}
                   nextLabel={bdLast ? undefined : t('dictation.nextStep')}
                 />
-                {bdActive.reviewing && (
-                  <p className="max-w-2xl text-center text-sm sm:text-base text-ink/80 bg-paper border border-line rounded-md px-3 py-1.5 fade-in">{bdActive.notes[bdStep.chunk]}</p>
-                )}
+                {bdActive.reviewing && (bdLast ? bdActive.steps.slice(0, -1) : [bdStep]).map(s => (
+                  <p key={s.text} className="max-w-2xl text-center text-sm sm:text-base text-ink/80 bg-paper border border-line rounded-md px-3 py-1.5 fade-in">{s.note}</p>
+                ))}
               </div>
             ) : mode === PracticeMode.LISTENING ? (
               <ListeningGhost text={currentSub.text} blanks={blanks} />
@@ -257,7 +259,7 @@ const Studio: React.FC = () => {
                   onReplay={actions.onReplayCurrent}
                   onLookup={lookup}
                 />
-                {bd.available && mode === PracticeMode.INPUT && (
+                {mode === PracticeMode.INPUT && (
                   <div className="mt-1 flex justify-center items-center gap-2 text-[11px] text-mute">
                     <Btn
                       size="sm" flat className="!text-mute disabled:opacity-40"

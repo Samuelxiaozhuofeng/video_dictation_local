@@ -199,29 +199,18 @@ export default function App() {
     videoPlayerHandleProgressSeek,
   });
 
-  // Plays from `start` to the current line's own end (the end-of-line check
-  // pauses there); used by "break it down" to play the tail of a line.
-  const playFrom = useCallback((start: number) => {
-    const video = videoRef.current;
-    if (!video) return;
-    setShouldAutoAdvance(false);
-    video.currentTime = start;
-    setIsPlaying(true);
-    video.play().catch(e => { console.error('Play blocked', e); setIsPlaying(false); });
-  }, [videoRef, setIsPlaying, setShouldAutoAdvance]);
-
   // While "break it down" is on, every way of replaying (Shift+Space, Space,
-  // the transport's replay button) replays the current step, not the whole line.
-  const stepStartRef = useRef<number | null>(null);
-  const setStepStart = useCallback((start: number | null) => { stepStartRef.current = start; }, []);
+  // the transport's replay button) plays the current step's clip instead.
+  const stepReplayRef = useRef<(() => void) | null>(null);
+  const setStepReplay = useCallback((play: (() => void) | null) => { stepReplayRef.current = play; }, []);
   const replayCurrent = useCallback((autoAdvanceAfter?: boolean) => {
-    if (stepStartRef.current !== null) playFrom(stepStartRef.current);
+    if (stepReplayRef.current) stepReplayRef.current();
     else handleReplayCurrent(autoAdvanceAfter);
-  }, [playFrom, handleReplayCurrent]);
+  }, [handleReplayCurrent]);
   const togglePlayOrStep = useCallback(() => {
-    if (stepStartRef.current !== null && !isPlaying) playFrom(stepStartRef.current);
+    if (stepReplayRef.current && !isPlaying) stepReplayRef.current();
     else togglePlay();
-  }, [playFrom, togglePlay, isPlaying]);
+  }, [togglePlay, isPlaying]);
 
   const exitPractice = () => { setShowComplete(false); setAppState(AppState.UPLOAD); };
 
@@ -287,8 +276,7 @@ export default function App() {
         onToggleSavedList: setShowSavedList,
         onTogglePlay: togglePlayOrStep,
         onReplayCurrent: replayCurrent,
-        onPlayFrom: playFrom,
-        onSetStepStart: setStepStart,
+        onSetStepReplay: setStepReplay,
         onSkip: handleSkip,
         onProgressSeek: handleProgressSeek,
         onToggleSaveCurrent: toggleSaveCurrent,

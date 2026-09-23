@@ -1,5 +1,6 @@
 mod cache;
 mod import;
+mod tts;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -23,6 +24,7 @@ pub fn run() {
       import::open_youtube_login,
       import::probe_import_sizes,
       cache::write_cache,
+      tts::tts,
       trash_file
     ])
     .run(tauri::generate_context!())

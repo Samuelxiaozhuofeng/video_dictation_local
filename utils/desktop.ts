@@ -100,3 +100,14 @@ export async function relatedFilePaths(id: string, videoPath: string, subtitleFi
 export async function trashFile(path: string): Promise<void> {
   await invoke('trash_file', { path });
 }
+
+// Edge "Read aloud" voice through Rust (src-tauri/src/tts.rs). MP3 bytes, or
+// null when it fails (offline, blocked, Microsoft changed the check).
+export async function synthesizeSpeech(text: string, voice: string): Promise<ArrayBuffer | null> {
+  try {
+    const bytes = await invoke<ArrayBuffer | null>('tts', { text, voice });
+    return bytes && bytes.byteLength > 0 ? bytes : null;
+  } catch {
+    return null;
+  }
+}

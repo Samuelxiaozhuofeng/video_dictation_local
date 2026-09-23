@@ -27,3 +27,12 @@ tauri-plugin-dialog = "2.7.3"
 tauri-plugin-http = "=2.6.1"
 tauri-plugin-fs = "2.5.2"
 tauri-plugin-opener = "2.5.5"
+reqwest-websocket = "0.5"
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+tokio = { version = "1", features = ["time"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

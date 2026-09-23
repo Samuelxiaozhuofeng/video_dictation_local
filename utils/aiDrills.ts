@@ -232,29 +232,41 @@ export async function loadOrBuildCloze(opts: {
   return result;
 }
 
-// --- Break it down: split one line into 2–3 chunks ---
-// The model returns chunk START indices into the line's word list plus one
-// note per chunk. The notes are the only free text it writes and are never
+// --- Break it down: pick the 1–3 things worth learning in one line ---
+// The model returns word-index ranges into the line (split on spaces) plus one
+// note per point. The notes are the only free text it writes and are never
 // used to locate anything; any rule broken below throws the whole answer out.
 
 // One short line, and the user is sitting there waiting on it.
 const BREAKDOWN_TIMEOUT_MS = 30_000;
+const MAX_POINT_WORDS = 6;
 
-export type Breakdown = { starts: number[]; notes: string[] };
+export type BreakdownPoint = { from: number; to: number; note: string }; // words[from..to], inclusive
+export type Breakdown = { lang: string; points: BreakdownPoint[] };
+
+// Lines are split on spaces, not tokenizeText: punctuation stays on its word
+// ("Mary."), so a point's text is exactly what the user sees in the line.
+export function spaceWords(text: string): string[] {
+  return text.trim().split(/\s+/).filter(Boolean);
+}
 
 export function validateBreakdown(value: unknown, wordCount: number): Breakdown | null {
-  const v = value as { starts?: unknown; notes?: unknown } | null;
-  if (!v || !Array.isArray(v.starts) || !Array.isArray(v.notes)) return null;
-  const { starts, notes } = v as { starts: unknown[]; notes: unknown[] };
-  if (starts.length < 2 || starts.length > 3 || notes.length !== starts.length) return null;
-  if (starts[0] !== 0) return null;
-  for (let i = 0; i < starts.length; i++) {
-    const s = starts[i];
-    if (!Number.isInteger(s) || (s as number) < 0 || (s as number) >= wordCount) return null;
-    if (i > 0 && (s as number) <= (starts[i - 1] as number)) return null;
+  const v = value as { lang?: unknown; points?: unknown } | null;
+  if (!v || typeof v.lang !== 'string' || !/^[a-z]{2}$/.test(v.lang) || !Array.isArray(v.points)) return null;
+  if (v.points.length < 1 || v.points.length > 3) return null;
+  const points: BreakdownPoint[] = [];
+  let prevTo = -1;
+  for (const p of v.points as unknown[]) {
+    const { from, to, note } = (p ?? {}) as { from?: unknown; to?: unknown; note?: unknown };
+    if (!Number.isInteger(from) || !Number.isInteger(to)) return null;
+    const f = from as number, t = to as number;
+    if (f <= prevTo || t < f || t >= wordCount || t - f + 1 > MAX_POINT_WORDS) return null;
+    if (t - f + 1 >= wordCount) return null; // the whole line is the last step anyway
+    if (typeof note !== 'string' || !note.trim()) return null;
+    points.push({ from: f, to: t, note: note.trim() });
+    prevTo = t;
   }
-  if (notes.some(n => typeof n !== 'string' || !n.trim())) return null;
-  return { starts: starts as number[], notes: (notes as string[]).map(n => n.trim()) };
+  return { lang: v.lang, points };
 }
 
 export function parseBreakdownResponse(content: string, wordCount: number): Breakdown | null {
@@ -265,16 +277,32 @@ export function parseBreakdownResponse(content: string, wordCount: number): Brea
   try { return validateBreakdown(JSON.parse(match[0]), wordCount); } catch { return null; }
 }
 
+// One step per point in sentence order, then the whole line. Only the whole
+// line has no note: it is practised on the video's own audio.
+export type BreakdownStep = { text: string; note: string | null };
+
+export function buildSteps(lineText: string, points: BreakdownPoint[]): BreakdownStep[] {
+  const words = spaceWords(lineText);
+  return [
+    ...points.map(p => ({ text: words.slice(p.from, p.to + 1).join(' '), note: p.note })),
+    { text: lineText, note: null },
+  ];
+}
+
 function breakdownPrompt(words: string[], lang: 'zh' | 'en'): string {
   const listing = words.map((w, i) => `${i}\t${w}`).join('\n');
   const noteLang = lang === 'zh' ? '简体中文' : 'English';
-  const example = lang === 'zh' ? '"looking for = 寻找"' : '"looking for = searching for"';
+  const example = lang === 'zh'
+    ? '"was looking for：过去进行时 + look for（寻找），和后面的 when I saw 连用，表示「正在找的时候，突然看到」"'
+    : '"was looking for: past continuous + look for (search for); paired with the later when I saw, it means \'in the middle of searching, suddenly saw\'"';
   return `下面是一句口语转录，按「序号<TAB>词」列出，共 ${words.length} 个词。
 
-把它切成 2 到 3 块，切在意群的自然边界（从句、介词短语、停顿处），不要劈开固定搭配（如 tengo que、looking for）。
-只输出 JSON，格式：{"starts":[0,6,9],"notes":["…","…","…"]}
-- starts：每块第一个词的序号。第一个必须是 0，严格递增，都小于 ${words.length}。
-- notes：与 starts 一一对应，每条用一句简短的${noteLang}说明这一块的意思或用法，例如 ${example}。
+挑出这句里最值得学的 1 到 3 个点：固定搭配、短语动词、从句、时态或其他语法结构。
+只输出 JSON，格式：{"lang":"en","points":[{"from":1,"to":3,"note":"…"},{"from":6,"to":9,"note":"…"}]}
+- lang：这句话所用语言的 ISO 639-1 两字母小写代码（en、es、fr…）。
+- from / to：这个点在句中连续的第一个和最后一个词的序号（含两端），最多 ${MAX_POINT_WORDS} 个词，不能是整句。按句中顺序排列，互不重叠。
+- 如果一个结构在句中是断开的（如 was …ing … when …），只选其中最核心的连续几个词，在 note 里把整个结构讲清楚。
+- note：用一两句简短的${noteLang}讲这个点的意思和用法，讲到语法结构这一层，例如 ${example}。
 - JSON 以外不要输出任何文字。
 
 ${listing}`;

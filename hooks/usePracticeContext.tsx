@@ -44,8 +44,7 @@ export interface PracticeContextActions {
   onToggleSavedList: (show: boolean) => void;
   onTogglePlay: () => void;
   onReplayCurrent: (autoAdvanceAfter?: boolean) => void;
-  onPlayFrom: (startSec: number) => void; // plays to the current line's end
-  onSetStepStart: (startSec: number | null) => void; // non-null: replays play from here
+  onSetStepReplay: (play: (() => void) | null) => void; // non-null: replays call this instead
   onSkip: (direction: 'prev' | 'next') => void;
   onProgressSeek: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onToggleSaveCurrent: () => void;
