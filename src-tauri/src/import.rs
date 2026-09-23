@@ -634,7 +634,10 @@ fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str, quality: u32)
   let work = dir.join(id);
   let wav = work.with_extension("wav");
   let json = work.with_extension("json");
-  let srt = dir.join(file_stem).with_extension("srt");
+  // Append, not with_extension: a title like "Chinese... [id]" has dots in it.
+  let mut srt_name = file_stem.to_os_string();
+  srt_name.push(".srt");
+  let srt = dir.join(srt_name);
 
   emit(app, ImportProgress::stage(id, "extract", None));
   extract_wav(&video, &wav)?;
