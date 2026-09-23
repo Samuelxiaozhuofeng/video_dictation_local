@@ -186,7 +186,8 @@ fn parse_download_pct(line: &str) -> Option<u32> {
 fn parse_whisper_pct(line: &str) -> Option<u32> {
   let marker = "progress = ";
   let pos = line.rfind(marker)?;
-  let rest = &line[pos + marker.len()..];
+  // whisper pads the number: "progress =  42%".
+  let rest = line[pos + marker.len()..].trim_start();
   let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
   let v: u32 = digits.parse().ok()?;
   Some(v.min(100))
@@ -794,6 +795,12 @@ fn probe_sizes_blocking(url: String) -> Result<QualitySizes, String> {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn reads_padded_whisper_progress() {
+    assert_eq!(parse_whisper_pct("whisper_print_progress_callback: progress =  42%"), Some(42));
+    assert_eq!(parse_whisper_pct("whisper_print_progress_callback: progress = 100%"), Some(100));
+  }
 
   // With VAD on, whisper reports segment times on the original audio clock but
   // leaves token times on the silence-stripped one. Unmapped, the gap grows all
