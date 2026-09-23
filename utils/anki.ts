@@ -55,7 +55,16 @@ export const invokeAnki = async (action: string, params: any = {}, url: string =
       body: JSON.stringify({ action, version: 6, params }),
     });
     
-    const result = await response.json();
+    // res.json() on the Tauri http plugin's response throws WebKit's bare "string
+    // did not match the expected pattern" in the desktop app; parse the text
+    // ourselves and keep what came back, so a real failure says what it got.
+    const raw = await response.text();
+    let result: any;
+    try {
+      result = JSON.parse(raw);
+    } catch {
+      throw new Error(`HTTP ${response.status}: ${raw.slice(0, 120) || '(empty body)'}`);
+    }
     
     if (result.error) {
       throw new Error(result.error);
