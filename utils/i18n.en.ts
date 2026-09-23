@@ -124,6 +124,7 @@ export const en = {
 
   // --- SettingsAI.tsx ---
   'settingsAI.apiKey': 'API Key',
+  'settingsAI.apiKeyBad': 'The key contains spaces or other characters a key cannot have, so it will not work. Clear it and paste your key again.',
   'settingsAI.apiKeyHint': 'Get a key from your AI provider. Stored on this computer only.',
   'settingsAI.apiKeyPlaceholder': 'Enter your API key...',
   'settingsAI.baseUrl': 'API base URL (OpenAI-compatible)',

@@ -45,10 +45,15 @@ export const readJsonBody = async <T,>(res: Response): Promise<T> => {
 
 export type Endpoint = { baseUrl: string; apiKey: string };
 
+// A key is printable ASCII with no spaces. Anything else (a pasted sentence, a
+// stray space) cannot even go into a request header — the webview throws a bare
+// "Type error" — so such a key counts as not set, and Settings says why.
+export const isBadKey = (key: string): boolean => /[^\x21-\x7e]/.test(key);
+
 export const getEndpoint = (): Endpoint | null => {
   const config = getAIConfig();
   const baseUrl = normalizeBaseUrl(config.baseUrl);
-  if (!config.apiKey || !baseUrl) return null;
+  if (!config.apiKey || !baseUrl || isBadKey(config.apiKey)) return null;
   return { baseUrl, apiKey: config.apiKey };
 };
 

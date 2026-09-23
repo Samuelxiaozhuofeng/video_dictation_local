@@ -83,7 +83,8 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
   const [models, setModels] = useState<string[]>(() => AI.getCachedModels());
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState('');
-  const aiReady = !!(aiApiKey && aiBaseUrl.trim() && (aiModel.trim() || aiSegmentModel.trim()));
+  const badKey = AI.isBadKey(aiApiKey);
+  const aiReady = !!(aiApiKey && !badKey && aiBaseUrl.trim() && (aiModel.trim() || aiSegmentModel.trim()));
 
   const fetchModels = async () => {
     setFetching(true);
@@ -102,7 +103,7 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
     <div className="space-y-6">
       <Field
         label={t('settingsAI.apiKey')}
-        hint={t('settingsAI.apiKeyHint')}
+        hint={badKey ? <span className="text-ink">{t('settingsAI.apiKeyBad')}</span> : t('settingsAI.apiKeyHint')}
       >
         <input
           type="password"
@@ -127,7 +128,7 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
         <Field
           label={t('settingsAI.model')}
           right={
-            <Btn type="button" size="sm" flat disabled={!aiApiKey || !aiBaseUrl.trim() || fetching} onClick={() => void fetchModels()}>
+            <Btn type="button" size="sm" flat disabled={!aiApiKey || badKey || !aiBaseUrl.trim() || fetching} onClick={() => void fetchModels()}>
               {fetching ? t('settingsAI.fetching') : t('settingsAI.fetchModels')}
             </Btn>
           }

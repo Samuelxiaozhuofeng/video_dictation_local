@@ -125,6 +125,7 @@ export const zh: Record<keyof typeof en, string> = {
 
   // --- SettingsAI.tsx ---
   'settingsAI.apiKey': 'API Key',
+  'settingsAI.apiKeyBad': '密钥里混进了空格或中文等字符，用不了。请清空后重新粘贴你的密钥。',
   'settingsAI.apiKeyHint': '向你的 AI 服务商获取密钥，仅保存在本机。',
   'settingsAI.apiKeyPlaceholder': '输入你的 API Key...',
   'settingsAI.baseUrl': 'API 地址（OpenAI 兼容）',

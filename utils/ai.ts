@@ -2,7 +2,7 @@ import { fetch } from '@tauri-apps/plugin-http';
 import { t } from './i18n';
 import { getAIConfig, getEndpoint, readJsonBody, DEFAULT_PROMPT } from './aiConfig';
 
-export { getAIConfig, saveAIConfig, listModels, getCachedModels, DEFAULT_PROMPT } from './aiConfig';
+export { getAIConfig, saveAIConfig, listModels, getCachedModels, isBadKey, DEFAULT_PROMPT } from './aiConfig';
 
 export interface WordDefinition {
     word: string;
