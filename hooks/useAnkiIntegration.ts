@@ -53,6 +53,11 @@ function pickRecorderMime(): { mimeType: string; ext: string } {
   return { mimeType: '', ext: 'webm' };
 }
 
+class AudioCaptureError extends Error {}
+
+const alertAudioFailed = (e: AudioCaptureError) =>
+  dialog.alert(t('anki.audioFailedTitle'), `${t('anki.audioFailedBody')}\n\n${e.message}`);
+
 export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiIntegrationReturn {
   const { videoRef, videoFileName } = params;
 
@@ -185,17 +190,20 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
           }
       }
 
-      // 2. Capture Audio (only if includeAudio is true)
-      if (includeAudio && needsAudio && videoRef.current) {
+      // 2. Capture Audio (only if includeAudio is true). A card whose audio
+      // field comes out empty is worse than no card: the caller stops and says why.
+      if (includeAudio && needsAudio) {
+          let result: { base64: string; ext: string } | null = null;
           try {
-              const result = await captureAudioClip(currentSub.startTime, currentSub.endTime);
-              if (result) {
-                audioBase64 = result.base64;
-                audioExt = result.ext;
-              }
+              result = await captureAudioClip(currentSub.startTime, currentSub.endTime);
           } catch (e) {
               console.error("Audio capture failed", e);
+              throw new AudioCaptureError(e instanceof Error ? e.message : String(e));
           }
+          if (!result) throw new AudioCaptureError('no video');
+          if (!result.base64) throw new AudioCaptureError('empty recording');
+          audioBase64 = result.base64;
+          audioExt = result.ext;
       }
 
       return { screenshotBase64, audioBase64, audioExt };
@@ -222,7 +230,16 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
     if (needsAudio) setAnkiStatus('recording');
     else setAnkiStatus('adding');
 
-    const { screenshotBase64, audioBase64, audioExt } = await captureMedia(subtitle, template, true);
+    let media: Awaited<ReturnType<typeof captureMedia>>;
+    try {
+        media = await captureMedia(subtitle, template, true);
+    } catch (e) {
+        setAnkiStatus('error');
+        if (e instanceof AudioCaptureError) alertAudioFailed(e);
+        setTimeout(() => setAnkiStatus('idle'), 3000);
+        return;
+    }
+    const { screenshotBase64, audioBase64, audioExt } = media;
 
     setAnkiStatus('adding');
     try {
@@ -265,19 +282,31 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
         throw new Error('Anki card not configured');
       }
 
-      const { screenshotBase64, audioBase64, audioExt } = await captureMedia(subtitle, template, includeAudio);
+      let media: Awaited<ReturnType<typeof captureMedia>>;
+      try {
+          media = await captureMedia(subtitle, template, includeAudio);
+      } catch (e) {
+          if (e instanceof AudioCaptureError) alertAudioFailed(e);
+          throw e;
+      }
+      const { screenshotBase64, audioBase64, audioExt } = media;
 
-      await Anki.addNote(ankiConfig.url, template, {
-          sentence: subtitle.text,
-          videoName: videoFileName || 'Unknown',
-          timestamp: Storage.formatTimeCode(subtitle.startTime),
-          screenshotBase64,
-          audioBase64,
-          audioExt,
-          word,
-          definition,
-          example
-      });
+      try {
+          await Anki.addNote(ankiConfig.url, template, {
+              sentence: subtitle.text,
+              videoName: videoFileName || 'Unknown',
+              timestamp: Storage.formatTimeCode(subtitle.startTime),
+              screenshotBase64,
+              audioBase64,
+              audioExt,
+              word,
+              definition,
+              example
+          });
+      } catch (e: any) {
+          dialog.alert(t('anki.refusedTitle'), e?.message ?? String(e));
+          throw e;
+      }
   }, [ankiConfig, captureMedia, videoFileName]);
 
   return {

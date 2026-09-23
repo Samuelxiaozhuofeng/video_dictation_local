@@ -287,6 +287,8 @@ export const en = {
   'anki.noCardTitle': 'No Anki card set up',
   'anki.noCardBody': 'Open Settings → Anki and pick a deck and note type for the Word or Audio card.',
   'anki.refusedTitle': 'Anki refused the card',
+  'anki.audioFailedTitle': "Recording failed, the card wasn't added",
+  'anki.audioFailedBody': "The audio for this line couldn't be recorded, so no card was made rather than one without sound. Click again to retry; if it keeps failing, lower the start / end padding in Settings → Practice (lines at the very start or end of a video are the usual cause).",
 
   // --- utils/ai.ts ---
   'ai.noKeyError': 'Fill in the API address, API key and model in Settings → AI to use AI explanations.',

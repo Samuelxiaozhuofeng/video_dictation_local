@@ -288,6 +288,8 @@ export const zh: Record<keyof typeof en, string> = {
   'anki.noCardTitle': '还没有配置 Anki 卡片',
   'anki.noCardBody': '打开 设置 → Anki，为单词卡片或音频卡片选择牌组和笔记类型。',
   'anki.refusedTitle': 'Anki 拒绝了这张卡片',
+  'anki.audioFailedTitle': '录音失败，这张卡片没有加入',
+  'anki.audioFailedBody': '这句的音频没录下来。为了不做出没有声音的卡片，这次先不加。再点一次可以重试；如果一直失败，到 设置 → 练习 把起始 / 结尾留白调小一点（视频开头或结尾的句子最容易超出范围）。',
 
   // --- utils/ai.ts ---
   'ai.noKeyError': '在 设置 → AI 中填好 API 地址、API Key 和模型才能用 AI 解释。',
