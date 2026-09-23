@@ -78,3 +78,8 @@ export async function readCacheText(id: string, kind: CacheKind): Promise<string
 export async function writeCacheText(id: string, kind: CacheKind, text: string): Promise<void> {
   await invoke('write_cache', { id, kind, text });
 }
+
+// Moves the file to the macOS Trash (user can put it back).
+export async function trashFile(path: string): Promise<void> {
+  await invoke('trash_file', { path });
+}

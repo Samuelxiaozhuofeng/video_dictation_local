@@ -22,8 +22,26 @@ pub fn run() {
       import::start_import,
       import::open_youtube_login,
       import::probe_import_sizes,
-      cache::write_cache
+      cache::write_cache,
+      trash_file
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
+}
+
+// Move a file to the macOS Trash (recoverable), via the system `trash` tool.
+#[tauri::command]
+fn trash_file(path: String) -> Result<(), String> {
+  if !std::path::Path::new(&path).is_file() {
+    return Err("not a file".into());
+  }
+  let out = std::process::Command::new("/usr/bin/trash")
+    .arg(&path)
+    .output()
+    .map_err(|e| e.to_string())?;
+  if out.status.success() {
+    Ok(())
+  } else {
+    Err(String::from_utf8_lossy(&out.stderr).into_owned())
+  }
 }

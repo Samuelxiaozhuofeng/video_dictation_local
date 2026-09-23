@@ -6,7 +6,7 @@ import { getPracticeConfig } from '../utils/storage';
 import { parseSRT } from '../utils/srtParser';
 import { buildSections } from '../utils/sections';
 import {
-  fileNameFromPath, listenDragDrop, pickSubtitlePath, pickVideoPath, readSubtitleFile,
+  fileNameFromPath, listenDragDrop, pickSubtitlePath, pickVideoPath, readSubtitleFile, trashFile,
 } from '../utils/desktop';
 import { formatImportError, isCookieError, openYouTubeLogin, retryImport, startLocalImport, subscribeImportJobs } from '../utils/importJob';
 import { Btn, Card, Stamp, H, inputCls } from './ui';
@@ -257,12 +257,24 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
   const handleDelete = async (v: VideoRecord) => {
     const ok = await dialog.confirm(t('home.deleteTitle'), t('home.deleteBody', { name: v.displayName }), { ok: t('home.deleteOk'), danger: true });
     if (!ok) return;
+    const trash = !!v.videoPath && await dialog.confirm(
+      t('home.deleteFileTitle'),
+      t('home.deleteFileBody', { file: fileNameFromPath(v.videoPath) }),
+      { ok: t('home.deleteFileOk'), cancel: t('home.deleteFileKeep'), danger: true },
+    );
     setDeletingId(v.id);
     try {
       await VideoStorage.deleteVideoRecord(v.id);
       setVideos(prev => (prev ? prev.filter(x => x.id !== v.id) : prev));
     } catch {
       dialog.alert(t('home.deleteFailTitle'), t('home.deleteFailBody'));
+      setDeletingId(null);
+      return;
+    }
+    try {
+      if (trash) await trashFile(v.videoPath!);
+    } catch {
+      dialog.alert(t('home.deleteFileFailTitle'), t('home.deleteFileFailBody'));
     } finally {
       setDeletingId(null);
     }

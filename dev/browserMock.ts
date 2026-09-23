@@ -55,6 +55,8 @@ async function handle(cmd: string, args: Args): Promise<unknown> {
     case 'plugin:opener|open_url':
       window.open(args.url, '_blank');
       return null;
+    case 'trash_file':
+      return null; // recorded in __MOCK__.calls; real files untouched
     case 'probe_import_sizes':
       return { '1080': null, '720': null, '480': null };
     default:
