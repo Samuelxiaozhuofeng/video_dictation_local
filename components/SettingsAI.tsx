@@ -30,35 +30,19 @@ const Check: React.FC<{ checked: boolean; onChange: (v: boolean) => void; label:
 );
 
 
-// A plain <select> rather than an <input list> datalist: the app's WKWebView
-// does not pop a datalist open, so the fetched models were invisible. Typing
-// still works for ids the provider does not list.
+// Models are picked from the provider's own list ("Fetch models"), never typed.
+// A plain <select>: the app's WKWebView does not pop a datalist open. A saved
+// model the list does not have (or before any fetch) still shows as an option.
 const ModelPicker: React.FC<{
   value: string;
   onChange: (value: string) => void;
   models: string[];
-  placeholder: string;
-  pickLabel: string;
-}> = ({ value, onChange, models, placeholder, pickLabel }) => (
-  <div className="flex gap-2">
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`${inputCls} min-w-0 font-mono`}
-      placeholder={placeholder}
-    />
-    {models.length > 0 && (
-      <select
-        value={models.includes(value) ? value : ''}
-        onChange={(e) => onChange(e.target.value)}
-        className={`${inputCls} !w-36 shrink-0`}
-      >
-        <option value="">{pickLabel}</option>
-        {models.map((m) => <option key={m} value={m}>{m}</option>)}
-      </select>
-    )}
-  </div>
+  emptyLabel: string;
+}> = ({ value, onChange, models, emptyLabel }) => (
+  <select value={value} onChange={(e) => onChange(e.target.value)} className={`${inputCls} font-mono`}>
+    <option value="">{emptyLabel}</option>
+    {(value && !models.includes(value) ? [value, ...models] : models).map((m) => <option key={m} value={m}>{m}</option>)}
+  </select>
 );
 
 const SettingsAI: React.FC<SettingsAIProps> = ({
@@ -144,8 +128,7 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
             value={aiModel}
             onChange={setAiModel}
             models={models}
-            placeholder="model-id"
-            pickLabel={t('settingsAI.pickModel')}
+            emptyLabel={models.length > 0 ? t('settingsAI.pickModel') : t('settingsAI.fetchFirst')}
           />
         </Field>
 
@@ -170,8 +153,7 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
           value={aiSegmentModel}
           onChange={setAiSegmentModel}
           models={models}
-          placeholder={t('settingsAI.segmentModelPlaceholder')}
-          pickLabel={t('settingsAI.pickModel')}
+          emptyLabel={t('settingsAI.segmentModelPlaceholder')}
         />
       </Field>
 
