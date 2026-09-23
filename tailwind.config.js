@@ -17,7 +17,8 @@ export default {
       },
       fontFamily: {
         sans: ['"Instrument Sans"', '"PingFang SC"', '"Microsoft YaHei"', 'system-ui', 'sans-serif'],
-        serif: ['Newsreader', '"Songti SC"', 'Georgia', 'serif'],
+        // Chinese in a serif slot falls back to PingFang, not Songti: Songti next to Newsreader looks off.
+        serif: ['Newsreader', '"PingFang SC"', 'Georgia', 'serif'],
         mono: ['"Instrument Sans"', '"PingFang SC"', 'system-ui', 'sans-serif'],
       },
       boxShadow: {

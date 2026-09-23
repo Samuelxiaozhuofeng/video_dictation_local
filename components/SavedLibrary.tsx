@@ -48,7 +48,7 @@ const SavedLibrary: React.FC = () => {
       {filteredLines.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredLines.map((line) => (
-            <Card key={line.id} className="p-5 flex flex-col">
+            <Card key={line.id} flat className="p-5 flex flex-col">
               <p className="font-serif text-lg leading-relaxed flex-1 mb-4">
                 "{line.text}"
               </p>
@@ -72,7 +72,7 @@ const SavedLibrary: React.FC = () => {
           ))}
         </div>
       ) : (
-        <Card tone="paper" className="p-10 text-center max-w-lg mx-auto">
+        <Card tone="paper" flat className="p-10 text-center max-w-lg mx-auto border-0">
           <h3 className="font-serif text-2xl">
             {searchTerm ? t('savedLibrary.noMatch') : t('savedLibrary.nothingSavedYet')}
           </h3>

@@ -134,18 +134,9 @@ const AddVideo: React.FC<{ initialPath: string | null; onClose: () => void }> = 
             <p className="mt-1 text-sm text-mute">{t('home.dropHint')}</p>
           </div>
 
-          <button
-            type="button"
-            onClick={browse}
-            className={`press w-full h-14 px-4 rounded-lg border flex items-center gap-3 text-left ${path ? 'border-accent text-ink' : 'border-line text-mute hover:text-ink hover:bg-shade'}`}
-          >
-            <FileVideo size={18} className="shrink-0" />
-            <span className="min-w-0 flex-1 truncate text-sm">{path ? fileNameFromPath(path) : t('add.pickLocal')}</span>
-            {path && <span className="text-xs text-mute shrink-0">{t('add.change')}</span>}
-          </button>
-
-          <div className="flex items-center gap-3 text-xs text-faint">
-            <span className="flex-1 border-t border-line" />{t('add.or')}<span className="flex-1 border-t border-line" />
+          <div className="flex items-center gap-3 min-w-0">
+            <Btn onClick={browse} className="shrink-0"><FileVideo size={16} /> {path ? t('add.change') : t('add.pickLocal')}</Btn>
+            <span className={`min-w-0 truncate text-sm ${path ? 'text-ink' : 'text-faint'}`}>{path ? fileNameFromPath(path) : t('add.dragHint')}</span>
           </div>
 
           <div className="space-y-2">
@@ -173,8 +164,7 @@ const AddVideo: React.FC<{ initialPath: string | null; onClose: () => void }> = 
           </label>
         </div>
 
-        <div className="px-7 py-4 border-t border-line flex items-center justify-between gap-3">
-          <span className="text-xs text-faint">{t('add.dragHint')}</span>
+        <div className="px-7 py-4 border-t border-line flex items-center justify-end gap-3">
           <div className="flex gap-2">
             <Btn flat onClick={onClose}>{t('dialog.cancel')}</Btn>
             <Btn tone="accent" disabled={!ready || busy} onClick={start}>{t('add.start')}</Btn>

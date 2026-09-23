@@ -37,7 +37,7 @@ export const Btn: React.FC<BtnProps> = ({
     ? 'bg-transparent text-mute hover:text-ink hover:bg-shade border border-transparent'
     : tone === 'white'
       ? 'bg-transparent text-ink border border-line hover:bg-shade'
-      : `${toneBg[tone]} border border-transparent`;
+      : `${toneBg[tone]} border border-transparent disabled:!bg-ink/10 disabled:!text-ink/40 disabled:!opacity-100`;
   return (
     <button
       {...rest}
@@ -132,7 +132,8 @@ export const Menu: React.FC<{
   align?: 'left' | 'right';
   up?: boolean;
   children?: React.ReactNode; // extra panel content above the items (e.g. a Seg)
-}> = ({ items, trigger, align = 'right', up = false, children }) => {
+  footer?: React.ReactNode; // quiet content below the items (e.g. a key legend)
+}> = ({ items, trigger, align = 'right', up = false, children, footer }) => {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -164,6 +165,7 @@ export const Menu: React.FC<{
               {it.label}
             </button>
           ))}
+          {footer}
         </div>
       )}
     </div>

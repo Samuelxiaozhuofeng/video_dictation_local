@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, MoreHorizontal, Loader2, KeyRound, RotateCw, ArrowRight } from 'lucide-react';
+import { Plus, MoreHorizontal, Loader2 } from 'lucide-react';
 import { LearningMode, VideoRecord } from '../types';
 import * as VideoStorage from '../utils/videoStorage';
 import { getPracticeConfig } from '../utils/storage';
@@ -204,9 +204,9 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
     return items;
   };
 
-  const more = (v: VideoRecord) => (
+  const more = (v: VideoRecord, size: 'sm' | 'lg' = 'sm') => (
     <Menu items={menuFor(v)} trigger={(open, toggle) => (
-      <Btn square size="sm" flat onClick={toggle} title={t('home.more')} aria-label={t('home.more')} className={open ? '!bg-shade !text-ink' : ''}>
+      <Btn square size={size} flat onClick={toggle} title={t('home.more')} aria-label={t('home.more')} className={open ? '!bg-shade !text-ink' : ''}>
         {deletingId === v.id ? <Loader2 size={16} className="animate-spin" /> : <MoreHorizontal size={16} />}
       </Btn>
     )} />
@@ -215,24 +215,13 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
   // A running import, or one that failed: its own status instead of a position.
   const jobStatus = (v: VideoRecord) => {
     const job = v.importJob!;
-    if (!job.error) {
-      return (
-        <div className="mt-2 max-w-md">
-          <p className="text-[13px] text-mute">{jobLabel(job)}</p>
-          <Line pct={job.percent ?? 0} className="mt-2" />
-        </div>
-      );
-    }
+    if (!job.error) return null;
     return (
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <p className="text-[13px] text-ink">{formatImportError(job.error)}</p>
-        {isCookieError(job.error) && (
-          <Btn size="sm" onClick={handleYouTubeLogin}><KeyRound size={14} /> {t('home.ytLogin')}</Btn>
-        )}
-        {job.stage === 'download' && (
-          <Btn size="sm" onClick={() => handleRetry(v)} disabled={retryingId === v.id}><RotateCw size={14} /> {t('home.retry')}</Btn>
-        )}
-      </div>
+      <p className="mt-1 text-[13px] text-mute">
+        {formatImportError(job.error)}
+        {isCookieError(job.error) && <><span className="mx-2 text-faint">·</span><button type="button" onClick={handleYouTubeLogin} className="text-ink hover:underline underline-offset-4">{t('home.ytLogin')}</button></>}
+        {job.stage === 'download' && <><span className="mx-2 text-faint">·</span><button type="button" onClick={() => handleRetry(v)} disabled={retryingId === v.id} className="text-ink hover:underline underline-offset-4 disabled:opacity-40">{t('home.retry')}</button></>}
+      </p>
     );
   };
 
@@ -241,6 +230,7 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
     return job ? <span> · {t('home.prepBreakdownRunning', { done: job.done, total: job.total || '…' })}</span> : null;
   };
 
+  const addBtn = <Btn size="sm" flat className="-mr-3" onClick={() => setAdding({ path: null })}><Plus size={15} /> {t('home.addVideo')}</Btn>;
   const lead = videos?.find(v => !v.importJob);
   const rest = (videos ?? []).filter(v => v !== lead);
 
@@ -267,8 +257,7 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
             const w = where(lead);
             return (
               <section className="pt-6 pb-12">
-                <p className="text-xs text-mute">{t('home.continueLast')}</p>
-                <button type="button" onClick={() => onResume(lead, lastMode(lead))} className="mt-3 block text-left font-serif text-[40px] leading-[1.15] hover:text-white transition-colors break-words">
+                <button type="button" onClick={() => onResume(lead, lastMode(lead))} className="block text-left font-serif text-[40px] leading-[1.15] hover:text-white transition-colors break-words">
                   {lead.displayName}
                 </button>
                 <div className="mt-4 flex items-center gap-4 text-[13px] text-mute">
@@ -277,19 +266,18 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
                 </div>
                 <div className="mt-8 flex items-center gap-2">
                   <Btn tone="accent" size="lg" onClick={() => onResume(lead, lastMode(lead))}>
-                    {t('home.continueMode', { mode: modeName(lastMode(lead)) })} <ArrowRight size={17} />
+                    {t('home.continueMode', { mode: modeName(lastMode(lead)) })}
                   </Btn>
-                  {more(lead)}
+                  {more(lead, 'lg')}
+                  <span className="flex-1" />
+                  {addBtn}
                 </div>
               </section>
             );
           })()}
 
           <section className="border-t border-line">
-            <div className="h-14 flex items-center justify-between">
-              <h2 className="text-xs text-mute">{t('home.yourVideos')}</h2>
-              <Btn size="sm" flat onClick={() => setAdding({ path: null })}><Plus size={15} /> {t('home.addVideo')}</Btn>
-            </div>
+            {!lead && <div className="h-14 flex items-center justify-end">{addBtn}</div>}
             {rest.length === 0 ? (
               <p className="py-6 text-[13px] text-faint">{t('home.onlyOne')}</p>
             ) : (
@@ -297,30 +285,32 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
                 {rest.map(v => {
                   const w = v.importJob ? null : where(v);
                   return (
-                    <li key={v.id} className="group relative flex items-center gap-4 py-4 border-t border-line first:border-t-0 focus-within:z-10 hover:z-10">
+                    <li key={v.id} className="group relative flex items-center gap-6 py-3.5 border-t border-line first:border-t-0 focus-within:z-10 hover:z-10">
                       <div className="min-w-0 flex-1">
                         {v.importJob ? (
-                          <p className="font-serif text-xl leading-snug text-ink/80 break-words">{v.displayName}</p>
+                          <p className="font-serif text-[17px] leading-snug text-ink/70 truncate">{v.displayName}</p>
                         ) : (
-                          <button type="button" onClick={() => onResume(v, lastMode(v))} className="block text-left font-serif text-xl leading-snug hover:text-white transition-colors break-words">
+                          <button type="button" onClick={() => onResume(v, lastMode(v))} className="block max-w-full text-left font-serif text-[17px] leading-snug hover:text-white transition-colors truncate">
                             {v.displayName}
                           </button>
                         )}
-                        {v.importJob ? jobStatus(v) : (
-                          <div className="mt-1.5 flex items-center gap-4 text-[13px] text-mute">
-                            <span>{w!.text}{prepLine(v)}</span>
-                            <Line pct={w!.pct} className="w-24" />
-                          </div>
-                        )}
+                        {v.importJob && jobStatus(v)}
                       </div>
-                      <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                        {!v.importJob && (
-                          <>
-                            <Btn size="sm" flat onClick={() => onResume(v, LearningMode.DICTATION)} title={t('home.dictateTitle')}>{t('home.dictate')}</Btn>
-                            <Btn size="sm" flat onClick={() => onResume(v, LearningMode.BLUR)} title={t('home.blurTitle')}>{t('home.blur')}</Btn>
-                          </>
-                        )}
-                        {more(v)}
+                      {/* Where you are, at the right edge; on hover the "…" takes its place. */}
+                      <div className="relative shrink-0 w-[230px] h-8 flex items-center justify-end">
+                        <div className="flex items-center justify-end gap-4 text-[13px] text-mute group-hover:opacity-0 group-focus-within:opacity-0 transition-opacity">
+                          {v.importJob ? (
+                            !v.importJob.error && <><span>{jobLabel(v.importJob)}</span><Line pct={v.importJob.percent ?? 0} className="w-[120px] shrink-0" /></>
+                          ) : (
+                            <>
+                              <span className="truncate">{w!.text}{prepLine(v)}</span>
+                              <Line pct={w!.pct} className="w-[120px] shrink-0" />
+                            </>
+                          )}
+                        </div>
+                        <div className="absolute right-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                          {more(v)}
+                        </div>
                       </div>
                     </li>
                   );

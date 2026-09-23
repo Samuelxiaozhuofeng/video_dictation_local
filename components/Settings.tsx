@@ -4,7 +4,7 @@ import * as Anki from '../utils/anki';
 import * as AI from '../utils/ai';
 import * as Storage from '../utils/storage';
 import { useAnkiConnection } from '../hooks/useAnkiConnection';
-import { Card, H, Stamp } from './ui';
+import { H, Stamp } from './ui';
 import SettingsGeneral from './SettingsGeneral';
 import SettingsAI from './SettingsAI';
 import SettingsAnki from './SettingsAnki';
@@ -118,8 +118,8 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <Card className="p-6">
+    <div className="divide-y divide-line">
+      <section className="pb-10">
         <H>{t('settings.practice')}</H>
         <SettingsGeneral
           lang={lang}
@@ -140,9 +140,9 @@ const Settings: React.FC = () => {
             flashSaved();
           }}
         />
-      </Card>
+      </section>
 
-      <Card className="p-6">
+      <section className="py-10">
         <H>AI</H>
         <SettingsAI
           aiModel={aiModel}
@@ -176,9 +176,9 @@ const Settings: React.FC = () => {
             saveAI({ segmentModel: v });
           }}
         />
-      </Card>
+      </section>
 
-      <Card className="p-6">
+      <section className="py-10">
         <H>Anki</H>
         <SettingsAnki
           url={ankiConnection.url}
@@ -218,7 +218,7 @@ const Settings: React.FC = () => {
           fetchModelFields={ankiConnection.fetchModelFields}
           saveAnki={saveAnki}
         />
-      </Card>
+      </section>
 
       {savedFlash && (
         <div className="fixed bottom-6 right-6 z-50">

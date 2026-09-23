@@ -56,11 +56,7 @@ const Transport: React.FC<{ lineLabel: string; menuItems: MenuItem[]; menuPanel?
       </div>
 
       <div className="min-w-0 flex-1 truncate">
-        {recording ? (
-          <span className="blink text-accent">{t('transport.recordingBanner')}</span>
-        ) : (
-          <span className="hidden xl:inline">{learningMode === LearningMode.DICTATION ? t('transport.legendDictation') : t('transport.legend')}</span>
-        )}
+        {recording && <span className="blink text-accent">{t('transport.recordingBanner')}</span>}
       </div>
 
       <div className="flex items-center gap-0.5 shrink-0">
@@ -76,14 +72,29 @@ const Transport: React.FC<{ lineLabel: string; menuItems: MenuItem[]; menuPanel?
         <Btn square size="sm" flat onClick={() => actions.onSetVolume(volume === 0 ? 1 : 0)} title={volume === 0 ? t('transport.unmute') : t('transport.mute')}>
           {volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
         </Btn>
-        <Menu up items={menuItems} trigger={(open, toggle) => (
+        <Menu up items={menuItems} footer={
+          <div className="mt-1.5 pt-3 px-3.5 pb-2 border-t border-line grid grid-cols-2 gap-x-5 gap-y-1.5 text-[11px]">
+            {[
+              ...(learningMode === LearningMode.DICTATION ? t('transport.legendDictation') : t('transport.legend')).split(' · '),
+              ...(learningMode === LearningMode.DICTATION ? [t('transport.legendTyping')] : []),
+            ].map(k => {
+              const cut = k.indexOf(' ');
+              return (
+                <div key={k} className="flex justify-between gap-3 whitespace-nowrap">
+                  <span className="text-mute">{k.slice(cut + 1)}</span>
+                  <span className="text-ink/80">{k.slice(0, cut)}</span>
+                </div>
+              );
+            })}
+          </div>
+        } trigger={(open, toggle) => (
           <Btn square size="sm" flat onClick={toggle} title={t('home.more')} aria-label={t('home.more')} className={open ? '!bg-shade !text-ink' : ''}>
             <MoreHorizontal size={17} />
           </Btn>
         )}>
           <div className="px-3.5 py-2 flex flex-col gap-2">
             <span className="text-xs text-mute">{t('transport.speed')}</span>
-            <Seg size="sm" value={playbackSpeed} onChange={actions.onSetPlaybackSpeed} options={SPEEDS.map(s => ({ value: s, label: `${s}×` }))} />
+            <Seg size="sm" className="w-full [&>button]:flex-1" value={playbackSpeed} onChange={actions.onSetPlaybackSpeed} options={SPEEDS.map(s => ({ value: s, label: `${s}×` }))} />
           </div>
           {menuPanel}
           {menuItems.length > 0 && <div className="my-1.5 border-t border-line" />}

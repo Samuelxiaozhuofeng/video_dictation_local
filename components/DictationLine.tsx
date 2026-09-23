@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Send, RefreshCw, ArrowRight } from 'lucide-react';
 import { PracticeMode } from '../types';
 import {
   tokenizeText, getWordTokens, Token, TokenType, compareWords,
@@ -149,8 +148,8 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
         </p>
 
         {/* Yours, word by word */}
-        <div className="w-full flex flex-wrap items-baseline gap-x-2 gap-y-1 font-serif text-xl">
-          <span className="text-xs font-sans text-mute mr-1">{t('dictation.youTyped')}</span>
+        {/* Yours underneath, dimmer; only a wrong word steps forward. */}
+        <div className="w-full flex flex-wrap items-baseline gap-x-[0.3em] gap-y-1 font-serif text-xl" aria-label={t('dictation.youTyped')}>
           {groups.map(g => {
             if (g.wi < 0) return <span key={g.key} className="text-mute">{g.punct}</span>;
             if (!isBlank(g.wi)) return null;
@@ -158,19 +157,21 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
             if (!r) return null;
             return (
               <span key={g.key}>
-                <span title={r.isCorrect ? '' : t('dictation.expected', { word: r.targetWord })} className={r.isCorrect ? 'text-accent' : 'mark-ink'}>
-                  {r.inputWord || '＿'}
-                </span>
+                {r.inputWord ? (
+                  <span title={r.isCorrect ? '' : t('dictation.expected', { word: r.targetWord })} className={r.isCorrect ? 'text-mute' : 'text-ink underline decoration-accent decoration-[1.5px] underline-offset-[6px]'}>
+                    {r.inputWord}
+                  </span>
+                ) : (
+                  // Left blank: the same empty slot you saw while typing.
+                  <span title={t('dictation.expected', { word: r.targetWord })} className="inline-block align-baseline border-b-[1.5px] border-line" style={{ width: `${Math.max(2, r.targetWord.length) * 0.46}em`, height: '1em' }} />
+                )}
                 <span className="text-mute">{g.punct}</span>
               </span>
             );
           })}
         </div>
 
-        <div className="flex gap-2">
-          <Btn onClick={() => onReplay(false)}><RefreshCw size={16} /> {t('dictation.hearAgain')}</Btn>
-          <Btn tone="accent" onClick={() => onComplete(true)}>{nextLabel ?? t('common.nextLine')} <ArrowRight size={16} /></Btn>
-        </div>
+        <Btn tone="accent" onClick={() => onComplete(true)}>{nextLabel ?? t('common.nextLine')}</Btn>
       </div>
     );
   }
@@ -214,13 +215,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
             </span>
           );
         })}
-        <Btn type="submit" flat square size="sm" disabled={wordTokens.every((_, i) => !isBlank(i) || !(inputs[i] || '').trim())} className="self-center font-sans" title={t('dictation.checkTitle')}>
-          <Send size={16} />
-        </Btn>
       </form>
-      <p className="mt-4 text-xs text-mute">
-        {t('dictation.keyHint')}
-      </p>
     </div>
   );
 };

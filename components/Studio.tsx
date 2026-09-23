@@ -156,7 +156,9 @@ const Studio: React.FC = () => {
   // The two lines just before this one, fading back like a transcript.
   const past = [currentSubtitleIndex - 2, currentSubtitleIndex - 1].filter(i => i >= 0 && subtitles[i]);
 
-  const menuItems: MenuItem[] = [];
+  const menuItems: MenuItem[] = [
+    { label: <><Bookmark size={15} /> {t('studio.savedLinesFromVideo')}{savedIds.size > 0 && <span className="ml-auto text-mute">{savedIds.size}</span>}</>, onClick: () => actions.onToggleSavedList(true) },
+  ];
   if (!isBlur && mode === PracticeMode.INPUT && !bdActive) {
     menuItems.push({
       label: <><Scissors size={15} /> {bd.state.status === 'loading' ? t('studio.breakdownLoading') : t('studio.breakdown')}</>,
@@ -167,14 +169,14 @@ const Studio: React.FC = () => {
   }
   const menuPanel = isBlur ? (
     <MenuRow label={t('studio.playbackLabel')}>
-      <Seg size="sm" value={blurPlaybackMode} onChange={actions.onSetBlurPlaybackMode} options={[
+      <Seg size="sm" className="w-full [&>button]:flex-1" value={blurPlaybackMode} onChange={actions.onSetBlurPlaybackMode} options={[
         { value: BlurPlaybackMode.SENTENCE_BY_SENTENCE, label: t('studio.stepLabel'), title: t('studio.stepTitle') },
         { value: BlurPlaybackMode.CONTINUOUS, label: t('studio.flowLabel'), title: t('studio.flowTitle') },
       ]} />
     </MenuRow>
   ) : (
     <MenuRow label={t('studio.clozeLabel')} hint={!hasClozeAi ? t('studio.clozeNeedKey') : undefined}>
-      <Seg size="sm" value={effectiveLevel} onChange={setLevel} options={[
+      <Seg size="sm" className="w-full [&>button]:flex-1" value={effectiveLevel} onChange={setLevel} options={[
         { value: 'easy', label: hasClozeAi ? t('studio.clozeEasy') : <span className="opacity-40">{t('studio.clozeEasy')}</span>, title: hasClozeAi ? t('studio.clozeEasyTitle') : t('studio.clozeNeedKey') },
         { value: 'medium', label: hasClozeAi ? t('studio.clozeMedium') : <span className="opacity-40">{t('studio.clozeMedium')}</span>, title: hasClozeAi ? t('studio.clozeMediumTitle') : t('studio.clozeNeedKey') },
         { value: 'full', label: t('studio.clozeFull'), title: t('studio.clozeFullTitle') },
@@ -198,19 +200,14 @@ const Studio: React.FC = () => {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <span className="hidden sm:inline px-2">{isBlur ? t('studio.blurBadge') : t('studio.dictationBadge')}</span>
-          <Btn size="sm" flat onClick={() => actions.onToggleSavedList(!showSavedList)} title={t('studio.savedLinesFromVideo')} className={showSavedList ? '!bg-shade !text-ink' : ''}>
-            <Bookmark size={14} /> <span className="hidden sm:inline">{t('nav.saved')}</span>{savedIds.size > 0 && <span>{savedIds.size}</span>}
-          </Btn>
-        </div>
       </header>
 
-      {/* --- Video left, transcript right --- */}
-      <div className="relative flex-1 min-h-0 flex flex-col lg:flex-row lg:items-center gap-8 lg:gap-14 px-6 lg:px-11 pb-6">
-        <div className="relative min-h-0 min-w-0 flex-1 self-stretch flex items-center justify-center">
+      {/* --- Video left, transcript right: tops aligned, the pair centred in the window --- */}
+      <div className="relative flex-1 min-h-0 flex flex-col justify-center px-6 lg:px-11 pb-8">
+       <div className="min-h-0 flex flex-col lg:flex-row lg:items-start gap-8 lg:gap-12">
+        <div className="relative min-w-0 flex-1">
           {videoSrc ? (
-            <video ref={videoRef} crossOrigin="anonymous" src={videoSrc} onLoadedMetadata={() => actions.onReplayCurrent()} className="block w-full h-full object-contain" />
+            <video ref={videoRef} crossOrigin="anonymous" src={videoSrc} onLoadedMetadata={() => actions.onReplayCurrent()} className="block w-full h-auto max-h-[calc(100vh-190px)] object-contain object-left-top" />
           ) : (
             <p className="text-mute text-sm">{t('studio.noVideoLoaded')}</p>
           )}
@@ -221,7 +218,7 @@ const Studio: React.FC = () => {
           )}
         </div>
 
-        <section className="shrink-0 lg:w-[440px] flex flex-col gap-5 lg:max-h-full lg:overflow-y-auto" aria-label={t('studio.lineCount', { current: currentSubtitleIndex + 1, total: subtitles.length })}>
+        <section className="shrink-0 lg:w-[440px] flex flex-col gap-5 lg:max-h-[calc(100vh-190px)] lg:overflow-y-auto" aria-label={t('studio.lineCount', { current: currentSubtitleIndex + 1, total: subtitles.length })}>
           {past.map((i, k) => (
             <div key={subtitles[i].id} className={`flex gap-4 items-baseline ${k === past.length - 1 ? 'opacity-40' : 'opacity-20'}`}>
               <span className="w-6 shrink-0 text-xs">{i + 1}</span>
@@ -283,6 +280,7 @@ const Studio: React.FC = () => {
             </div>
           </div>
         </section>
+       </div>
       </div>
 
       {showSectionComplete && (
@@ -323,19 +321,15 @@ const MenuRow: React.FC<{ label: string; hint?: string; children: React.ReactNod
 
 // One covered slot per word while the line plays: given words show as text, blanks as underlines.
 const ListeningGhost: React.FC<{ text: string; blanks: number[] }> = ({ text, blanks }) => {
-  const t = useT();
   const words = getWordTokens(tokenizeText(text));
   const set = new Set(blanks);
   return (
-    <div className="flex flex-col items-start gap-4">
-      <div className="flex flex-wrap gap-x-2.5 gap-y-2 font-serif text-[30px] leading-[42px]">
-        {words.map((w, i) => set.has(i) ? (
-          <span key={i} className="inline-block h-[40px] border-b-[1.5px] border-line" style={{ width: `${Math.max(2, w.value.length) * 0.5}em` }} />
-        ) : (
-          <span key={i} className="text-ink/60">{w.value}</span>
-        ))}
-      </div>
-      <span className="text-xs text-mute inline-flex items-center gap-2"><span className="blink w-1.5 h-1.5 rounded-full bg-accent" /> {t('studio.listening')}</span>
+    <div className="flex flex-wrap gap-x-2.5 gap-y-2 font-serif text-[30px] leading-[42px]">
+      {words.map((w, i) => set.has(i) ? (
+        <span key={i} className="inline-block h-[40px] border-b-[1.5px] border-line" style={{ width: `${Math.max(2, w.value.length) * 0.46}em` }} />
+      ) : (
+        <span key={i} className="text-ink/50">{w.value}</span>
+      ))}
     </div>
   );
 };
