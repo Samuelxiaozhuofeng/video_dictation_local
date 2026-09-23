@@ -5,7 +5,7 @@ import * as AI from '../utils/ai';
 import * as Storage from '../utils/storage';
 import { usePracticeContext } from '../hooks/usePracticeContext';
 import { useBreakdown } from '../hooks/useBreakdown';
-import { Btn, Card, Seg, MenuItem } from './ui';
+import { Btn, Card, Seg, MenuItem, Stamp } from './ui';
 import DictationLine, { LINE } from './DictationLine';
 import BlurLine from './BlurLine';
 import Transport from './Transport';
@@ -16,6 +16,7 @@ import { useT } from '../utils/i18n';
 import { canCloze, loadOrBuildCloze, pickBlanks } from '../utils/aiDrills';
 import { readCacheText, writeCacheText } from '../utils/desktop';
 import { IS_WINDOWS } from '../utils/platform';
+import { matches, formatCombo, useShortcuts } from '../utils/shortcuts';
 
 // The practice room: video on the left, a transcript column on the right (two faded
 // past lines over the line you work on), the remote (Transport) along the bottom.
@@ -115,6 +116,27 @@ const Studio: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [bdActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Its own key: while typing a line, and when it cannot run, say why for a
+  // moment instead of doing nothing (a dead key looks broken).
+  const combos = useShortcuts();
+  const [bdHint, setBdHint] = useState<string | null>(null);
+  const bdBlocked = !hasClozeAi ? t('studio.breakdownNeedKey') : bd.tooShort ? t('studio.breakdownTooShort') : bd.state.status === 'loading' ? t('studio.breakdownLoading') : null;
+  useEffect(() => {
+    if (isBlur || mode !== PracticeMode.INPUT || bdActive) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!matches(e, 'breakdown')) return;
+      e.preventDefault();
+      if (bdBlocked) setBdHint(bdBlocked); else startBreakdown();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isBlur, mode, bdActive, bdBlocked, isPlaying]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!bdHint) return;
+    const id = window.setTimeout(() => setBdHint(null), 2500);
+    return () => window.clearTimeout(id);
+  }, [bdHint]);
+
   const setLevel = (level: ClozeLevel) => {
     if (level !== 'full' && !hasClozeAi) return;
     setClozeLevel(level);
@@ -162,7 +184,7 @@ const Studio: React.FC = () => {
   ];
   if (!isBlur && mode === PracticeMode.INPUT && !bdActive) {
     menuItems.push({
-      label: <><Scissors size={15} /> {bd.state.status === 'loading' ? t('studio.breakdownLoading') : t('studio.breakdown')}</>,
+      label: <><Scissors size={15} /> {bd.state.status === 'loading' ? t('studio.breakdownLoading') : t('studio.breakdown')}<span className="ml-auto pl-3 text-mute">{formatCombo(combos.breakdown)}</span></>,
       onClick: startBreakdown,
       disabled: !hasClozeAi || bd.tooShort || bd.state.status === 'loading',
       title: !hasClozeAi ? t('studio.breakdownNeedKey') : bd.tooShort ? t('studio.breakdownTooShort') : t('studio.breakdownTitle'),
@@ -296,6 +318,12 @@ const Studio: React.FC = () => {
           <Btn onClick={actions.onRestart}><RotateCcw size={16} /> {t('studio.startOver')}</Btn>
           <Btn tone="accent" onClick={actions.onExit} autoFocus>{t('studio.backToVideosBtn')}</Btn>
         </Overlay>
+      )}
+
+      {bdHint && (
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-20 z-30">
+          <Stamp tone="accent-soft" className="shadow-card">{bdHint}</Stamp>
+        </div>
       )}
 
       <Transport lineLabel={t('studio.lineCount', { current: currentSubtitleIndex + 1, total: subtitles.length })} menuItems={menuItems} menuPanel={menuPanel} />

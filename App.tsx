@@ -18,6 +18,7 @@ import * as VideoStorage from './utils/videoStorage';
 import { fileNameFromPath, pathExists, pickVideoPath, videoSrcFromPath } from './utils/desktop';
 import { t, useLang } from './utils/i18n';
 import { markInterruptedJobs, startImportListener } from './utils/importJob';
+import { matches } from './utils/shortcuts';
 
 export default function App() {
   const lang = useLang();
@@ -241,9 +242,9 @@ export default function App() {
     { code: 'Space', shiftKey: true, preventDefault: true, condition: () => inPractice, handler: () => replayCurrent() },
     { code: 'Space', shiftKey: false, preventDefault: true, allowInEditable: false, condition: () => inPractice, handler: () => togglePlayOrStep() },
     { code: 'Enter', preventDefault: true, allowInEditable: false, condition: () => inPractice && (mode === PracticeMode.FEEDBACK || blurStepPaused), handler: () => handleContinue() },
-    { code: 'ArrowUp', ctrlOrMeta: true, preventDefault: true, condition: () => inPractice, handler: () => handleSkip('prev') },
-    { code: 'ArrowDown', ctrlOrMeta: true, preventDefault: true, condition: () => inPractice, handler: () => handleSkip('next') },
-    { code: 'KeyN', ctrlOrMeta: true, shiftKey: true, condition: () => inPractice, handler: (e: KeyboardEvent) => handleAddToAnkiShortcut(e) },
+    { preventDefault: true, condition: (e: KeyboardEvent) => inPractice && matches(e, 'prev'), handler: () => handleSkip('prev') },
+    { preventDefault: true, condition: (e: KeyboardEvent) => inPractice && matches(e, 'next'), handler: () => handleSkip('next') },
+    { condition: (e: KeyboardEvent) => inPractice && matches(e, 'anki'), handler: (e: KeyboardEvent) => handleAddToAnkiShortcut(e) },
   ]), [inPractice, mode, blurStepPaused, replayCurrent, togglePlayOrStep, handleContinue, handleSkip, handleAddToAnkiShortcut]);
 
   useKeyboardShortcuts(keyboardShortcuts);

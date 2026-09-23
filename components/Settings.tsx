@@ -8,6 +8,7 @@ import { H, Stamp } from './ui';
 import SettingsGeneral from './SettingsGeneral';
 import SettingsAI from './SettingsAI';
 import SettingsAnki from './SettingsAnki';
+import SettingsShortcuts from './SettingsShortcuts';
 import { useT, useLang, setLang, Lang } from '../utils/i18n';
 
 type AnkiPatch = {
@@ -140,6 +141,11 @@ const Settings: React.FC = () => {
             flashSaved();
           }}
         />
+      </section>
+
+      <section className="py-10">
+        <H>{t('shortcuts.title')}</H>
+        <SettingsShortcuts onSaved={flashSaved} />
       </section>
 
       <section className="py-10">

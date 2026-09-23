@@ -6,6 +6,7 @@ import {
 } from '../utils/textTokenizer';
 import { Btn } from './ui';
 import { useT } from '../utils/i18n';
+import { matches } from '../utils/shortcuts';
 
 // Dictation line: one input box per word (INPUT), then a word-by-word comparison (FEEDBACK).
 // Word lookup is delegated to Studio via onLookup.
@@ -105,7 +106,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
 
   const keyDown = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.shiftKey && e.key === ' ') { e.preventDefault(); e.stopPropagation(); onReplay(false); return; }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x') { e.preventDefault(); showPeek(i); return; }
+    if (matches(e, 'peek')) { e.preventDefault(); showPeek(i); return; }
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
       const nxt = stepBlank(i, 1);

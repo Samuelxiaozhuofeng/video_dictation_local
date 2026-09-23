@@ -1,10 +1,15 @@
 import React from 'react';
-import { Play, Pause, SkipBack, SkipForward, RotateCcw, Bookmark, PlusCircle, Volume2, VolumeX, Mic, Check, X, Loader2, MoreHorizontal } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, RotateCcw, Bookmark, PlusCircle, Volume2, VolumeX, Mic, Check, X, Loader2, MoreHorizontal, Keyboard } from 'lucide-react';
 import { LearningMode } from '../types';
 import * as Storage from '../utils/storage';
 import { usePracticeContext } from '../hooks/usePracticeContext';
 import { Btn, Menu, MenuItem, Seg } from './ui';
 import { useT } from '../utils/i18n';
+import { formatCombo, useShortcuts, ActionId } from '../utils/shortcuts';
+import ShortcutLegend from './ShortcutLegend';
+
+const PIN_KEY = 'linguaclip_keys_pinned';
+const readPinned = () => { try { return localStorage.getItem(PIN_KEY) === '1'; } catch { return false; } };
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5];
 
@@ -34,6 +39,16 @@ const Transport: React.FC<{ lineLabel: string; menuItems: MenuItem[]; menuPanel?
     }
   };
   const af = ankiFace();
+  const combos = useShortcuts();
+  const withKey = (label: string, id: ActionId) => `${label} (${formatCombo(combos[id])})`;
+  const [pinned, setPinned] = React.useState(readPinned);
+  const togglePinned = () => {
+    setPinned(p => {
+      try { localStorage.setItem(PIN_KEY, p ? '0' : '1'); } catch { /* localStorage unavailable */ }
+      return !p;
+    });
+  };
+  const dictation = learningMode === LearningMode.DICTATION;
 
   return (
     <footer className={`relative shrink-0 h-14 px-6 lg:px-11 flex items-center gap-4 text-xs text-mute transition-colors ${recording ? 'bg-accent-soft' : ''}`}>
@@ -46,13 +61,19 @@ const Transport: React.FC<{ lineLabel: string; menuItems: MenuItem[]; menuPanel?
           className="absolute inset-0 !h-full opacity-0 cursor-pointer" aria-label={t('transport.seek')} />
       </div>
 
+      {pinned && (
+        <div className="absolute right-6 lg:right-11 bottom-full mb-3 z-20 px-3.5 py-3 rounded-lg bg-paper/90 border border-line backdrop-blur-sm">
+          <ShortcutLegend dictation={dictation} />
+        </div>
+      )}
+
       <div className="flex items-center gap-0.5 shrink-0 -ml-2">
-        <Btn square size="sm" flat onClick={() => actions.onSkip('prev')} title={t('transport.previousLine')}><SkipBack size={16} /></Btn>
-        <Btn square size="sm" flat onClick={() => actions.onReplayCurrent()} title={t('transport.replayLine')}><RotateCcw size={16} /></Btn>
-        <Btn square size="sm" flat onClick={actions.onTogglePlay} title={isPlaying ? t('transport.pauseSpace') : t('transport.playSpace')} className="!text-ink">
+        <Btn square size="sm" flat onClick={() => actions.onSkip('prev')} title={withKey(t('transport.previousLine'), 'prev')}><SkipBack size={16} /></Btn>
+        <Btn square size="sm" flat onClick={() => actions.onReplayCurrent()} title={withKey(t('transport.replayLine'), 'replay')}><RotateCcw size={16} /></Btn>
+        <Btn square size="sm" flat onClick={actions.onTogglePlay} title={withKey(isPlaying ? t('transport.pauseSpace') : t('transport.playSpace'), 'play')} className="!text-ink">
           {isPlaying ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" className="ml-0.5" />}
         </Btn>
-        <Btn square size="sm" flat onClick={() => actions.onSkip('next')} title={t('transport.nextLine')}><SkipForward size={16} /></Btn>
+        <Btn square size="sm" flat onClick={() => actions.onSkip('next')} title={withKey(t('transport.nextLine'), 'next')}><SkipForward size={16} /></Btn>
       </div>
 
       <div className="min-w-0 flex-1 truncate">
@@ -65,28 +86,18 @@ const Transport: React.FC<{ lineLabel: string; menuItems: MenuItem[]; menuPanel?
           <Bookmark size={16} fill={isCurrentSaved ? 'currentColor' : 'none'} />
         </Btn>
         {ankiReady && (
-          <Btn size="sm" flat disabled={ankiStatus !== 'idle'} onClick={actions.onAddToAnki} title={t('transport.sendToAnki')} className={ankiStatus === 'idle' ? '' : '!opacity-100 !text-ink'}>
+          <Btn size="sm" flat disabled={ankiStatus !== 'idle'} onClick={actions.onAddToAnki} title={withKey(t('transport.sendToAnki'), 'anki')} className={ankiStatus === 'idle' ? '' : '!opacity-100 !text-ink'}>
             {af.icon} <span className="hidden sm:inline">{af.label}</span>
           </Btn>
         )}
         <Btn square size="sm" flat onClick={() => actions.onSetVolume(volume === 0 ? 1 : 0)} title={volume === 0 ? t('transport.unmute') : t('transport.mute')}>
           {volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
         </Btn>
+        <Btn square size="sm" flat onClick={togglePinned} title={pinned ? t('keys.hide') : t('keys.show')} aria-pressed={pinned} className={pinned ? '!text-accent' : ''}>
+          <Keyboard size={16} />
+        </Btn>
         <Menu up items={menuItems} footer={
-          <div className="mt-1.5 pt-3 px-3.5 pb-2 border-t border-line grid grid-cols-2 gap-x-5 gap-y-1.5 text-xs">
-            {[
-              ...(learningMode === LearningMode.DICTATION ? t('transport.legendDictation') : t('transport.legend')).split(' · '),
-              ...(learningMode === LearningMode.DICTATION ? [t('transport.legendTyping')] : []),
-            ].map(k => {
-              const cut = k.indexOf(' ');
-              return (
-                <div key={k} className="flex justify-between gap-3 whitespace-nowrap">
-                  <span className="text-mute">{k.slice(cut + 1)}</span>
-                  <span className="text-ink/80">{k.slice(0, cut)}</span>
-                </div>
-              );
-            })}
-          </div>
+          <ShortcutLegend dictation={dictation} className="mt-1.5 pt-3 px-3.5 pb-2 border-t border-line" />
         } trigger={(open, toggle) => (
           <Btn square size="sm" flat onClick={toggle} title={t('home.more')} aria-label={t('home.more')} className={open ? '!bg-shade !text-ink' : ''}>
             <MoreHorizontal size={17} />
