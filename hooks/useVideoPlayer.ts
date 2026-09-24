@@ -79,7 +79,10 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
             blurAutoAdvanceRef.current = true;
             onAutoAdvance?.();
           }
-        } else {
+        } else if (!video.paused) {
+          // rAF and the timeupdate our own seek fires can both land here before
+          // React re-renders; the first one pauses, so paused = already handled
+          // (else an auto-advance fires twice and skips a line).
           video.pause();
           setIsPlaying(false);
           video.currentTime = currentSub.endTime;

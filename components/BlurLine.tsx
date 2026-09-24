@@ -4,7 +4,8 @@ import { useT } from '../utils/i18n';
 
 // Blur mode line: every word starts as a covered block. First click reveals it,
 // second click looks it up. Lookup itself lives in Studio (DefinitionPanel).
-const BlurLine: React.FC<{ text: string; onLookup: (word: string) => void }> = ({ text, onLookup }) => {
+// onReveal fires once per line, on the first covered word opened.
+const BlurLine: React.FC<{ text: string; onLookup: (word: string) => void; onReveal?: () => void }> = ({ text, onLookup, onReveal }) => {
   const t = useT();
   const tokens = useMemo(() => tokenizeText(text), [text]);
   const [revealed, setRevealed] = useState<Set<number>>(new Set());
@@ -17,6 +18,7 @@ const BlurLine: React.FC<{ text: string; onLookup: (word: string) => void }> = (
     const word = raw.replace(/[.,/#!$%^&*;:{}=\-_`~()?"']/g, '');
     if (!word) return;
     if (!revealed.has(wordIdx)) {
+      if (revealed.size === 0) onReveal?.();
       setRevealed(prev => new Set(prev).add(wordIdx));
       setPicked(wordIdx);
       return;

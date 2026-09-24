@@ -15,6 +15,7 @@ import AddVideo from './AddVideo';
 import { canCloze } from '../utils/aiDrills';
 import { cancelPrep, getPrepJob, prepStatus, prepareBreakdowns, subscribePrep } from '../utils/breakdownPrep';
 import { cancelCloze, clozeStatus, getClozeJob, linesOf, prepareCloze, subscribeCloze } from '../utils/clozePrep';
+import { countForVideo, deckCounts, getAllCards, subscribeCards } from '../utils/review';
 
 // Home does two things: pick up the video you were on, and add a new one.
 // As a list the most recent video leads and the rest are quiet rows; as cards
@@ -23,6 +24,7 @@ import { cancelCloze, clozeStatus, getClozeJob, linesOf, prepareCloze, subscribe
 
 interface HomeProps {
   onResume: (record: VideoRecord, mode: LearningMode) => void | Promise<void>;
+  onOpenReview?: () => void;
 }
 
 const VIDEO_EXT = /\.(mp4|mov|m4v)$/i;
@@ -37,7 +39,7 @@ const Line: React.FC<{ pct: number; className?: string }> = ({ pct, className = 
   </div>
 );
 
-const Home: React.FC<HomeProps> = ({ onResume }) => {
+const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
   const t = useT();
   const lang = useLang();
   const [videos, setVideos] = useState<VideoRecord[] | null>(null);
@@ -116,6 +118,18 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
     };
   }, []);
 
+  // "3 lines · 2 words due": a quiet link to the review page, only when something is due.
+  const [reviewDue, setReviewDue] = useState<string | null>(null);
+  useEffect(() => {
+    const load = () => getAllCards().then(cards => {
+      const { line, word } = deckCounts(cards);
+      const what = [line.due && t('home.reviewLine', { n: line.due }), word.due && t('home.reviewWord', { n: word.due })].filter(Boolean).join(' · ');
+      setReviewDue(what ? t('home.reviewDue', { what }) : null);
+    }).catch(() => setReviewDue(null));
+    load();
+    return subscribeCards(load);
+  }, [lang]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const bump = () => setPrepTick(n => n + 1);
     const offs = [subscribePrep(bump), subscribeCloze(bump)];
@@ -165,11 +179,13 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
   };
 
   const handleDelete = async (v: VideoRecord) => {
-    const ok = await dialog.confirm(t('home.deleteTitle'), t('home.deleteBody', { name: v.displayName }), { ok: t('home.deleteOk'), danger: true });
+    const n = await countForVideo(v.id).catch(() => 0);
+    const cardsNote = n > 0 ? ' ' + t('home.deleteHasCards', { n }) : '';
+    const ok = await dialog.confirm(t('home.deleteTitle'), t('home.deleteBody', { name: v.displayName }) + (v.videoPath ? '' : cardsNote), { ok: t('home.deleteOk'), danger: true });
     if (!ok) return;
     const trash = !!v.videoPath && await dialog.confirm(
       t('home.deleteFileTitle'),
-      t('home.deleteFileBody', { file: fileNameFromPath(v.videoPath) }),
+      t('home.deleteFileBody', { file: fileNameFromPath(v.videoPath) }) + cardsNote,
       { ok: t('home.deleteFileOk'), cancel: t('home.deleteFileKeep'), danger: true },
     );
     setDeletingId(v.id);
@@ -305,6 +321,9 @@ const Home: React.FC<HomeProps> = ({ onResume }) => {
       ) : (
         <>
           <div className="pt-4 flex items-center justify-end gap-3">
+            {reviewDue && onOpenReview && (
+              <button type="button" onClick={onOpenReview} className="mr-auto text-sm text-mute hover:text-ink underline-offset-4 hover:underline">{reviewDue}</button>
+            )}
             <Seg<View> size="sm" value={view} onChange={setView} options={[
               { value: 'list', label: <List size={14} />, title: t('home.viewList') },
               { value: 'cards', label: <LayoutGrid size={14} />, title: t('home.viewCards') },

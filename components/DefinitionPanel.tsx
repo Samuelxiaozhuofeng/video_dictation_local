@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, X, Check, Plus, Sparkles } from 'lucide-react';
+import { Loader2, X, Check, Plus, Sparkles, BookmarkPlus, BookmarkCheck } from 'lucide-react';
 import * as AI from '../utils/ai';
 import { DictEntry, Seg, Sense, senseToAnki } from '../utils/dictionary';
 import { Btn, Card, Stamp } from './ui';
@@ -10,6 +10,7 @@ import { useT } from '../utils/i18n';
 // listed meaning by meaning; each has its own "+" that sends just that meaning
 // (and its first two examples) to Anki as an audio card. The AI can point at the
 // meaning this sentence uses (pick); an AI-only answer (data) gets one "+".
+// Next to each "+", a bookmark keeps the same meaning in the word review deck.
 
 export type WordToAnki = (word: string, definition: string, example?: string) => void | Promise<void>;
 
@@ -83,20 +84,30 @@ const DefinitionPanel: React.FC<{
   onClose: () => void;
   onWordToAnki?: WordToAnki;
   onExplain?: () => void;
-}> = ({ def, onClose, onWordToAnki, onExplain }) => {
+  onKeepWord?: (word: string, definition: string, example: string) => void;
+}> = ({ def, onClose, onWordToAnki, onExplain, onKeepWord }) => {
   const t = useT();
   const [add, setAdd] = useState<AddState>({ sent: new Set(), busy: null, failed: null });
+  const [kept, setKept] = useState<Set<string>>(new Set());
 
   // id = "entry:sense" or "ai"; the popup is remounted per word, so ids never clash.
+  const fieldsOf = (id: string): { definition: string; example?: string } | null => {
+    if (id === 'ai') return def.data ? { definition: aiHtml(def.data) } : null;
+    const [e, s] = id.split(':').map(Number);
+    const entry = def.dict?.[e];
+    return entry?.senses[s] ? senseToAnki(entry, entry.senses[s]) : null;
+  };
+
+  const keep = (id: string) => {
+    const fields = fieldsOf(id);
+    if (!onKeepWord || !def.word || !fields) return;
+    setKept(k => new Set(k).add(id));
+    onKeepWord(def.word, fields.definition, fields.example ?? '');
+  };
+
   const send = async (id: string) => {
     if (!onWordToAnki || !def.word) return;
-    let fields: { definition: string; example?: string } | null = null;
-    if (id === 'ai' && def.data) fields = { definition: aiHtml(def.data) };
-    else if (def.dict) {
-      const [e, s] = id.split(':').map(Number);
-      const entry = def.dict[e];
-      if (entry?.senses[s]) fields = senseToAnki(entry, entry.senses[s]);
-    }
+    const fields = fieldsOf(id);
     if (!fields) return;
     setAdd(a => ({ ...a, busy: id, failed: null }));
     try {
@@ -106,7 +117,22 @@ const DefinitionPanel: React.FC<{
       setAdd(a => ({ ...a, busy: null, failed: id }));
     }
   };
-  const action = (id: string) => (onWordToAnki ? <AddBtn id={id} add={add} onAdd={send} /> : null);
+  const action = (id: string) => (
+    <div className="shrink-0 flex gap-1.5">
+      {onKeepWord && (
+        <Btn
+          square size="sm" tone={kept.has(id) ? 'accent-soft' : 'white'}
+          disabled={kept.has(id)}
+          onClick={() => keep(id)}
+          title={kept.has(id) ? t('definition.kept') : t('definition.keep')}
+          aria-label={t('definition.keep')}
+        >
+          {kept.has(id) ? <BookmarkCheck size={14} /> : <BookmarkPlus size={14} />}
+        </Btn>
+      )}
+      {onWordToAnki && <AddBtn id={id} add={add} onAdd={send} />}
+    </div>
+  );
 
   let n = 0; // running meaning number, matching pick.index
   const pickIndex = def.pick?.index ?? null;

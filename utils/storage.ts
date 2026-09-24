@@ -1,6 +1,5 @@
-import { SavedLine, Subtitle, PracticeConfig, AudioPaddingConfig, ClozeLevel } from '../types';
+import { Subtitle, PracticeConfig, AudioPaddingConfig, ClozeLevel } from '../types';
 
-const STORAGE_KEY = 'linguaclip_saved_lines';
 const STORAGE_KEY_PRACTICE = 'linguaclip_practice_config';
 const STORAGE_KEY_AUDIO_PADDING = 'linguaclip_audio_padding';
 
@@ -10,48 +9,6 @@ export const formatTimeCode = (seconds: number): string => {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-};
-
-export const getSavedLines = (): SavedLine[] => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch (e) {
-    console.error("Failed to load saved lines", e);
-    return [];
-  }
-};
-
-export const saveLineToStorage = (sub: Subtitle, videoName: string): SavedLine[] => {
-  const lines = getSavedLines();
-  // Prevent duplicates based on text content
-  if (lines.some(l => l.text === sub.text)) {
-    return lines;
-  }
-
-  const newLine: SavedLine = {
-    id: crypto.randomUUID(),
-    text: sub.text,
-    dateSaved: Date.now(),
-    videoName,
-    timeDisplay: formatTimeCode(sub.startTime),
-  };
-
-  const updated = [newLine, ...lines];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  return updated;
-};
-
-export const removeLineFromStorage = (text: string): SavedLine[] => {
-  const lines = getSavedLines();
-  const updated = lines.filter(l => l.text !== text);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  return updated;
-};
-
-export const clearStorage = () => {
-  localStorage.removeItem(STORAGE_KEY);
-  return [];
 };
 
 // --- Practice Config Storage ---

@@ -1,6 +1,6 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Subtitle } from '../types';
-import * as Storage from '../utils/storage';
+import { addLine, savedStarts, unsaveLine } from '../utils/review';
 
 export interface UseSavedLinesParams {
   videoId: string | null;
@@ -13,94 +13,54 @@ export interface UseSavedLinesReturn {
   savedIds: Set<number>;
   showSavedList: boolean;
   savedItems: Subtitle[];
-  
+
   // Actions
   setShowSavedList: (show: boolean) => void;
   toggleSave: (subtitle: Subtitle) => void;
   deleteSavedItem: (id: number, e?: React.MouseEvent) => void;
   isCurrentSaved: (subtitle: Subtitle | null) => boolean;
-  
-  // Initialization
-  loadSavedIds: (subtitles: Subtitle[]) => Set<number>;
-  setSavedIds: (ids: Set<number>) => void;
 }
 
+// Bookmarks live in the review library, keyed by this video + the line's start
+// time, so the same words in two videos are two separate bookmarks.
 export function useSavedLines(params: UseSavedLinesParams): UseSavedLinesReturn {
-  const { fullSubtitles, videoFileName } = params;
+  const { videoId, fullSubtitles, videoFileName } = params;
 
   const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
   const [showSavedList, setShowSavedList] = useState(false);
 
-  // Get saved items from fullSubtitles
-  const savedItems = useMemo(() => {
-    return fullSubtitles.filter(s => savedIds.has(s.id));
-  }, [fullSubtitles, savedIds]);
+  useEffect(() => {
+    setSavedIds(new Set());
+    if (!videoId) return;
+    let cancelled = false;
+    savedStarts(videoId).then(starts => {
+      if (!cancelled) setSavedIds(new Set(fullSubtitles.filter(s => starts.has(s.startTime.toFixed(2))).map(s => s.id)));
+    }).catch(console.error);
+    return () => { cancelled = true; };
+  }, [videoId, fullSubtitles]);
 
-  // Check if a subtitle is saved
-  const isCurrentSaved = useCallback((subtitle: Subtitle | null) => {
-    return subtitle ? savedIds.has(subtitle.id) : false;
-  }, [savedIds]);
+  const savedItems = useMemo(() => fullSubtitles.filter(s => savedIds.has(s.id)), [fullSubtitles, savedIds]);
 
-  // Load saved IDs from storage based on subtitle text
-  const loadSavedIds = useCallback((subtitles: Subtitle[]) => {
-    const storedLines = Storage.getSavedLines();
-    const previouslySavedIds = new Set<number>();
-    
-    subtitles.forEach(sub => {
-      if (storedLines.some(l => l.text === sub.text)) {
-        previouslySavedIds.add(sub.id);
-      }
-    });
-    
-    return previouslySavedIds;
-  }, []);
+  const isCurrentSaved = useCallback((subtitle: Subtitle | null) => (subtitle ? savedIds.has(subtitle.id) : false), [savedIds]);
 
-  // Toggle save status of a subtitle
-  const toggleSave = useCallback((subtitle: Subtitle) => {
-    const isSaved = savedIds.has(subtitle.id);
-    
-    if (isSaved) {
-      setSavedIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(subtitle.id);
-        return newSet;
-      });
-      Storage.removeLineFromStorage(subtitle.text);
-    } else {
-      setSavedIds(prev => {
-        const newSet = new Set(prev);
-        newSet.add(subtitle.id);
-        return newSet;
-      });
-      Storage.saveLineToStorage(subtitle, videoFileName || 'Unknown Video');
-    }
-  }, [savedIds, videoFileName]);
+  const unsave = useCallback((sub: Subtitle) => {
+    if (!videoId) return;
+    setSavedIds(prev => { const next = new Set(prev); next.delete(sub.id); return next; });
+    unsaveLine(videoId, sub.startTime).catch(console.error);
+  }, [videoId]);
 
-  // Delete a saved item
+  const toggleSave = useCallback((sub: Subtitle) => {
+    if (!videoId) return;
+    if (savedIds.has(sub.id)) return unsave(sub);
+    setSavedIds(prev => new Set(prev).add(sub.id));
+    addLine({ videoId, videoName: videoFileName || '', text: sub.text, start: sub.startTime, end: sub.endTime }, 'saved').catch(console.error);
+  }, [savedIds, videoId, videoFileName, unsave]);
+
   const deleteSavedItem = useCallback((id: number, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    
+    e?.stopPropagation();
     const sub = fullSubtitles.find(s => s.id === id);
-    if (sub) {
-      setSavedIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(id);
-        return newSet;
-      });
-      Storage.removeLineFromStorage(sub.text);
-    }
-  }, [fullSubtitles]);
+    if (sub) unsave(sub);
+  }, [fullSubtitles, unsave]);
 
-  return {
-    savedIds,
-    showSavedList,
-    savedItems,
-    setShowSavedList,
-    toggleSave,
-    deleteSavedItem,
-    isCurrentSaved,
-    loadSavedIds,
-    setSavedIds
-  };
+  return { savedIds, showSavedList, savedItems, setShowSavedList, toggleSave, deleteSavedItem, isCurrentSaved };
 }
-

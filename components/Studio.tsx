@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Play, Bookmark, RotateCcw, ArrowLeft, ArrowRight, Scissors } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, Bookmark, RotateCcw, ArrowLeft, ArrowRight, Scissors, Repeat } from 'lucide-react';
 import { PracticeMode, LearningMode, BlurPlaybackMode, ClozeLevel } from '../types';
 import * as AI from '../utils/ai';
 import * as Storage from '../utils/storage';
@@ -18,6 +18,8 @@ import { canCloze, pickBlanks } from '../utils/aiDrills';
 import { getClozeJob, prepareCloze, subscribeCloze } from '../utils/clozePrep';
 import { IS_WINDOWS } from '../utils/platform';
 import { matches, formatCombo, useShortcuts } from '../utils/shortcuts';
+import { addLine, addWord, getAllCards, hasAudio, lineCardId, Reason, ReviewCard } from '../utils/review';
+import ReviewSession from './ReviewSession';
 
 // The practice room: video on the left, a transcript column on the right (two faded
 // past lines over the line you work on), the remote (Transport) along the bottom.
@@ -82,6 +84,28 @@ const Studio: React.FC = () => {
   // The last step is the whole line: finishing it moves on like a normal line.
   const bdNext = () => { if (!bd.next()) { bd.cancel(); actions.onContinue(); } };
   const bdReplay = () => { if (!bd.play()) actions.onReplayCurrent(); };
+
+  // --- Review library: lines the learner got stuck on go into the sentence deck ---
+  // Writes never block practice. "Stuck" (wrong / helped / breakdown / blur) lines
+  // of this section can be redone straight from the section-done overlay.
+  const [stuck, setStuck] = useState<Set<string>>(new Set());
+  const [retry, setRetry] = useState<ReviewCard[] | null>(null);
+  useEffect(() => setStuck(new Set()), [currentSectionIndex]);
+  const record = (reason: Reason) => {
+    if (!currentSub || !videoId) return;
+    addLine({ videoId, videoName, text: currentSub.text, start: currentSub.startTime, end: currentSub.endTime }, reason).catch(console.error);
+    setStuck(prev => new Set(prev).add(lineCardId(videoId, currentSub.startTime)));
+  };
+  const keepWord = (word: string, definition: string, example: string) => {
+    if (!currentSub || !videoId) return;
+    addWord({ videoId, videoName, text: currentSub.text, start: currentSub.startTime, end: currentSub.endTime }, word, definition, example).catch(console.error);
+  };
+  const openRetry = () => {
+    if (isPlaying) actions.onTogglePlay();
+    getAllCards().then(all => setRetry(all.filter(c => stuck.has(c.id) && hasAudio(c)))).catch(console.error);
+  };
+  const retryBtn = stuck.size > 0 && <Btn onClick={openRetry}><Repeat size={16} /> {t('studio.retryStuck', { n: stuck.size })}</Btn>;
+  useEffect(() => { if (bdActive) record('breakdown'); }, [bdActive?.lineId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     actions.onSetStepReplay(bdStep && !bdLast ? () => bd.play() : null);
@@ -288,7 +312,7 @@ const Studio: React.FC = () => {
                 <span className="font-serif italic text-mute text-xl">{t('studio.endOfPart')}</span>
               ) : isBlur ? (
                 <div className="flex flex-col items-start gap-5">
-                  <BlurLine text={currentSub.text} onLookup={lookup} />
+                  <BlurLine text={currentSub.text} onLookup={lookup} onReveal={() => record('blur')} />
                   {isStep && !isPlaying && (
                     <Btn tone="accent" onClick={actions.onContinue}>{t('common.nextLine')} <ChevronRight size={16} /></Btn>
                   )}
@@ -324,6 +348,7 @@ const Studio: React.FC = () => {
                     onComplete={correct => (correct ? actions.onContinue() : actions.onInputComplete(correct))}
                     onReplay={actions.onReplayCurrent}
                     onLookup={lookup}
+                    onResult={o => { if (!o.correct) record('wrong'); else if (o.helped) record('peek'); }}
                   />
                   {mode === PracticeMode.INPUT && (bd.state.status === 'failed' || (clozeProgress && effectiveLevel !== 'full')) && (
                     <p className="mt-3 text-xs text-mute">
@@ -341,6 +366,7 @@ const Studio: React.FC = () => {
       {showSectionComplete && (
         <Overlay title={t('studio.sectionDoneTitle', { n: currentSectionIndex + 1 })} body={t('studio.sectionDoneBody')}>
           <Btn onClick={() => actions.onSetShowSectionComplete(false)}><RotateCcw size={16} /> {t('studio.review')}</Btn>
+          {retryBtn}
           <Btn onClick={actions.onStopAfterSection}>{t('studio.stopHere')}</Btn>
           <Btn tone="accent" onClick={actions.onNextSection} autoFocus>{t('studio.nextSection')} <ArrowRight size={16} /></Btn>
         </Overlay>
@@ -351,7 +377,8 @@ const Studio: React.FC = () => {
           [String(fullSubtitles.length), t('studio.statLines')],
           [String(savedIds.size), t('studio.statSaved')],
         ]}>
-          <Btn onClick={actions.onRestart}><RotateCcw size={16} /> {t('studio.startOver')}</Btn>
+          {retryBtn}
+          <Btn onClick={() => { setStuck(new Set()); actions.onRestart(); }}><RotateCcw size={16} /> {t('studio.startOver')}</Btn>
           <Btn tone="accent" onClick={actions.onExit} autoFocus>{t('studio.backToVideosBtn')}</Btn>
         </Overlay>
       )}
@@ -366,8 +393,9 @@ const Studio: React.FC = () => {
 
       {showSavedList && <SavedDrawer />}
       {defOpen && (
-        <DefinitionPanel key={def.word} def={def} onClose={closeDef} onWordToAnki={actions.onWordToAnki} onExplain={AI.aiReady() ? explain : undefined} />
+        <DefinitionPanel key={def.word} def={def} onClose={closeDef} onWordToAnki={actions.onWordToAnki} onExplain={AI.aiReady() ? explain : undefined} onKeepWord={keepWord} />
       )}
+      {retry && <ReviewSession cards={retry} onClose={() => { setRetry(null); setStuck(new Set()); }} />}
     </div>
   );
 };

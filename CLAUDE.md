@@ -61,3 +61,5 @@ node test-anki.mjs        # Anki 旧配置合并成一种卡 + 单词加粗（�
 ## 碰数据前
 
 IndexedDB `linguaclip_db`：`videos` 表是练习记录本体；`fileHandles` 表是网页时代遗留，已不读不写——**不要删表、不要动 DB_VERSION**。改记录用 `patchVideoRecord(id, {...})` 按字段更新，别整条覆盖。结构变更要先过设计门。
+
+复习卡片在另一个库 `linguaclip_review`（`utils/review.ts`，见 docs/README.md「本地数据」）。收藏 = 卡片的 `saved` 位，localStorage `linguaclip_saved_lines` 只读不写。复习库的写入一律不许挡住练习（fire-and-forget + catch）。

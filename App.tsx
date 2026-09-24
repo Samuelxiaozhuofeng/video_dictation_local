@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { AppState, PracticeMode, VideoRecord, LearningMode, BlurPlaybackMode } from './types';
-import SavedLibrary from './components/SavedLibrary';
+import ReviewPage from './components/ReviewPage';
 import Settings from './components/Settings';
 import Home from './components/Home';
 import Shell from './components/Shell';
@@ -68,7 +68,7 @@ export default function App() {
   const {
     savedIds, showSavedList, savedItems, setShowSavedList,
     toggleSave: savedLinesToggleSave, deleteSavedItem: savedLinesDeleteSavedItem,
-    isCurrentSaved: savedLinesIsCurrentSaved, loadSavedIds, setSavedIds,
+    isCurrentSaved: savedLinesIsCurrentSaved,
   } = useSavedLines({ videoId: currentVideoId, fullSubtitles, videoFileName });
 
   const finishPractice = useCallback(() => {
@@ -150,7 +150,6 @@ export default function App() {
     setVideoFileName(videoName);
     setIsPlaying(false);
     setCurrentVideoId(recordId || null);
-    setSavedIds(loadSavedIds(result.parsed));
     setVideoSrc(videoSrcFromPath(videoPath));
     setShowComplete(false);
     setAppState(AppState.PRACTICE);
@@ -258,8 +257,8 @@ export default function App() {
   const page = appState !== AppState.PRACTICE ? (
     <Shell active={appState} onNav={setAppState}>
       {appState === AppState.SETTINGS ? <Settings /> :
-       appState === AppState.LIBRARY ? <SavedLibrary /> :
-       <Home onResume={handleResume} />}
+       appState === AppState.LIBRARY ? <ReviewPage /> :
+       <Home onResume={handleResume} onOpenReview={() => setAppState(AppState.LIBRARY)} />}
     </Shell>
   ) : (
     <PracticeProvider

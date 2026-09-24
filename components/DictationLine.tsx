@@ -18,6 +18,9 @@ interface Props {
   onLookup: (word: string) => void;
   blanks?: number[]; // word indices the user types; omit = every word
   nextLabel?: string; // feedback's forward button; defaults to "next line"
+  // Once per attempt, when the line is done (all right, or submitted): did it
+  // come out right, and was help used (peek, or playing from a word).
+  onResult?: (o: { correct: boolean; helped: boolean }) => void;
 }
 
 // How far into the line word i starts, by letters: a rough stand-in for time when
@@ -32,7 +35,7 @@ const letterRatio = (words: string[], i: number): number => {
 // Typing and the answer share one setting, so submitting changes colours, not positions.
 export const LINE = 'flex flex-wrap items-baseline gap-x-[0.25em] font-serif text-[30px] leading-[42px]';
 
-const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay, onLookup, blanks, nextLabel }) => {
+const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay, onLookup, blanks, nextLabel, onResult }) => {
   const t = useT();
   const tokens = useMemo(() => tokenizeText(targetText), [targetText]);
   const wordTokens = useMemo(() => getWordTokens(tokens), [tokens]);
@@ -67,9 +70,16 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
   const [peek, setPeek] = useState<number | null>(null);
   const peekTimer = useRef<number | null>(null);
   const replayTimer = useRef<number | null>(null);
+  const attempt = useRef({ helped: false, reported: false });
+  const report = (correct: boolean) => {
+    if (attempt.current.reported) return;
+    attempt.current.reported = true;
+    onResult?.({ correct, helped: attempt.current.helped });
+  };
 
   useEffect(() => {
     if (mode === PracticeMode.INPUT) {
+      attempt.current = { helped: false, reported: false };
       setInputs(wordTokens.map((w, i) => isBlank(i) ? '' : w.value));
       refs.current = refs.current.slice(0, wordTokens.length);
       setTimeout(() => refs.current[firstBlank()]?.focus(), 50);
@@ -87,6 +97,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
 
   const showPeek = (i: number) => {
     if (!wordTokens[i]) return;
+    attempt.current.helped = true;
     if (peekTimer.current) window.clearTimeout(peekTimer.current);
     setPeek(i);
     peekTimer.current = window.setTimeout(() => { setPeek(null); peekTimer.current = null; }, 2000);
@@ -101,6 +112,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
     if (nxt >= 0) {
       setTimeout(() => refs.current[nxt]?.focus(), 100);
     } else if (areAllWordsCorrectFlexibleCase(tokens, next)) {
+      report(true);
       clearReplay();
       replayTimer.current = window.setTimeout(() => onReplay(true), 200); // all right: replay once, then auto-advance
     }
@@ -110,12 +122,15 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
     e?.preventDefault();
     if (mode !== PracticeMode.INPUT) return;
     clearReplay();
-    if (inputs.some(w => w.trim().length > 0)) onComplete(areAllWordsCorrectFlexibleCase(tokens, inputs));
+    if (!inputs.some(w => w.trim().length > 0)) return;
+    const correct = areAllWordsCorrectFlexibleCase(tokens, inputs);
+    report(correct);
+    onComplete(correct);
   };
 
   const keyDown = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.shiftKey && e.key === ' ') { e.preventDefault(); e.stopPropagation(); clearReplay(); onReplay(false); return; }
-    if (matches(e, 'playFrom')) { e.preventDefault(); e.stopPropagation(); clearReplay(); onReplay(false, letterRatio(wordTokens.map(w => w.value), i)); return; }
+    if (matches(e, 'playFrom')) { e.preventDefault(); e.stopPropagation(); clearReplay(); attempt.current.helped = true; onReplay(false, letterRatio(wordTokens.map(w => w.value), i)); return; }
     if (matches(e, 'peek')) { e.preventDefault(); showPeek(i); return; }
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
