@@ -4,7 +4,7 @@
 
 - **视频 + 自带 .srt**：`AddVideo.tsx` 直接 `createVideoRecord` 建好记录，交给 `onPractice` 进练习页，不走导入任务。拖进窗口的 .srt 也会填进弹窗。只收 .srt（`parseSRT` 读不懂别的格式）。
 - **只有视频**：走导入任务。转录组件（whisper-cli + large-v3-turbo q5_0 模型 + VAD 模型，约 580MB）**不打进 App**，第一次导入时由 `src-tauri/src/whisper_setup.rs` 下载到 `~/Library/Application Support/com.linguaclip.app/whisper/`，卡片显示 `setup` 阶段进度。弹窗先用 `import_tools` 命令查组件在不在，不在就写明大小、按钮改成「下载组件并生成字幕」。
-- **转录方式**（设置 → 转录，`utils/transcribeConfig.ts`，localStorage `linguaclip_transcribe_config`）：本机（默认）分「标准」large-v3-turbo q5_0 和「轻量」small q5_1（约 190MB，DTW 预设 `small`）；或云端 Groq（用户自填免费密钥，不下载任何组件）。`start_import` 多带 `engine / model / apiKey`，老前端不带 = 本机标准。重试按**当前**设置走，不按卡片当初的方式。
+- **转录方式**（设置 → 转录，`utils/transcribeConfig.ts`，localStorage `linguaclip_transcribe_config`）：本机（默认）分「标准」large-v3-turbo q5_0 和「轻量」small q5_1（约 190MB，DTW 预设 `small`）；或云端 Groq / 阿里云百炼（用户自填密钥，不下载任何组件；存储里 mode `cloud` = Groq、`bailian` = 百炼）。`start_import` 多带 `engine`（`local` / `groq` / `bailian`）/ `model` / `apiKey`，老前端不带 = 本机标准。重试按**当前**设置走，不按卡片当初的方式。
 - **YouTube 链接**：只给自己装了 yt-dlp（+ ffmpeg、node）的人。`import_tools` 查不到 yt-dlp 就不显示网址框。
 
 ## 链路
@@ -42,7 +42,7 @@
 - 没有「取消」：删掉生成中的卡片后台照跑到底，写回时记录不存在就跳过。
 - 语言下拉 `en / es / ja / zh / auto`，对应 whisper `-l`。旁边是画质下拉 1080 / 720 / 480。
 
-## 云端转录（cloud_asr.rs）
+## 云端转录（cloud_asr.rs 切段拼接 + groq.rs / bailian.rs）
 
 - Groq `whisper-large-v3-turbo`，`verbose_json` + 词级、句级时间戳。免费账号单次 25MB、每天约 8 小时声音、每分钟 20 次。
 - 抽出的 16k wav 按段上传：Mac 每段 60 分钟、先用 afconvert 压成 AAC（约 16MB/小时）；Windows 没有编码器，每段 11 分钟原样传 wav（约 21MB）。切口在名义位置 ±3 秒内找最静的 50ms；末尾不足 2 秒的尾巴并进上一段。
@@ -50,3 +50,5 @@
 - 报错码 `cloud:key`（401）/ `cloud:quota:…`（429）/ `cloud:toolarge`（413）/ `cloud:denied:…`（403，常见于地区不支持）/ `cloud:network:…` / `cloud:empty`，前端 `formatImportError` 翻译。失败不自动换本机。
 - 真调一次：`GROQ_API_KEY=… cargo test --manifest-path src-tauri/Cargo.toml -- --ignored groq`
 - 设置页「转录组件位置」= `transcribe_location` 命令：实际在用的那份模型（可能在 `~/.cache/whisper.cpp`），没下载时显示我们的下载目录。
+- 阿里云百炼 `qwen3-asr-flash-filetrans`（bailian.rs，北京地域，国际站密钥不通）：只收 URL，所以每段 = 取上传凭证 → 传到百炼免费临时存储（48 小时自动删，`oss://` 地址，调用时带 `X-DashScope-OssResourceResolve: enable`）→ 提交异步任务（`X-DashScope-Async: enable`，`enable_words: true`）→ 每 2 秒查一次 → 下载结果 JSON。每段 60 分钟（上传上限 1GB）。实测 11 分钟西语 8 秒出结果，逐词时间毫秒、没有回退；词不带标点，同样走句子文本补回。欠费 `Arrearage` 映射成 `cloud:quota:`。
+- 真调一次：`DASHSCOPE_API_KEY=… [LC_LONG_VIDEO=长视频] cargo test --manifest-path src-tauri/Cargo.toml -- --ignored bailian --nocapture`

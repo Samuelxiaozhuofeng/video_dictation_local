@@ -607,10 +607,10 @@ pub(crate) fn read_words(json_path: &Path) -> Result<Vec<Word>, String> {
   Ok(words)
 }
 
-// Settings → Transcription: this machine (with a model size) or Groq's cloud.
+// Settings → Transcription: this machine (with a model size) or a cloud service.
 pub(crate) enum Engine {
   Local(crate::whisper_setup::Tier),
-  Cloud { api_key: String },
+  Cloud { provider: crate::cloud_asr::Provider, api_key: String },
 }
 
 fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str, quality: u32, engine: &Engine) -> Result<(), String> {
@@ -670,11 +670,11 @@ fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str, quality: u32,
       let on_pct = |pct| emit(app, ImportProgress::stage(id, "transcribe", Some(pct)));
       transcribe(on_pct, &parts.whisper, &parts.model, &parts.vad, tier.dtw(), lang, &wav, &work).map(|()| None)
     }
-    (None, Engine::Cloud { api_key }) => {
+    (None, Engine::Cloud { provider, api_key }) => {
       emit(app, ImportProgress::stage(id, "cloud", Some(0)));
       let on_pct = |pct| emit(app, ImportProgress::stage(id, "cloud", Some(pct)));
       // Writes <work>.srt like whisper-cli; the words come back directly.
-      crate::cloud_asr::transcribe(on_pct, api_key, lang, &wav, &work).map(Some)
+      crate::cloud_asr::transcribe(on_pct, *provider, api_key, lang, &wav, &work).map(Some)
     }
     (None, Engine::Local(_)) => unreachable!("local engine always has parts"),
   }
@@ -757,12 +757,13 @@ pub fn start_import(
   // Older front ends send no engine: that is the local standard model.
   let engine = match engine.as_deref().unwrap_or("local") {
     "local" => Engine::Local(crate::whisper_setup::Tier::parse(model.as_deref().unwrap_or("standard"))?),
-    "cloud" => {
+    cloud @ ("groq" | "bailian") => {
       let key = api_key.unwrap_or_default().trim().to_string();
       if key.is_empty() {
         return Err("cloud:key".into());
       }
-      Engine::Cloud { api_key: key }
+      let provider = if cloud == "groq" { crate::cloud_asr::Provider::Groq } else { crate::cloud_asr::Provider::Bailian };
+      Engine::Cloud { provider, api_key: key }
     }
     _ => return Err("bad-engine".into()),
   };

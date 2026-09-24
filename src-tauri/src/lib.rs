@@ -1,7 +1,11 @@
 mod anki;
+mod bailian;
 mod cache;
 mod cloud_asr;
+#[cfg(test)]
+mod cloud_live_tests;
 mod decode;
+mod groq;
 mod import;
 mod paths;
 mod tts;

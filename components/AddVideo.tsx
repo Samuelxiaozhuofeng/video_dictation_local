@@ -13,7 +13,7 @@ import {
   startUrlImport,
 } from '../utils/importJob';
 import { parseSRT } from '../utils/srtParser';
-import { cloudKeyMissing, getTranscribeConfig } from '../utils/transcribeConfig';
+import { CLOUD, cloudKeyMissing, getTranscribeConfig } from '../utils/transcribeConfig';
 import * as VideoStorage from '../utils/videoStorage';
 import { useT } from '../utils/i18n';
 import { dialog } from './Dialog';
@@ -68,7 +68,7 @@ const AddVideo: React.FC<Props> = ({ initialPath, initialSrt, onClose, onPractic
   const valid = isYouTubeUrl(trimmed);
   const ownSubtitles = !!path && !!srt;
   const [engine] = useState(getTranscribeConfig);
-  const cloud = engine.mode === 'cloud';
+  const cloud = engine.mode === 'local' ? null : CLOUD[engine.mode];
   const noKey = !ownSubtitles && cloudKeyMissing(engine);
   const ready = (!!path || (valid && !!tools?.youtube)) && !noKey;
   const needsSetup = !ownSubtitles && ready && !cloud && tools?.whisper === false;
@@ -218,7 +218,7 @@ const AddVideo: React.FC<Props> = ({ initialPath, initialSrt, onClose, onPractic
           </label>}
 
           {needsSetup && <p className="text-sm text-mute">{t('add.setupNote', { size: engine.localModel === 'light' ? 190 : 580 })}</p>}
-          {!ownSubtitles && cloud && <p className={`text-sm ${noKey ? 'text-ink' : 'text-mute'}`}>{t(noKey ? 'add.cloudNoKey' : 'add.cloudNote')}</p>}
+          {!ownSubtitles && cloud && <p className={`text-sm ${noKey ? 'text-ink' : 'text-mute'}`}>{t(noKey ? 'add.cloudNoKey' : 'add.cloudNote', { name: t(cloud.name) })}</p>}
         </div>
 
         <div className="px-7 py-4 border-t border-line flex items-center justify-end gap-3">

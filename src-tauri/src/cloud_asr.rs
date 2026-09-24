@@ -1,7 +1,8 @@
-// Cloud transcription through Groq's hosted Whisper (Settings → Transcription).
-// The 16k mono wav import.rs extracted is cut into pieces that each fit one
-// upload (free accounts: 25MB), at a quiet spot near each cut, sent one by one,
-// and stitched back into the same .srt file and word list the local engine gives.
+// Cloud transcription (Settings → Transcription): Groq's hosted Whisper or
+// Alibaba Cloud Bailian's Qwen3-ASR. The 16k mono wav import.rs extracted is
+// cut into pieces that each fit one upload, at a quiet spot near each cut, sent
+// one by one, and stitched back into the same .srt file and word list the local
+// engine gives. The providers themselves live in groq.rs and bailian.rs.
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 use std::time::Duration;
@@ -10,31 +11,43 @@ use tauri_plugin_http::reqwest;
 
 use crate::import::Word;
 
-const URL: &str = "https://api.groq.com/openai/v1/audio/transcriptions";
-const MODEL: &str = "whisper-large-v3-turbo";
-const RATE: u64 = 16_000; // samples per second, mono 16-bit (extract_wav)
+pub(crate) const RATE: u64 = 16_000; // samples per second, mono 16-bit (extract_wav)
 
-// macOS compresses each piece to AAC (~36kbps measured → ~16MB an hour);
-// elsewhere pieces go up as plain wav (32KB/s → ~21MB per 11 minutes).
-#[cfg(target_os = "macos")]
-const PIECE_SECS: u64 = 60 * 60;
-#[cfg(not(target_os = "macos"))]
-const PIECE_SECS: u64 = 11 * 60;
+#[derive(Clone, Copy)]
+pub(crate) enum Provider {
+  Groq,
+  Bailian,
+}
+
+impl Provider {
+  // macOS compresses each piece to AAC (~36kbps measured → ~16MB an hour);
+  // elsewhere pieces go up as plain wav (32KB/s). Groq's free tier takes 25MB
+  // an upload (11 minutes of wav); Bailian takes 1GB, so an hour is plenty.
+  fn piece_secs(self) -> u64 {
+    match self {
+      Self::Groq if cfg!(target_os = "macos") => 60 * 60,
+      Self::Groq => 11 * 60,
+      Self::Bailian => 60 * 60,
+    }
+  }
+}
 // A cut moves at most this far to land in a pause instead of mid-word.
 const SLACK_SECS: u64 = 3;
 
 pub(crate) fn transcribe(
   on_pct: impl FnMut(u32),
+  provider: Provider,
   api_key: &str,
   lang: &str,
   wav: &Path,
   stem: &Path,
 ) -> Result<Vec<Word>, String> {
-  transcribe_in_pieces(on_pct, api_key, lang, wav, stem, PIECE_SECS)
+  transcribe_in_pieces(on_pct, provider, api_key, lang, wav, stem, provider.piece_secs())
 }
 
-fn transcribe_in_pieces(
+pub(crate) fn transcribe_in_pieces(
   mut on_pct: impl FnMut(u32),
+  provider: Provider,
   api_key: &str,
   lang: &str,
   wav: &Path,
@@ -49,7 +62,8 @@ fn transcribe_in_pieces(
 
   let client = reqwest::Client::builder()
     .connect_timeout(Duration::from_secs(15))
-    // A 16MB upload on a slow line; generous, but not forever.
+    // A 16MB upload on a slow line; generous, but not forever. (Bailian's
+    // wait for its queue is polled, not held open, so this covers it too.)
     .timeout(Duration::from_secs(10 * 60))
     .build()
     .map_err(|e| format!("cloud:network:{e}"))?;
@@ -60,7 +74,12 @@ fn transcribe_in_pieces(
   let pieces: Vec<(u64, u64)> = cuts.windows(2).map(|w| (w[0], w[1])).collect();
   for (i, &(from, to)) in pieces.iter().enumerate() {
     let audio = piece_audio(&mut file, data_at, from, to, stem, i)?;
-    let resp = tauri::async_runtime::block_on(send(&client, api_key, lang, audio))?;
+    let resp = tauri::async_runtime::block_on(async {
+      match provider {
+        Provider::Groq => crate::groq::send(&client, api_key, lang, audio).await,
+        Provider::Bailian => crate::bailian::send(&client, api_key, lang, audio).await,
+      }
+    })?;
     let offset_ms = from * 1000 / RATE;
     for seg in &resp.segments {
       let text = seg.text.trim();
@@ -100,7 +119,7 @@ fn transcribe_in_pieces(
 
 // Byte offset and sample count of the PCM data. afconvert writes extra chunks
 // (FLLR padding) before `data`, so walk the chunk list instead of assuming 44.
-fn wav_data(path: &Path) -> std::io::Result<(u64, u64)> {
+pub(crate) fn wav_data(path: &Path) -> std::io::Result<(u64, u64)> {
   let mut f = std::fs::File::open(path)?;
   let mut head = [0u8; 12];
   f.read_exact(&mut head)?;
@@ -216,85 +235,44 @@ fn compress(wav: Vec<u8>, _stem: &Path, _i: usize) -> Result<(Vec<u8>, &'static 
   Ok((wav, "audio.wav", "audio/wav"))
 }
 
-// ---- Groq -----------------------------------------------------------------
+// ---- what every provider hands back ----------------------------------------
 
+// A provider's answer in one shape: its lines (seconds, punctuated text) and
+// its words (seconds; spelling may lack punctuation, see punctuate()).
 #[derive(serde::Deserialize, Default)]
-struct Resp {
+pub(crate) struct Resp {
   #[serde(default)]
-  segments: Vec<Seg>,
+  pub(crate) segments: Vec<Seg>,
   #[serde(default)]
-  words: Vec<RawWord>,
+  pub(crate) words: Vec<RawWord>,
 }
 
 #[derive(serde::Deserialize)]
-struct Seg {
-  start: f64,
-  end: f64,
-  text: String,
+pub(crate) struct Seg {
+  pub(crate) start: f64,
+  pub(crate) end: f64,
+  pub(crate) text: String,
 }
 
 #[derive(serde::Deserialize)]
-struct RawWord {
-  word: String,
-  start: f64,
-  end: f64,
+pub(crate) struct RawWord {
+  pub(crate) word: String,
+  pub(crate) start: f64,
+  pub(crate) end: f64,
 }
 
-async fn send(
-  client: &reqwest::Client,
-  api_key: &str,
-  lang: &str,
-  (audio, name, mime): (Vec<u8>, &str, &str),
-) -> Result<Resp, String> {
-  let boundary = format!("lc{}", uuid::Uuid::new_v4().simple());
-  let mut body = Vec::with_capacity(audio.len() + 1024);
-  let mut field = |k: &str, v: &str| {
+// multipart/form-data by hand (reqwest is built without its multipart feature).
+pub(crate) fn form_body(boundary: &str, fields: &[(&str, &str)], (file, name, mime): (&[u8], &str, &str)) -> Vec<u8> {
+  let mut body = Vec::with_capacity(file.len() + 2048);
+  for (k, v) in fields {
     body.extend_from_slice(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"{k}\"\r\n\r\n{v}\r\n").as_bytes());
-  };
-  field("model", MODEL);
-  field("response_format", "verbose_json");
-  field("timestamp_granularities[]", "word");
-  field("timestamp_granularities[]", "segment");
-  field("temperature", "0");
-  if lang != "auto" {
-    field("language", lang);
   }
   body.extend_from_slice(
-    format!("--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{name}\"\r\nContent-Type: {mime}\r\n\r\n")
-      .as_bytes(),
+    format!("--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{name}\"\r\nContent-Type: {mime}\r\n\r\n").as_bytes(),
   );
-  body.extend_from_slice(&audio);
+  body.extend_from_slice(file);
   body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
-
-  let res = client
-    .post(URL)
-    .bearer_auth(api_key)
-    .header("Content-Type", format!("multipart/form-data; boundary={boundary}"))
-    .body(body)
-    .send()
-    .await
-    .map_err(|e| format!("cloud:network:{e}"))?;
-  let status = res.status().as_u16();
-  let text = res.text().await.map_err(|e| format!("cloud:network:{e}"))?;
-  if status != 200 {
-    return Err(http_error(status, &text));
-  }
-  serde_json::from_str(&text).map_err(|e| format!("cloud:{e}"))
-}
-
-// Raw codes; utils/importJob.ts formatImportError turns them into sentences.
-fn http_error(status: u16, body: &str) -> String {
-  let msg = serde_json::from_str::<serde_json::Value>(body)
-    .ok()
-    .and_then(|v| v.pointer("/error/message").and_then(|m| m.as_str()).map(str::to_string))
-    .unwrap_or_else(|| body.chars().take(200).collect());
-  match status {
-    401 => "cloud:key".into(),
-    429 => format!("cloud:quota:{msg}"),
-    413 => "cloud:toolarge".into(),
-    403 => format!("cloud:denied:{msg}"),
-    _ => format!("cloud:HTTP {status} {msg}"),
-  }
+  body
 }
 
 // ---- words ----------------------------------------------------------------
@@ -444,59 +422,6 @@ mod tests {
     let len = std::fs::metadata(&wav).unwrap().len();
     assert_eq!(at + n * 2, len);
     assert!(n > RATE * 3, "{n} samples");
-    std::fs::remove_dir_all(&dir).unwrap();
-  }
-
-  // Real Groq call with the fixture clip. Needs a key:
-  // GROQ_API_KEY=… cargo test --manifest-path src-tauri/Cargo.toml -- --ignored groq
-  #[test]
-  #[ignore]
-  fn groq_transcribes_fixture() {
-    let key = std::env::var("GROQ_API_KEY").expect("GROQ_API_KEY");
-    let dir = std::env::temp_dir().join(format!("lc-groq-{}", uuid::Uuid::new_v4()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let video = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/speech.m4v");
-    let wav = dir.join("s.wav");
-    crate::import::extract_wav(&video, &wav).unwrap();
-    let stem = dir.join("s");
-    let words = transcribe(|_| {}, &key, "en", &wav, &stem).unwrap();
-    let srt = std::fs::read_to_string(stem.with_extension("srt")).unwrap();
-    eprintln!("{srt}\n{:?}", texts(&words));
-    assert!(srt.to_lowercase().contains("quick brown fox"), "{srt}");
-    assert!(words.len() >= 8 && words.iter().any(|w| w.w.ends_with('.')), "{:?}", texts(&words));
-    assert!(std::fs::read_dir(&dir).unwrap().count() == 2, "piece files left behind");
-    std::fs::remove_dir_all(&dir).unwrap();
-  }
-
-  // Several pieces stitched back together, on a real 11-minute Spanish video cut
-  // every 4 minutes (uses ~11 minutes of the free daily quota):
-  // GROQ_API_KEY=… LC_LONG_VIDEO=/path/video.mp4 cargo test … -- --ignored groq_pieces --nocapture
-  #[test]
-  #[ignore]
-  fn groq_pieces_stitch_in_order() {
-    let key = std::env::var("GROQ_API_KEY").expect("GROQ_API_KEY");
-    let video = std::env::var("LC_LONG_VIDEO").expect("LC_LONG_VIDEO");
-    let dir = std::env::temp_dir().join(format!("lc-groq-{}", uuid::Uuid::new_v4()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let wav = dir.join("s.wav");
-    crate::import::extract_wav(Path::new(&video), &wav).unwrap();
-    let (_, samples) = wav_data(&wav).unwrap();
-    let stem = dir.join("s");
-    let mut pcts = Vec::new();
-    let words = transcribe_in_pieces(|p| pcts.push(p), &key, "es", &wav, &stem, 240).unwrap();
-    let srt = std::fs::read_to_string(stem.with_extension("srt")).unwrap();
-    eprintln!("progress {pcts:?}, {} words, {} cues", words.len(), srt.matches(" --> ").count());
-    for cut in [240_000u32, 480_000] {
-      let near: Vec<String> = words.iter().filter(|w| w.from.abs_diff(cut) < 6000).map(|w| format!("{}@{}", w.w, w.from)).collect();
-      eprintln!("around {cut}: {}", near.join(" "));
-    }
-    eprintln!("{}", &srt[srt.len().saturating_sub(300)..]);
-    assert_eq!(pcts.len(), 3);
-    assert!(words.len() > 500);
-    assert!(words.windows(2).all(|p| p[1].from >= p[0].from));
-    assert!(u64::from(words.last().unwrap().to) <= samples * 1000 / RATE + 1000);
-    assert!(words.last().unwrap().from > 600_000, "last word should be near the end");
-    assert!(words.iter().any(|w| w.w.starts_with('¿')), "Spanish opening marks kept");
     std::fs::remove_dir_all(&dir).unwrap();
   }
 }

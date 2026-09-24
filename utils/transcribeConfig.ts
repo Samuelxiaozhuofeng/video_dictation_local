@@ -1,25 +1,32 @@
 import { isBadKey } from './aiConfig';
 
 // Settings → Transcription: how "make subtitles" runs. On this machine with one
-// of two model sizes, or on Groq's hosted Whisper with the user's own free key.
-// Stored on this machine only, like the AI key.
+// of two model sizes, or on a cloud service with the user's own key: Groq
+// (mode 'cloud', the first cloud option, kept for saved settings) or Alibaba
+// Cloud Bailian. Stored on this machine only, like the AI key.
 
-export type TranscribeMode = 'local' | 'cloud';
+export type TranscribeMode = 'local' | 'cloud' | 'bailian';
 export type LocalModel = 'standard' | 'light';
-export type TranscribeConfig = { mode: TranscribeMode; localModel: LocalModel; groqKey: string };
+export type TranscribeConfig = { mode: TranscribeMode; localModel: LocalModel; groqKey: string; bailianKey: string };
+export type CloudMode = Exclude<TranscribeMode, 'local'>;
 
-export const GROQ_KEYS_URL = 'https://console.groq.com/keys';
+export const CLOUD = {
+  cloud: { name: 'transcribe.cloud', engine: 'groq', keyField: 'groqKey', keysUrl: 'https://console.groq.com/keys', placeholder: 'gsk_…' },
+  bailian: { name: 'transcribe.bailian', engine: 'bailian', keyField: 'bailianKey', keysUrl: 'https://bailian.console.aliyun.com/?tab=model#/api-key', placeholder: 'sk-…' },
+} as const;
 
 const STORAGE_KEY = 'linguaclip_transcribe_config';
-const DEFAULTS: TranscribeConfig = { mode: 'local', localModel: 'standard', groqKey: '' };
+const DEFAULTS: TranscribeConfig = { mode: 'local', localModel: 'standard', groqKey: '', bailianKey: '' };
 
 export function getTranscribeConfig(): TranscribeConfig {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    const str = (v: unknown) => (typeof v === 'string' ? v : '');
     return {
-      mode: stored.mode === 'cloud' ? 'cloud' : 'local',
+      mode: stored.mode === 'cloud' || stored.mode === 'bailian' ? stored.mode : 'local',
       localModel: stored.localModel === 'light' ? 'light' : 'standard',
-      groqKey: typeof stored.groqKey === 'string' ? stored.groqKey : '',
+      groqKey: str(stored.groqKey),
+      bailianKey: str(stored.bailianKey),
     };
   } catch {
     return { ...DEFAULTS };
@@ -30,16 +37,19 @@ export function saveTranscribeConfig(config: TranscribeConfig): void {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(config)); } catch { /* localStorage unavailable */ }
 }
 
-// Cloud picked but no usable key: the add-video dialog stops here instead of
-// starting an import that can only fail.
+const cloudKey = (config: TranscribeConfig): string =>
+  config.mode === 'local' ? '' : config[CLOUD[config.mode].keyField].trim();
+
+// A cloud service picked but no usable key: the add-video dialog stops here
+// instead of starting an import that can only fail.
 export function cloudKeyMissing(config = getTranscribeConfig()): boolean {
-  const key = config.groqKey.trim();
-  return config.mode === 'cloud' && (!key || isBadKey(key));
+  const key = cloudKey(config);
+  return config.mode !== 'local' && (!key || isBadKey(key));
 }
 
 // What start_import needs to know about the engine (src-tauri/src/import.rs).
 export function engineArgs(config = getTranscribeConfig()) {
-  return config.mode === 'cloud'
-    ? { engine: 'cloud', model: null, apiKey: config.groqKey.trim() }
-    : { engine: 'local', model: config.localModel, apiKey: null };
+  return config.mode === 'local'
+    ? { engine: 'local', model: config.localModel, apiKey: null }
+    : { engine: CLOUD[config.mode].engine, model: null, apiKey: cloudKey(config) };
 }
