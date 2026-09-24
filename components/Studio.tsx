@@ -317,7 +317,7 @@ const Studio: React.FC = () => {
                     targetText={currentSub.text}
                     mode={mode}
                     blanks={blanks}
-                    onComplete={correct => (correct ? actions.onContinue() : actions.onInputComplete(correct))}
+                    onComplete={correct => (correct && mode === PracticeMode.FEEDBACK ? actions.onContinue() : actions.onInputComplete(correct))}
                     onReplay={actions.onReplayCurrent}
                     onLookup={lookup}
                     extra={offerBtn}

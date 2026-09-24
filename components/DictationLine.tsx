@@ -115,7 +115,8 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
     } else if (areAllWordsCorrectFlexibleCase(tokens, next)) {
       report(true);
       clearReplay();
-      replayTimer.current = window.setTimeout(() => onReplay(true), 200); // all right: replay once, then auto-advance
+      // All right: replay once and show the answer, then wait for Enter so words can be looked up.
+      replayTimer.current = window.setTimeout(() => { onReplay(false); onComplete(true); }, 200);
     }
   };
 
