@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AudioPaddingConfig } from '../types';
 import { Field, Seg } from './ui';
 import { useT, Lang } from '../utils/i18n';
+import { getPracticeConfig, savePracticeConfig } from '../utils/storage';
 import { DICT_OPTIONS, DictLang, getDictChoice, saveDictChoice } from '../utils/dictionary';
 
 interface SettingsGeneralProps {
@@ -51,6 +52,7 @@ const SettingsGeneral: React.FC<SettingsGeneralProps> = ({
   onSaved,
 }) => {
   const t = useT();
+  const [autoAdd, setAutoAdd] = useState(() => getPracticeConfig().autoAddReview ?? true);
   const SECTION_OPTS = [
     { value: 0, label: t('settingsGeneral.optFull') },
     { value: 1, label: '1' },
@@ -75,6 +77,17 @@ const SettingsGeneral: React.FC<SettingsGeneralProps> = ({
         }
       >
         <Seg options={SECTION_OPTS} value={sectionLength} onChange={setSectionLength} className="flex-wrap" />
+      </Field>
+
+      <Field label={t('settingsGeneral.autoAddReview')} hint={t('settingsGeneral.autoAddReviewHint')}>
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={autoAdd}
+            onChange={e => { setAutoAdd(e.target.checked); savePracticeConfig({ ...getPracticeConfig(), autoAddReview: e.target.checked }); onSaved(); }}
+          />
+          {t('settingsGeneral.autoAddReviewLabel')}
+        </label>
       </Field>
 
       <DictionaryPicker onSaved={onSaved} />

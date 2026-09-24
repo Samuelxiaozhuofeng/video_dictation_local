@@ -142,6 +142,9 @@ export const en = {
   'settings.savedFlash': 'Saved ✓',
 
   // --- SettingsGeneral.tsx ---
+  'settingsGeneral.autoAddReview': 'Sentence review',
+  'settingsGeneral.autoAddReviewLabel': 'Automatically add lines I miss, peek at or break down to sentence review',
+  'settingsGeneral.autoAddReviewHint': 'When off, those lines show a button under the answer so you choose whether to add them.',
   'settingsGeneral.sectionLength': 'Section length',
   'settingsGeneral.sectionLengthHintFull': 'The entire video will be played as one continuous session.',
   'settingsGeneral.sectionLengthHint': 'The video will be automatically divided into {n}-minute sections to reduce practice fatigue.',
@@ -429,3 +432,4 @@ export const en = {
   'definition.keep': 'Keep this word (word review)',
   'definition.kept': 'Kept',
 } as const;
+  'studio.addToReview': 'Add to sentence review',

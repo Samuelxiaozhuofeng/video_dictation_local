@@ -143,6 +143,9 @@ export const zh: Record<keyof typeof en, string> = {
   'settings.savedFlash': '已保存 ✓',
 
   // --- SettingsGeneral.tsx ---
+  'settingsGeneral.autoAddReview': '句子复习',
+  'settingsGeneral.autoAddReviewLabel': '答错、用了提示或拆解的句子，自动加入句子复习',
+  'settingsGeneral.autoAddReviewHint': '不勾选时，这些句子会在答案下面出一个按钮，你自己决定要不要加。',
   'settingsGeneral.sectionLength': '分段长度',
   'settingsGeneral.sectionLengthHintFull': '整个视频会作为一段连续的练习播放。',
   'settingsGeneral.sectionLengthHint': '视频会自动按每 {n} 分钟分段，减少练习疲劳。',
@@ -430,3 +433,4 @@ export const zh: Record<keyof typeof en, string> = {
   'definition.keep': '记下这个词（进单词复习）',
   'definition.kept': '已记下',
 };
+  'studio.addToReview': '加入句子复习',

@@ -95,8 +95,13 @@ const Studio: React.FC = () => {
   useEffect(() => setStuck(new Set()), [currentSectionIndex]);
   // Writes still in flight, so "redo" can wait for the last line's card instead of missing it.
   const pending = useRef(new Set<Promise<void>>());
-  const record = (reason: Reason) => {
+  // Auto-add is a setting; when off, a stuck line only offers an "add" button.
+  const autoAdd = Storage.getPracticeConfig().autoAddReview ?? true;
+  const [offer, setOffer] = useState<{ reason: Reason; start: number } | null>(null);
+  const record = (reason: Reason, force = false) => {
     if (!currentSub || !videoId) return;
+    if (!autoAdd && !force) { setOffer({ reason, start: currentSub.startTime }); return; }
+    setOffer(null);
     const p = addLine({ videoId, videoName, text: currentSub.text, start: currentSub.startTime, end: currentSub.endTime }, reason).catch(console.error);
     pending.current.add(p);
     p.finally(() => pending.current.delete(p));
@@ -320,6 +325,9 @@ const Studio: React.FC = () => {
                     </p>
                   )}
                 </>
+              )}
+              {offer && offer.start === currentSub.startTime && (
+                <Btn className="mt-3" onClick={() => record(offer.reason, true)}><Bookmark size={16} /> {t('studio.addToReview')}</Btn>
               )}
             </div>
           </div>
