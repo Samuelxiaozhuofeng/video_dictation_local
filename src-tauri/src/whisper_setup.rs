@@ -26,13 +26,21 @@ struct Asset {
 }
 
 // macOS: built by scripts/build-whisper-cli.sh; links only system frameworks.
-#[cfg(not(windows))]
+#[cfg(all(not(windows), not(target_arch = "x86_64")))]
 const WHISPER_CLI: Asset = Asset {
   name: "whisper-cli",
   size: 3_055_240,
   sha256: "09d672178dcc7daba8f5b36a2a0bab86a5de9cd8f0bcf699f2fc7f785274a80f",
   // ponytail: GitHub only; add a mirror if users in China report this step failing.
   urls: &["https://github.com/Samuelxiaozhuofeng/video_dictation_local/releases/download/whisper-cli-1.8.4/whisper-cli"],
+};
+// Intel Mac: same script with ARCH=x86_64 (CPU only, no Metal), its own Release.
+#[cfg(all(not(windows), target_arch = "x86_64"))]
+const WHISPER_CLI: Asset = Asset {
+  name: "whisper-cli",
+  size: 2_787_904,
+  sha256: "bf75b0892780cec6435d99f08236f11aa736a62a2383bed53c117beea033cc96",
+  urls: &["https://github.com/Samuelxiaozhuofeng/video_dictation_local/releases/download/whisper-cli-1.8.4-x86_64/whisper-cli"],
 };
 #[cfg(not(windows))]
 const WHISPER_EXE: &str = "whisper-cli";
