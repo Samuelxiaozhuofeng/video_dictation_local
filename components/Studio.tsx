@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Play, Bookmark, RotateCcw, ArrowLeft, ArrowRight, Scissors, Repeat } from 'lucide-react';
 import { PracticeMode, LearningMode, BlurPlaybackMode, ClozeLevel } from '../types';
-import * as AI from '../utils/ai';
 import * as Storage from '../utils/storage';
 import { usePracticeContext } from '../hooks/usePracticeContext';
 import { useBreakdown } from '../hooks/useBreakdown';
@@ -10,10 +9,11 @@ import DictationLine, { LINE } from './DictationLine';
 import BlurLine from './BlurLine';
 import Transport from './Transport';
 import SavedDrawer from './SavedDrawer';
-import DefinitionPanel, { DefinitionState, emptyDefinition } from './DefinitionPanel';
+import DefinitionPanel from './DefinitionPanel';
+import { useLookup } from '../hooks/useLookup';
 import { tokenizeText, getWordTokens } from '../utils/textTokenizer';
-import { useT, getLang } from '../utils/i18n';
-import { detectLang, lookupWord, senseList, DictEntry } from '../utils/dictionary';
+import { useT } from '../utils/i18n';
+import { detectLang } from '../utils/dictionary';
 import { canCloze, pickBlanks } from '../utils/aiDrills';
 import { getClozeJob, prepareCloze, subscribeCloze } from '../utils/clozePrep';
 import { IS_WINDOWS } from '../utils/platform';
@@ -171,53 +171,8 @@ const Studio: React.FC = () => {
   };
 
   // --- Word lookup (shared by both modes) ---
-  const [def, setDef] = useState<DefinitionState>(emptyDefinition);
-  const lookupSeq = useRef(0);
-
   const dictLang = useMemo(() => detectLang(lineTexts), [lineTexts]);
-
-  // Dictionary first. AI answers instead when the dictionary has nothing (or no
-  // dictionary covers the language), and first when the UI is English, since
-  // the dictionaries only give Chinese.
-  const lookup = async (word: string) => {
-    const seq = ++lookupSeq.current;
-    const mine = () => seq === lookupSeq.current;
-    const context = currentSub?.text ?? '';
-    const ai = AI.aiReady();
-    setDef({ ...emptyDefinition, word, loading: true });
-    let dict: DictEntry[] | null = null;
-    let offline = false;
-    if (dictLang && !(ai && getLang() === 'en')) {
-      try { dict = await lookupWord(word, dictLang); } catch (e) { offline = true; console.error('Dictionary lookup failed:', e); }
-    }
-    if (!mine()) return;
-    if (dict) return setDef({ ...emptyDefinition, word, dict, context });
-    if (!ai) {
-      const error = t(offline ? 'definition.dictOffline' : dictLang ? 'definition.notFound' : 'definition.noDictLang');
-      return setDef({ ...emptyDefinition, word, failed: true, error });
-    }
-    try {
-      const data = await AI.getWordDefinition(word, context);
-      if (mine()) setDef({ ...emptyDefinition, word, data });
-    } catch (e) {
-      if (mine()) setDef({ ...emptyDefinition, word, failed: true, error: (e as Error).message });
-    }
-  };
-
-  // AI points at the dictionary meaning this sentence uses.
-  const explain = async () => {
-    const seq = lookupSeq.current;
-    const { word, context, dict } = def;
-    if (!word || !dict) return;
-    setDef(d => ({ ...d, aiLoading: true, aiError: undefined }));
-    try {
-      const pick = await AI.pickSense(word, context ?? '', senseList(dict).map(s => s.line));
-      if (seq === lookupSeq.current) setDef(d => ({ ...d, pick, aiLoading: false }));
-    } catch (e) {
-      if (seq === lookupSeq.current) setDef(d => ({ ...d, aiLoading: false, aiError: (e as Error).message }));
-    }
-  };
-  const closeDef = () => { lookupSeq.current++; setDef(emptyDefinition); };
+  const { def, lookup, explain, closeDef } = useLookup(dictLang, currentSub?.text ?? '');
 
   useEffect(closeDef, [currentSubtitleIndex, currentSectionIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -400,7 +355,7 @@ const Studio: React.FC = () => {
 
       {showSavedList && <SavedDrawer />}
       {defOpen && (
-        <DefinitionPanel key={def.word} def={def} onClose={closeDef} onWordToAnki={actions.onWordToAnki} onExplain={AI.aiReady() ? explain : undefined} onKeepWord={keepWord} />
+        <DefinitionPanel key={def.word} def={def} onClose={closeDef} onWordToAnki={actions.onWordToAnki} onExplain={explain} onKeepWord={keepWord} />
       )}
       {retry && <ReviewSession cards={retry} onClose={() => { setRetry(null); setStuck(new Set()); }} />}
     </div>

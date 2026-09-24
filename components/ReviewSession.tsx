@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PracticeMode } from '../types';
-import { ReviewCard, Outcome, recordOutcome, repointVideo, getAllCards, dueQueue, wordIndexIn } from '../utils/review';
+import { ReviewCard, Outcome, recordOutcome, repointVideo, getAllCards, dueQueue, wordIndexIn, addWord } from '../utils/review';
 import { getVideoRecord, patchVideoRecord } from '../utils/videoStorage';
 import { getAudioPaddingConfig } from '../utils/storage';
 import { videoSrcFromPath, pathExists, pickVideoPath } from '../utils/desktop';
 import { tokenizeText, getWordTokens } from '../utils/textTokenizer';
 import { Btn, Card } from './ui';
 import DictationLine from './DictationLine';
+import DefinitionPanel from './DefinitionPanel';
+import { useLookup } from '../hooks/useLookup';
+import { detectLang } from '../utils/dictionary';
 import { useT } from '../utils/i18n';
 
 // A review round: one card at a time over the whole window, graded by how the
@@ -113,6 +116,16 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
     [card],
   );
 
+  // Words in the answer can be looked up, and kept, as on the practice page (no Anki: that records off the practice video).
+  const dictLang = useMemo(() => detectLang(queue.map(c => c.text)), [queue]);
+  const { def, lookup, explain, closeDef } = useLookup(dictLang, card?.text ?? '');
+  useEffect(closeDef, [card]); // eslint-disable-line react-hooks/exhaustive-deps
+  const keepWord = (word: string, definition: string, example: string) => {
+    if (!card) return;
+    const videoPath = relinked.current.get(card.videoId) ?? card.videoPath;
+    addWord({ videoId: card.videoId, videoName: card.videoName, videoPath, text: card.text, start: card.start, end: card.end }, word, definition, example).catch(console.error);
+  };
+
   const playCard = (then?: () => void, fromRatio?: number) => {
     if (!card || !path) return;
     const [from, to] = clipOf(card);
@@ -183,16 +196,17 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
     setMode(PracticeMode.INPUT);
   };
 
-  // Own keys only: Esc quits, Enter moves on from feedback; nothing reaches the page underneath.
-  const keys = useRef({ onClose, next, mode, done });
-  keys.current = { onClose, next, mode, done };
+  // Own keys only: Esc closes the definition, else quits; Enter moves on from feedback; nothing reaches the page underneath.
+  const defOpen = def.word !== null;
+  const keys = useRef({ onClose, next, mode, done, defOpen, closeDef });
+  keys.current = { onClose, next, mode, done, defOpen, closeDef };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const inside = rootRef.current?.contains(e.target as Node);
       const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
       const k = keys.current;
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); k.onClose(); return; }
-      if (e.key === 'Enter' && !typing && !k.done && k.mode === PracticeMode.FEEDBACK) { e.preventDefault(); e.stopPropagation(); k.next(); return; }
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (k.defOpen) k.closeDef(); else k.onClose(); return; }
+      if (e.key === 'Enter' && !typing && !k.done && !k.defOpen && k.mode === PracticeMode.FEEDBACK) { e.preventDefault(); e.stopPropagation(); k.next(); return; }
       if (!inside) e.stopPropagation();
     };
     window.addEventListener('keydown', onKey, true);
@@ -242,7 +256,7 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
                 nextLabel={isWord ? t('session.next') : undefined}
                 onComplete={complete}
                 onReplay={replay}
-                onLookup={() => {}}
+                onLookup={lookup}
                 onResult={result}
               />
               {isWord && mode === PracticeMode.FEEDBACK && (
@@ -257,6 +271,7 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
           ) : null}
         </div>
       </div>
+      {defOpen && <DefinitionPanel key={def.word} def={def} onClose={closeDef} onExplain={explain} onKeepWord={keepWord} />}
     </div>
   );
 };
