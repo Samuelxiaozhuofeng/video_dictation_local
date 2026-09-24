@@ -92,13 +92,21 @@ export async function writeCacheText(id: string, kind: CacheKind, text: string):
 export async function relatedFilePaths(id: string, videoPath: string, subtitleFileName: string): Promise<string[]> {
   const ours = await ownDir();
   const videoDir = videoPath.slice(0, Math.max(videoPath.lastIndexOf('/'), videoPath.lastIndexOf('\\')));
-  const candidates = [
-    await cacheFilePath(id, 'words'),
-    await cacheFilePath(id, 'cloze'),
-    await cacheFilePath(id, 'breakdown'),
+  return existing([
+    ...await cachePaths(id),
     ...(subtitleFileName ? [await join(ours, subtitleFileName), await join(videoDir, subtitleFileName)] : []),
-  ];
-  const unique = [...new Set(candidates)];
+  ]);
+}
+
+// Just our word/cloze/breakdown caches for a record, the ones that exist.
+export async function cacheFilePaths(id: string): Promise<string[]> {
+  return existing(await cachePaths(id));
+}
+
+const cachePaths = (id: string) => Promise.all((['words', 'cloze', 'breakdown'] as const).map(k => cacheFilePath(id, k)));
+
+async function existing(paths: string[]): Promise<string[]> {
+  const unique = [...new Set(paths)];
   const found = await Promise.all(unique.map(pathExists));
   return unique.filter((_, i) => found[i]);
 }

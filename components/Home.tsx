@@ -5,7 +5,7 @@ import * as VideoStorage from '../utils/videoStorage';
 import { getPracticeConfig } from '../utils/storage';
 import { parseSRT } from '../utils/srtParser';
 import { buildSections } from '../utils/sections';
-import { fileNameFromPath, listenDragDrop, trashFile, relatedFilePaths } from '../utils/desktop';
+import { fileNameFromPath, listenDragDrop, trashFile, relatedFilePaths, cacheFilePaths } from '../utils/desktop';
 import { formatImportError, isCookieError, openYouTubeLogin, retryImport, subscribeImportJobs } from '../utils/importJob';
 import { Btn, Menu, MenuItem, Seg } from './ui';
 import VideoCover from './VideoCover';
@@ -15,7 +15,7 @@ import AddVideo from './AddVideo';
 import { canCloze } from '../utils/aiDrills';
 import { cancelPrep, getPrepJob, prepStatus, prepareBreakdowns, subscribePrep } from '../utils/breakdownPrep';
 import { cancelCloze, clozeStatus, getClozeJob, linesOf, prepareCloze, subscribeCloze } from '../utils/clozePrep';
-import { countForVideo, deckCounts, getAllCards, subscribeCards } from '../utils/review';
+import { countForVideo, deckCounts, deleteVideoCards, getAllCards, subscribeCards } from '../utils/review';
 import { getToday } from '../utils/today';
 
 // Home does two things: pick up the video you were on, and add a new one.
@@ -182,15 +182,16 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
   };
 
   const handleDelete = async (v: VideoRecord) => {
-    const n = await countForVideo(v.id).catch(() => 0);
-    const cardsNote = n > 0 ? ' ' + t('home.deleteHasCards', { n }) : '';
-    const ok = await dialog.confirm(t('home.deleteTitle'), t('home.deleteBody', { name: v.displayName }) + (v.videoPath ? '' : cardsNote), { ok: t('home.deleteOk'), danger: true });
+    const n = await countForVideo(v.id).catch(() => -1); // unreadable: still warn, the cards go either way
+    const cardsNote = n > 0 ? ' ' + t('home.deleteHasCards', { n }) : n < 0 ? ' ' + t('home.deleteCardsUnknown') : '';
+    const ok = await dialog.confirm(t('home.deleteTitle'), t('home.deleteBody', { name: v.displayName }) + cardsNote, { ok: t('home.deleteOk'), danger: true });
     if (!ok) return;
     const trash = !!v.videoPath && await dialog.confirm(
       t('home.deleteFileTitle'),
-      t('home.deleteFileBody', { file: fileNameFromPath(v.videoPath) }) + cardsNote,
+      t('home.deleteFileBody', { file: fileNameFromPath(v.videoPath) }),
       { ok: t('home.deleteFileOk'), cancel: t('home.deleteFileKeep'), danger: true },
     );
+    if (trash === null) return; // dismissed the file question: nothing is deleted
     setDeletingId(v.id);
     await Promise.all([cancelPrep(v.id), cancelCloze(v.id)]);
     try {
@@ -201,11 +202,16 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
       setDeletingId(null);
       return;
     }
+    // A failure here leaves orphan cards; the next launch offers to clear them.
+    await deleteVideoCards(v.id).catch(console.error);
     try {
       if (trash) {
         const paths = [v.videoPath!, ...await relatedFilePaths(v.id, v.videoPath!, v.subtitleFileName)];
         const results = await Promise.allSettled(paths.map(trashFile));
         if (results[0].status === 'rejected') throw results[0].reason;
+      } else {
+        // Keeping the video (and its .srt): only our own AI results go, nothing reads them after this.
+        await Promise.allSettled((await cacheFilePaths(v.id)).map(trashFile));
       }
     } catch {
       dialog.alert(t('home.deleteFileFailTitle'), t('home.deleteFileFailBody'));

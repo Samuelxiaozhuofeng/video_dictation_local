@@ -3,8 +3,8 @@
  *
  * Cards live in their own IndexedDB database (`linguaclip_review`) so the
  * practice records' database (and its DB_VERSION) is never touched. Each card
- * carries its own copy of the line, its times and the video path, so it
- * outlives the video record it came from.
+ * carries its own copy of the line, its times and the video path. Deleting a
+ * video deletes its cards too (deleteVideoCards).
  *
  * Grading is automatic, from how the dictation went: nobody rates themselves.
  */
@@ -195,7 +195,7 @@ export const deleteCards = async (ids: string[]) => {
 
 export interface LineRef { videoId: string; videoName: string; videoPath?: string; text: string; start: number; end: number }
 
-// The card keeps its own copy of the video path, so it still plays after the record is deleted.
+// The card keeps its own copy of the video path, taken from the record when the caller has none.
 const withPath = async (ref: LineRef): Promise<LineRef> =>
   ref.videoPath ? ref : { ...ref, videoPath: (await getVideoFromDB(ref.videoId).catch(() => null))?.videoPath };
 
@@ -232,6 +232,40 @@ export const recordOutcome = (card: ReviewCard, o: Outcome) =>
   update(card.id, old => old ? { ...old, videoPath: card.videoPath ?? old.videoPath, fsrs: schedule(old, o).fsrs } : undefined);
 
 export const countForVideo = async (videoId: string) => (await getAllCards()).filter(c => c.videoId === videoId).length;
+
+// Deleting a video takes its cards along. Read and delete in one transaction, so
+// a card written meanwhile is either seen here or written after.
+export const deleteVideoCards = async (videoId: string) => {
+  await migrateSavedLines().catch(console.error);
+  const t = (await db()).transaction([STORE, META], 'readwrite');
+  const s = t.objectStore(STORE);
+  const r = s.getAll();
+  r.onsuccess = () => {
+    const ids = (r.result as ReviewCard[]).filter(c => c.videoId === videoId).map(c => c.id);
+    ids.forEach(id => s.delete(id));
+    forget(t, ids);
+  };
+  await finished(t);
+  changed();
+};
+
+// Cards whose video record is gone: left by versions that kept cards on delete,
+// or by a delete whose card step failed. The user is asked once per card; the
+// ones they chose to keep are remembered here. Old bookmarks that never had a
+// video (videoId '') don't count. Throws if the records can't be read, so
+// "unreadable" never looks like "every video deleted".
+const KEPT = 'linguaclip_kept_orphans';
+const keptOrphans = (): string[] => {
+  try { return JSON.parse(localStorage.getItem(KEPT) || '[]'); } catch { return []; }
+};
+export const orphanCards = async () => {
+  const live = new Set((await getAllVideosFromDB()).map((r: { id: string }) => r.id));
+  const kept = new Set(keptOrphans());
+  return (await getAllCards()).filter(c => c.videoId && !live.has(c.videoId) && !kept.has(c.id));
+};
+export const keepOrphans = (ids: string[]) => {
+  try { localStorage.setItem(KEPT, JSON.stringify([...keptOrphans(), ...ids])); } catch { /* storage off: asked again next launch */ }
+};
 
 export const repointVideo = async (videoId: string, videoPath: string) => {
   await migrateSavedLines().catch(console.error);

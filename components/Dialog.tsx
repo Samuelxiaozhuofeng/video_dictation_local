@@ -4,7 +4,8 @@ import { t } from '../utils/i18n';
 
 // In-app replacement for window.alert / window.confirm.
 // Call `dialog.alert(...)` / `dialog.confirm(...)` from anywhere (hooks included);
-// <DialogHost /> mounted once at the root renders them.
+// <DialogHost /> mounted once at the root renders them. A confirm resolves
+// null when dismissed (Esc / click outside) rather than answered.
 
 type Pending = {
   kind: 'alert' | 'confirm';
@@ -13,12 +14,12 @@ type Pending = {
   ok?: string;
   cancel?: string;
   tone?: 'accent' | 'shade';
-  resolve: (v: boolean) => void;
+  resolve: (v: boolean | null) => void;
 };
 
 let listener: ((p: Pending | null) => void) | null = null;
 
-function open(p: Omit<Pending, 'resolve'>): Promise<boolean> {
+function open(p: Omit<Pending, 'resolve'>): Promise<boolean | null> {
   return new Promise(resolve => {
     listener?.({ ...p, resolve });
   });
@@ -38,14 +39,15 @@ export const DialogHost: React.FC = () => {
     return () => { listener = null; };
   }, []);
 
-  const close = (v: boolean) => { p?.resolve(v); setP(null); };
+  const close = (v: boolean | null) => { p?.resolve(v); setP(null); };
+  const dismiss = () => close(p?.kind === 'alert' ? true : null);
 
   useEffect(() => {
     if (!p) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Tab') return;
       e.stopPropagation(); // nothing underneath the dialog should react to keys
-      if (e.key === 'Escape') close(p.kind === 'alert');
+      if (e.key === 'Escape') dismiss();
       if (e.key === 'Enter') close(true);
     };
     window.addEventListener('keydown', onKey, true);
@@ -55,7 +57,7 @@ export const DialogHost: React.FC = () => {
   if (!p) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 fade-in" onClick={() => close(p.kind === 'alert')}>
+    <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 fade-in" onClick={dismiss}>
       <Card className="w-full max-w-md shadow-lift" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
         <div className="px-6 pt-6 pb-2">
           <h3 className="font-serif text-xl leading-tight">{p.title}</h3>

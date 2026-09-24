@@ -21,10 +21,30 @@ import { t, useLang } from './utils/i18n';
 import { markInterruptedJobs, startImportListener } from './utils/importJob';
 import { matches } from './utils/shortcuts';
 import { countLine } from './utils/today';
+import { deleteCards, keepOrphans, orphanCards } from './utils/review';
+
+let orphansAsked = false; // StrictMode runs effects twice in dev
+async function askAboutOrphans() {
+  if (orphansAsked) return;
+  orphansAsked = true;
+  const cards = await orphanCards();
+  if (!cards.length) return;
+  const names = [...new Set(cards.map(c => c.videoName))];
+  const ok = await dialog.confirm(
+    t('app.orphansTitle', { n: cards.length }),
+    t('app.orphansBody', { names: names.slice(0, 3).join(' · ') + (names.length > 3 ? ' …' : '') }),
+    { ok: t('app.orphansOk'), cancel: t('app.orphansKeep'), danger: true },
+  );
+  if (ok) await deleteCards(cards.map(c => c.id));
+  else if (ok === false) keepOrphans(cards.map(c => c.id)); // dismissed: ask again next launch
+}
 
 export default function App() {
   const lang = useLang();
   useEffect(() => { document.documentElement.lang = lang; }, [lang]);
+
+  // Cards left by videos deleted in older versions: ask once whether they go too.
+  useEffect(() => { askAboutOrphans().catch(console.error); }, []);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
