@@ -143,12 +143,26 @@ const finished = (t: IDBTransaction) => new Promise<void>((resolve, reject) => {
   t.onerror = t.onabort = () => reject(t.error ?? new Error('Review database write failed'));
 });
 
+// While the old-bookmark move hasn't landed (it failed and will retry), note the ids the
+// user deleted or un-bookmarked, so the move skips them instead of bringing them back.
+// Same transaction as the delete; cleared when the move lands.
+const forget = (t: IDBTransaction, ids: string[]) => {
+  const m = t.objectStore(META);
+  const done = m.get('migrated');
+  done.onsuccess = () => {
+    if (done.result) return;
+    const g = m.get('deleted');
+    g.onsuccess = () => m.put({ id: 'deleted', ids: [...(g.result?.ids ?? []), ...ids] });
+  };
+};
+
 // Read, merge and write one card inside a single transaction, so two writes to
 // the same card (stuck + bookmarked at once) queue up instead of the later one
 // clobbering the earlier. `next` returns the new card, null to delete, undefined to leave it.
-const update = async (id: string, next: (old: ReviewCard | null) => ReviewCard | null | undefined) => {
+// `forgetIt` = the user took this card (or its bookmark) away; see forget().
+const update = async (id: string, next: (old: ReviewCard | null) => ReviewCard | null | undefined, forgetIt = false) => {
   await migrateSavedLines().catch(console.error);
-  const t = (await db()).transaction(STORE, 'readwrite');
+  const t = (await db()).transaction([STORE, META], 'readwrite');
   const s = t.objectStore(STORE);
   const r = s.get(id);
   r.onsuccess = () => {
@@ -156,6 +170,7 @@ const update = async (id: string, next: (old: ReviewCard | null) => ReviewCard |
     if (card === null) s.delete(id);
     else if (card) s.put(card);
   };
+  if (forgetIt) forget(t, [id]);
   await finished(t);
   changed();
 };
@@ -165,7 +180,14 @@ export const subscribeCards = (fn: () => void) => { listeners.add(fn); return ()
 const changed = () => listeners.forEach(fn => fn());
 
 export const getAllCards = async (): Promise<ReviewCard[]> => (await tx<ReviewCard[]>('readonly', s => s.getAll())) ?? [];
-export const deleteCards = async (ids: string[]) => { await tx('readwrite', s => ids.forEach(id => s.delete(id))); changed(); };
+export const deleteCards = async (ids: string[]) => {
+  await migrateSavedLines().catch(console.error);
+  const t = (await db()).transaction([STORE, META], 'readwrite');
+  ids.forEach(id => t.objectStore(STORE).delete(id));
+  forget(t, ids);
+  await finished(t);
+  changed();
+};
 
 export interface LineRef { videoId: string; videoName: string; videoPath?: string; text: string; start: number; end: number }
 
@@ -194,7 +216,7 @@ export const unsaveLine = (videoId: string, start: number) => update(lineCardId(
   if (!old) return undefined;
   const reasons = old.reasons.filter(r => r !== 'saved');
   return reasons.length === 0 ? null : { ...old, reasons, saved: false };
-});
+}, true);
 
 // Start times of this video's bookmarked lines, for the practice page's bookmark icons.
 export const savedStarts = async (videoId: string): Promise<Set<string>> =>
@@ -229,7 +251,8 @@ export const deckCounts = (cards: ReviewCard[], now = Date.now()) => {
 // Reads localStorage `linguaclip_saved_lines` and never writes it (it stays as
 // a backup). The "done" mark is written in the same transaction as the cards,
 // so they land together or not at all; ids are fixed, so a rerun is harmless.
-// Known limit: bookmarks made in an older app version after this ran aren't picked up.
+// Known limits: bookmarks made in an older app version after this ran aren't picked up;
+// going back to an older version before the move lands ignores forget() and can bring deleted cards back.
 
 let migrating: Promise<void> | null = null;
 
@@ -253,10 +276,19 @@ export const migrateSavedLines = () => migrating ??= (async () => {
     return newCard({ ...base, deck: 'line', text: line.text }, 'saved', line.dateSaved);
   });
   const t = d.transaction([STORE, META], 'readwrite');
-  const s = t.objectStore(STORE);
-  // Never clobber a card that already exists (made by practising before this finished).
-  for (const c of cards) { const r = s.get(c.id); r.onsuccess = () => { s.put(r.result ? withReason(r.result, 'saved') : c); }; }
-  t.objectStore(META).put({ id: 'migrated', at: Date.now(), count: cards.length });
+  const s = t.objectStore(STORE), m = t.objectStore(META);
+  const gone = m.get('deleted');
+  gone.onsuccess = () => {
+    const skip = new Set<string>(gone.result?.ids ?? []); // deleted / un-bookmarked while this kept failing: leave them be
+    // Never clobber a card that already exists (made by practising before this finished).
+    for (const c of cards) {
+      if (skip.has(c.id)) continue;
+      const r = s.get(c.id);
+      r.onsuccess = () => { s.put(r.result ? withReason(r.result, 'saved') : c); };
+    }
+    m.put({ id: 'migrated', at: Date.now(), count: cards.length });
+    m.delete('deleted');
+  };
   await new Promise<void>((resolve, reject) => { t.oncomplete = () => resolve(); t.onerror = t.onabort = () => reject(t.error); });
   changed();
 })().catch(e => { migrating = null; throw e; });
