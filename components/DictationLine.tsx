@@ -21,6 +21,7 @@ interface Props {
   // Once per attempt, when the line is done (all right, or submitted): did it
   // come out right, and was help used (peek, or playing from a word).
   onResult?: (o: { correct: boolean; helped: boolean }) => void;
+  extra?: React.ReactNode; // shown beside the feedback's forward button
 }
 
 // How far into the line word i starts, by letters: a rough stand-in for time when
@@ -35,7 +36,7 @@ const letterRatio = (words: string[], i: number): number => {
 // Typing and the answer share one setting, so submitting changes colours, not positions.
 export const LINE = 'flex flex-wrap items-baseline gap-x-[0.25em] font-serif text-[30px] leading-[42px]';
 
-const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay, onLookup, blanks, nextLabel, onResult }) => {
+const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay, onLookup, blanks, nextLabel, onResult, extra }) => {
   const t = useT();
   const tokens = useMemo(() => tokenizeText(targetText), [targetText]);
   const wordTokens = useMemo(() => getWordTokens(tokens), [tokens]);
@@ -129,7 +130,8 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
   };
 
   const keyDown = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.shiftKey && e.key === ' ') { e.preventDefault(); e.stopPropagation(); clearReplay(); onReplay(false); return; }
+    if (matches(e, 'reveal')) { e.preventDefault(); e.stopPropagation(); report(false); onComplete(false); return; }
+    if (matches(e, 'replay')) { e.preventDefault(); e.stopPropagation(); clearReplay(); onReplay(false); return; }
     if (matches(e, 'playFrom')) { e.preventDefault(); e.stopPropagation(); clearReplay(); attempt.current.helped = true; onReplay(false, letterRatio(wordTokens.map(w => w.value), i)); return; }
     if (matches(e, 'peek')) { e.preventDefault(); showPeek(i); return; }
     if (e.key === ' ' || e.key === 'Enter') {
@@ -199,7 +201,10 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
           })}
         </div>
 
-        <Btn tone="accent" onClick={() => onComplete(true)}>{nextLabel ?? t('common.nextLine')}</Btn>
+        <div className="flex gap-2">
+          <Btn tone="accent" onClick={() => onComplete(true)}>{nextLabel ?? t('common.nextLine')}</Btn>
+          {extra}
+        </div>
       </div>
     );
   }

@@ -360,6 +360,8 @@ export const zh: Record<keyof typeof en, string> = {
   'keys.prev': '上一句',
   'keys.next': '下一句',
   'keys.continue': '确认/继续',
+  'keys.skipLine': '跳过该句',
+  'keys.reveal': '直接看答案',
   'keys.peek': '提示',
   'keys.anki': '发送 Anki',
   'keys.breakdown': '拆开教我',

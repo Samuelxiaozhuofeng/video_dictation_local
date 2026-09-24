@@ -96,7 +96,7 @@ const Studio: React.FC = () => {
   // Writes still in flight, so "redo" can wait for the last line's card instead of missing it.
   const pending = useRef(new Set<Promise<void>>());
   // Auto-add is a setting; when off, a stuck line only offers an "add" button.
-  const autoAdd = Storage.getPracticeConfig().autoAddReview ?? true;
+  const autoAdd = Storage.getPracticeConfig().autoAddReview ?? false;
   const [offer, setOffer] = useState<{ reason: Reason; start: number } | null>(null);
   const record = (reason: Reason, force = false) => {
     if (!currentSub || !videoId) return;
@@ -107,6 +107,9 @@ const Studio: React.FC = () => {
     p.finally(() => pending.current.delete(p));
     setStuck(prev => new Set(prev).add(lineCardId(videoId, currentSub.startTime)));
   };
+  const offerBtn = offer && currentSub && offer.start === currentSub.startTime && (
+    <Btn className={bdActive || isBlur ? 'mt-3' : ''} onClick={() => record(offer.reason, true)}><Bookmark size={16} /> {t('studio.addToReview')}</Btn>
+  );
   const keepWord = (word: string, definition: string, example: string) => {
     if (!currentSub || !videoId) return;
     addWord({ videoId, videoName, text: currentSub.text, start: currentSub.startTime, end: currentSub.endTime }, word, definition, example).catch(console.error);
@@ -317,6 +320,7 @@ const Studio: React.FC = () => {
                     onComplete={correct => (correct ? actions.onContinue() : actions.onInputComplete(correct))}
                     onReplay={actions.onReplayCurrent}
                     onLookup={lookup}
+                    extra={offerBtn}
                     onResult={o => { if (!o.correct) record('wrong'); else if (o.helped) record('peek'); }}
                   />
                   {mode === PracticeMode.INPUT && (bd.state.status === 'failed' || (clozeProgress && effectiveLevel !== 'full')) && (
@@ -326,9 +330,7 @@ const Studio: React.FC = () => {
                   )}
                 </>
               )}
-              {offer && offer.start === currentSub.startTime && (
-                <Btn className="mt-3" onClick={() => record(offer.reason, true)}><Bookmark size={16} /> {t('studio.addToReview')}</Btn>
-              )}
+              {(bdActive || isBlur) && offerBtn}
             </div>
           </div>
         </section>

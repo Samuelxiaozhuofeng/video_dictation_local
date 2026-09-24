@@ -242,11 +242,12 @@ export default function App() {
   const blurStepPaused = learningMode === LearningMode.BLUR && blurPlaybackMode === BlurPlaybackMode.SENTENCE_BY_SENTENCE && !isPlaying;
 
   const keyboardShortcuts = useMemo(() => ([
-    { code: 'Space', shiftKey: true, preventDefault: true, condition: () => inPractice, handler: () => replayCurrent() },
+    { preventDefault: true, condition: (e: KeyboardEvent) => inPractice && matches(e, 'replay'), handler: () => replayCurrent() },
     { code: 'Space', shiftKey: false, preventDefault: true, allowInEditable: false, condition: () => inPractice, handler: () => togglePlayOrStep() },
     { code: 'Enter', preventDefault: true, allowInEditable: false, condition: () => inPractice && (mode === PracticeMode.FEEDBACK || blurStepPaused), handler: () => handleContinue() },
     { preventDefault: true, condition: (e: KeyboardEvent) => inPractice && matches(e, 'prev'), handler: () => handleSkip('prev') },
     { preventDefault: true, condition: (e: KeyboardEvent) => inPractice && matches(e, 'next'), handler: () => handleSkip('next') },
+    { preventDefault: true, condition: (e: KeyboardEvent) => inPractice && matches(e, 'skipLine'), handler: () => handleSkip('next') },
     { condition: (e: KeyboardEvent) => inPractice && matches(e, 'anki'), handler: (e: KeyboardEvent) => handleAddToAnkiShortcut(e) },
     // In a blank DictationLine handles it (from that word); anywhere else there's no current word, so replay the line.
     { preventDefault: true, condition: (e: KeyboardEvent) => inPractice && matches(e, 'playFrom'), handler: () => replayCurrent() },

@@ -54,7 +54,7 @@ export interface PracticeConfig {
   learningMode?: LearningMode; // Default learning mode for new videos
   blurPlaybackMode?: BlurPlaybackMode; // Default playback mode for blur mode
   clozeLevel?: ClozeLevel; // Dictation blank density; default 'full'
-  autoAddReview?: boolean; // stuck lines go into the sentence deck on their own; default true
+  autoAddReview?: boolean; // stuck lines go into the sentence deck on their own; default false
   videoShare?: number; // % of the practice page's width given to the video; default 60
 }
 

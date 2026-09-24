@@ -358,6 +358,8 @@ export const en = {
   'keys.playFrom': 'Play from this word',
   'keys.prev': 'Previous line',
   'keys.next': 'Next line',
+  'keys.skipLine': 'Skip this line',
+  'keys.reveal': 'Show answer',
   'keys.continue': 'Confirm/continue',
   'keys.peek': 'Hint',
   'keys.anki': 'Send to Anki',

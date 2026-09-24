@@ -52,7 +52,7 @@ const SettingsGeneral: React.FC<SettingsGeneralProps> = ({
   onSaved,
 }) => {
   const t = useT();
-  const [autoAdd, setAutoAdd] = useState(() => getPracticeConfig().autoAddReview ?? true);
+  const [autoAdd, setAutoAdd] = useState(() => getPracticeConfig().autoAddReview ?? false);
   const SECTION_OPTS = [
     { value: 0, label: t('settingsGeneral.optFull') },
     { value: 1, label: '1' },
