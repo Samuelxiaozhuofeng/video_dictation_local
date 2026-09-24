@@ -22,13 +22,26 @@ function grabFrame(path: string): Promise<string | null> {
     v.muted = true;
     v.preload = 'auto';
     v.onloadedmetadata = () => { v.currentTime = Math.min(5, (v.duration || 0) * 0.1); };
+    // True once a real frame landed. WKWebView (the Mac app) often has nothing
+    // painted yet at `seeked`, so the canvas stays transparent — a black JPEG.
+    const draw = (): boolean => {
+      const c = document.createElement('canvas');
+      c.width = 480;
+      c.height = Math.round(480 * (v.videoHeight / v.videoWidth)) || 270;
+      const g = c.getContext('2d')!;
+      g.drawImage(v, 0, 0, c.width, c.height);
+      if (g.getImageData(0, 0, 1, 1).data[3] === 0) return false;
+      done(c.toDataURL('image/jpeg', 0.75));
+      return true;
+    };
     v.onseeked = () => {
       try {
-        const c = document.createElement('canvas');
-        c.width = 480;
-        c.height = Math.round(480 * (v.videoHeight / v.videoWidth)) || 270;
-        c.getContext('2d')!.drawImage(v, 0, 0, c.width, c.height);
-        done(c.toDataURL('image/jpeg', 0.75));
+        if (!v.videoWidth) return done(null); // audio only: no frame will ever come
+        if (draw()) return;
+        if (!v.requestVideoFrameCallback) return done(null);
+        v.requestVideoFrameCallback(() => {
+          try { if (!draw()) done(null); } catch { done(null); }
+        });
       } catch {
         done(null);
       }
