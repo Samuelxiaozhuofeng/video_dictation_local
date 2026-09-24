@@ -11,6 +11,9 @@ import SettingsAnki from './SettingsAnki';
 import SettingsShortcuts from './SettingsShortcuts';
 import SettingsTranscribe from './SettingsTranscribe';
 import { useT, useLang, setLang, Lang } from '../utils/i18n';
+import { openExternal } from '../utils/desktop';
+
+const SPONSOR_URL = 'https://afdian.com/a/SamuelXiao';
 
 type AnkiPatch = {
   url?: string;
@@ -230,6 +233,12 @@ const Settings: React.FC = () => {
           createLinguaClip={createLinguaClip}
         />
       )}
+
+      <p className="mt-12 text-center text-xs text-mute">
+        <button type="button" className="underline-offset-4 hover:text-ink hover:underline" onClick={() => openExternal(SPONSOR_URL).catch(err => console.error(err))}>
+          {t('settings.sponsor')}
+        </button>
+      </p>
 
       {savedFlash && (
         <div className="fixed bottom-6 right-6 z-50">

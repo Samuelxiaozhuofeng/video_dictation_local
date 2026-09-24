@@ -134,6 +134,7 @@ export const en = {
   'transcribe.groqKey': 'Groq key',
   'transcribe.getKey': 'Get a free key from Groq',
   'transcribe.groqKeyHint': 'Sign in at Groq, open API Keys, click Create API Key and paste it here. Stored on this computer only.',
+  'settings.sponsor': 'Enjoying LinguaClip? Support me on Afdian ❤',
   'settings.savedFlash': 'Saved ✓',
 
   // --- SettingsGeneral.tsx ---

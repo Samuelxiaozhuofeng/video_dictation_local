@@ -135,6 +135,7 @@ export const zh: Record<keyof typeof en, string> = {
   'transcribe.groqKey': 'Groq 密钥',
   'transcribe.getKey': '去 Groq 免费拿密钥',
   'transcribe.groqKeyHint': '在 Groq 注册登录后，到 API Keys 页面点 Create API Key，复制粘贴到这里。只存在这台电脑上。',
+  'settings.sponsor': '觉得好用？去爱发电支持一下 ❤',
   'settings.savedFlash': '已保存 ✓',
 
   // --- SettingsGeneral.tsx ---
