@@ -30,8 +30,8 @@ export const ACTIONS: Action[] = [
 const STORAGE_KEY = 'linguaclip_shortcuts';
 
 // Editing, and what the system or the web view catches before the page does:
-// copy/paste/select all/undo/redo, quit/close/hide/minimise, find/reload/print/save/new tab.
-const RESERVED = ['KeyC', 'KeyV', 'KeyA', 'KeyZ', 'KeyY', 'KeyQ', 'KeyW', 'KeyH', 'KeyM', 'KeyF', 'KeyG', 'KeyR', 'KeyP', 'KeyS'];
+// copy/paste/select all/undo/redo, quit/close/hide/minimise, find/print/save (⌘R is free: no Reload menu, and a bound combo preventDefaults).
+const RESERVED = ['KeyC', 'KeyV', 'KeyA', 'KeyZ', 'KeyY', 'KeyQ', 'KeyW', 'KeyH', 'KeyM', 'KeyF', 'KeyG', 'KeyP', 'KeyS'];
 // Letters and digits only, plus ↑/↓: ⌘+Backspace/←/→/Enter are editing keys in a blank.
 const BINDABLE = /^(Key[A-Z]|Digit\d|ArrowUp|ArrowDown)$/;
 
