@@ -2,12 +2,13 @@ import React from 'react';
 import { AppState } from '../types';
 import { useT } from '../utils/i18n';
 
-// Page frame for the three non-practice screens: wordmark + three quiet tabs + scrolling body.
+// Page frame for the non-practice screens: wordmark + quiet tabs + scrolling body.
 const Shell: React.FC<{ active: AppState; onNav: (s: AppState) => void; children: React.ReactNode }> = ({ active, onNav, children }) => {
   const t = useT();
   const NAV: { state: AppState; label: string }[] = [
     { state: AppState.UPLOAD, label: t('nav.videos') },
     { state: AppState.LIBRARY, label: t('nav.saved') },
+    { state: AppState.CARDS, label: t('nav.cards') },
     { state: AppState.SETTINGS, label: t('nav.settings') },
   ];
   return (

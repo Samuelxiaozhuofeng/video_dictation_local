@@ -9,6 +9,7 @@ export enum AppState {
   UPLOAD = 'UPLOAD',
   PRACTICE = 'PRACTICE',
   LIBRARY = 'LIBRARY',
+  CARDS = 'CARDS',
   SETTINGS = 'SETTINGS',
 }
 

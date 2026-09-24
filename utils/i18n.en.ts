@@ -29,6 +29,7 @@ export const en = {
   // --- Shell.tsx / Studio.tsx nav labels ---
   'nav.videos': 'Videos',
   'nav.saved': 'Review',
+  'nav.cards': 'Cards',
   'nav.settings': 'Settings',
 
   // --- Home.tsx ---
@@ -355,6 +356,18 @@ export const en = {
   'review.lapses': 'forgot {n}×',
   'review.week': 'Next 7 days',
   'review.today': 'Today',
+  'cards.title': 'Cards',
+  'cards.all': 'All',
+  'cards.due': 'Due',
+  'cards.later': 'Not due',
+  'cards.silent': 'No audio',
+  'cards.noMatch': 'No cards match.',
+  'cards.pick': 'Delete several',
+  'cards.picked': '{n} selected',
+  'cards.pickAll': 'Select all',
+  'cards.pickNone': 'Select none',
+  'cards.removeManyTitle': 'Remove these {n} cards from review?',
+  'cards.removeManyBody': 'They won\'t come back, and their schedules are cleared.',
   'review.saved': 'Bookmarked',
   'review.play': 'Play the original',
   'review.remove': 'Remove from review',

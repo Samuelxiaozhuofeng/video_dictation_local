@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { AppState, PracticeMode, VideoRecord, LearningMode, BlurPlaybackMode } from './types';
 import ReviewPage from './components/ReviewPage';
+import CardsPage from './components/CardsPage';
 import Settings from './components/Settings';
 import Home from './components/Home';
 import Shell from './components/Shell';
@@ -258,6 +259,7 @@ export default function App() {
     <Shell active={appState} onNav={setAppState}>
       {appState === AppState.SETTINGS ? <Settings /> :
        appState === AppState.LIBRARY ? <ReviewPage /> :
+       appState === AppState.CARDS ? <CardsPage /> :
        <Home onResume={handleResume} onOpenReview={() => setAppState(AppState.LIBRARY)} />}
     </Shell>
   ) : (

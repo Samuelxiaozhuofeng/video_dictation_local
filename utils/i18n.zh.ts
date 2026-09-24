@@ -30,6 +30,7 @@ export const zh: Record<keyof typeof en, string> = {
   // --- Shell.tsx / Studio.tsx nav labels ---
   'nav.videos': '视频',
   'nav.saved': '复习',
+  'nav.cards': '卡片',
   'nav.settings': '设置',
 
   // --- Home.tsx ---
@@ -356,6 +357,18 @@ export const zh: Record<keyof typeof en, string> = {
   'review.lapses': '忘过 {n} 次',
   'review.week': '接下来一周',
   'review.today': '今天',
+  'cards.title': '卡片',
+  'cards.all': '全部',
+  'cards.due': '到期',
+  'cards.later': '没到期',
+  'cards.silent': '没声音',
+  'cards.noMatch': '没有符合条件的卡。',
+  'cards.pick': '批量删',
+  'cards.picked': '已选 {n} 张',
+  'cards.pickAll': '全选',
+  'cards.pickNone': '全不选',
+  'cards.removeManyTitle': '从复习里删掉这 {n} 张？',
+  'cards.removeManyBody': '删掉后它们不会再出现，排期也会清空。',
   'review.saved': '收藏',
   'review.play': '听原声',
   'review.remove': '从复习里删掉',

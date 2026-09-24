@@ -165,7 +165,7 @@ export const subscribeCards = (fn: () => void) => { listeners.add(fn); return ()
 const changed = () => listeners.forEach(fn => fn());
 
 export const getAllCards = async (): Promise<ReviewCard[]> => (await tx<ReviewCard[]>('readonly', s => s.getAll())) ?? [];
-export const deleteCard = async (id: string) => { await tx('readwrite', s => s.delete(id)); changed(); };
+export const deleteCards = async (ids: string[]) => { await tx('readwrite', s => ids.forEach(id => s.delete(id))); changed(); };
 
 export interface LineRef { videoId: string; videoName: string; videoPath?: string; text: string; start: number; end: number }
 
