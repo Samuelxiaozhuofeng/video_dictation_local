@@ -8,6 +8,8 @@ import { useT, getLang } from '../utils/i18n';
 
 export const DAY = 86_400_000;
 export const startOfDay = (ms: number) => new Date(ms).setHours(0, 0, 0, 0);
+// Local midnight `i` days after `ms`'s day (calendar days, so a DST day of 23/25h still lands on midnight).
+export const dayStart = (ms: number, i: number) => { const d = new Date(ms); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i); return d.getTime(); };
 export const fmt = (ms: number, o: Intl.DateTimeFormatOptions) => new Date(ms).toLocaleDateString(getLang() === 'zh' ? 'zh-CN' : 'en-US', o);
 
 // Every card, kept fresh; null until the first read.
@@ -32,8 +34,8 @@ const ReviewPage: React.FC = () => {
 
   // Cards (both decks, with audio) coming up on each of the next 7 days; today includes overdue.
   const week = Array.from({ length: 7 }, (_, i) => {
-    const day = startOfDay(now) + i * DAY; // ponytail: a DST day is 23/25h; off by an hour at most, only around the switch
-    const n = all.filter(c => hasAudio(c) && (i === 0 ? c.fsrs.due < day + DAY : c.fsrs.due >= day && c.fsrs.due < day + DAY)).length;
+    const day = dayStart(now, i), end = dayStart(now, i + 1);
+    const n = all.filter(c => hasAudio(c) && (i === 0 ? c.fsrs.due < end : c.fsrs.due >= day && c.fsrs.due < end)).length;
     return { label: i === 0 ? t('review.today') : i === 1 ? t('review.dueTomorrow') : fmt(day, { weekday: 'short' }), n };
   });
 
