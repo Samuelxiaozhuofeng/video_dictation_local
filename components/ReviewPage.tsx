@@ -4,12 +4,13 @@ import { ReviewCard, Deck, getAllCards, subscribeCards, deckCounts, dueQueue, de
 import { Btn, Card, H, Seg, Stamp, inputCls } from './ui';
 import { dialog } from './Dialog';
 import ReviewSession, { findVideo, clipOf, useClip } from './ReviewSession';
-import { useT } from '../utils/i18n';
+import { useT, getLang } from '../utils/i18n';
 
 // The review page: the two decks up top (due now, start), every card below.
 
 const DAY = 86_400_000;
 const startOfDay = (ms: number) => new Date(ms).setHours(0, 0, 0, 0);
+const fmt = (ms: number, o: Intl.DateTimeFormatOptions) => new Date(ms).toLocaleDateString(getLang() === 'zh' ? 'zh-CN' : 'en-US', o);
 const plain = (html?: string) => html ? new DOMParser().parseFromString(html, 'text/html').body.textContent ?? '' : '';
 
 const ReviewPage: React.FC = () => {
@@ -39,8 +40,15 @@ const ReviewPage: React.FC = () => {
     if (!hasAudio(c)) return t('review.noAudio');
     if (c.fsrs.due <= now) return t('review.dueToday');
     const days = Math.round((startOfDay(c.fsrs.due) - startOfDay(now)) / DAY);
-    return days <= 1 ? t('review.dueTomorrow') : t('review.dueInDays', { n: days });
+    return `${fmt(c.fsrs.due, { month: 'short', day: 'numeric' })} · ${days <= 1 ? t('review.dueTomorrow') : t('review.dueInDays', { n: days })}`;
   };
+
+  // Cards (both decks, with audio) coming up on each of the next 7 days; today includes overdue.
+  const week = Array.from({ length: 7 }, (_, i) => {
+    const day = startOfDay(now) + i * DAY; // ponytail: a DST day is 23/25h; off by an hour at most, only around the switch
+    const n = all.filter(c => hasAudio(c) && (i === 0 ? c.fsrs.due < day + DAY : c.fsrs.due >= day && c.fsrs.due < day + DAY)).length;
+    return { label: i === 0 ? t('review.today') : i === 1 ? t('review.dueTomorrow') : fmt(day, { weekday: 'short' }), n };
+  });
 
   const listen = async (c: ReviewCard) => {
     const path = await findVideo(c);
@@ -84,6 +92,17 @@ const ReviewPage: React.FC = () => {
   return (
     <div>
       <H>{t('review.title')}</H>
+      <div className="mb-6">
+        <h3 className="text-xs text-mute mb-2">{t('review.week')}</h3>
+        <div className="grid grid-cols-7 gap-2">
+          {week.map((d, i) => (
+            <div key={i} className="rounded-lg bg-shade/40 py-2 text-center">
+              <div className="text-xs text-mute">{d.label}</div>
+              <div className={`font-serif text-xl leading-tight ${d.n ? 'text-accent' : 'text-mute'}`}>{d.n}</div>
+            </div>
+          ))}
+        </div>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
         {deckCard('line', t('review.deckLine'), t('review.deckLineHint'))}
         {deckCard('word', t('review.deckWord'), t('review.deckWordHint'))}
@@ -111,6 +130,7 @@ const ReviewPage: React.FC = () => {
               <div className="mt-2 flex items-center gap-3 text-xs text-mute">
                 <span className="truncate min-w-0">{c.videoName}</span>
                 <span className="shrink-0">{when(c)}</span>
+                {c.fsrs.reps > 0 && <span className="shrink-0">{t('review.reps', { n: c.fsrs.reps })}{c.fsrs.lapses > 0 && ` · ${t('review.lapses', { n: c.fsrs.lapses })}`}</span>}
                 {c.saved && <Stamp tone="shade" className="shrink-0">{t('review.saved')}</Stamp>}
                 <span className="ml-auto shrink-0 flex items-center gap-1">
                   {hasAudio(c) && (
