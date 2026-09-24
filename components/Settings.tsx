@@ -9,6 +9,7 @@ import SettingsGeneral from './SettingsGeneral';
 import SettingsAI from './SettingsAI';
 import SettingsAnki from './SettingsAnki';
 import SettingsShortcuts from './SettingsShortcuts';
+import SettingsTranscribe from './SettingsTranscribe';
 import { useT, useLang, setLang, Lang } from '../utils/i18n';
 
 type AnkiPatch = {
@@ -37,7 +38,7 @@ const Settings: React.FC = () => {
   const [sectionLength, setSectionLength] = useState(Storage.DEFAULT_SECTION_LENGTH);
   const [audioPadding, setAudioPadding] = useState<AudioPaddingConfig>({ startPadding: 100, endPadding: 200 });
 
-  const [tab, setTab] = useState<'practice' | 'ai' | 'shortcuts' | 'anki'>('practice');
+  const [tab, setTab] = useState<'practice' | 'transcribe' | 'ai' | 'shortcuts' | 'anki'>('practice');
   const [savedFlash, setSavedFlash] = useState(false);
   const flashTimer = useRef<number>(0);
   const ankiConnection = useAnkiConnection();
@@ -122,6 +123,7 @@ const Settings: React.FC = () => {
     <div>
       <Seg<typeof tab> className="mb-8" value={tab} onChange={setTab} options={[
         { value: 'practice', label: t('settings.practice') },
+        { value: 'transcribe', label: t('settings.transcribe') },
         { value: 'ai', label: 'AI' },
         { value: 'shortcuts', label: t('shortcuts.title') },
         { value: 'anki', label: 'Anki' },
@@ -149,6 +151,8 @@ const Settings: React.FC = () => {
           onSaved={flashSaved}
         />
       )}
+
+      {tab === 'transcribe' && <SettingsTranscribe onSaved={flashSaved} />}
 
       {tab === 'shortcuts' && <SettingsShortcuts onSaved={flashSaved} />}
 

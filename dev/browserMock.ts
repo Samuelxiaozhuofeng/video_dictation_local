@@ -60,6 +60,13 @@ async function handle(cmd: string, args: Args): Promise<unknown> {
     case 'plugin:opener|open_url':
       window.open(args.url, '_blank');
       return null;
+    case 'plugin:opener|reveal_item_in_dir':
+      return null; // recorded in __MOCK__.calls
+    case 'transcribe_location': {
+      const dir = `${__DEV_HOME__}/Library/Application Support/com.linguaclip.app/whisper`;
+      const file = args.model === 'light' ? 'ggml-small-q5_1.bin' : 'ggml-large-v3-turbo-q5_0.bin';
+      return { dir, model: mock.tools.whisper ? `${dir}/${file}` : null };
+    }
     case 'trash_file':
       return null; // recorded in __MOCK__.calls; real files untouched
     case 'tts':

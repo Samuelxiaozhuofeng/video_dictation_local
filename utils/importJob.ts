@@ -9,11 +9,12 @@ import { prepareBreakdowns } from './breakdownPrep';
 import { linesOf, prepareCloze } from './clozePrep';
 import { parseSRT } from './srtParser';
 import { resegment, Word } from './resegment';
+import { engineArgs, getTranscribeConfig } from './transcribeConfig';
 import * as VideoStorage from './videoStorage';
 
 type ImportProgressPayload = {
   id: string;
-  stage: 'setup' | 'download' | 'extract' | 'transcribe' | 'done' | 'error';
+  stage: 'setup' | 'download' | 'extract' | 'transcribe' | 'cloud' | 'done' | 'error';
   percent?: number;
   error?: string;
   videoPath?: string;
@@ -79,6 +80,13 @@ export function formatImportError(raw: string): string {
   if (raw.startsWith('extract:')) {
     return t('import.failedExtract', { detail: raw.slice('extract:'.length) });
   }
+  if (raw === 'cloud:key') return t('import.cloudKey');
+  if (raw === 'cloud:toolarge') return t('import.cloudTooLarge');
+  if (raw === 'cloud:empty') return t('import.cloudEmpty');
+  if (raw.startsWith('cloud:quota:')) return t('import.cloudQuota', { detail: raw.slice('cloud:quota:'.length) });
+  if (raw.startsWith('cloud:network:')) return t('import.cloudNetwork', { detail: raw.slice('cloud:network:'.length) });
+  if (raw.startsWith('cloud:denied:')) return t('import.cloudDenied', { detail: raw.slice('cloud:denied:'.length) });
+  if (raw.startsWith('cloud:')) return t('import.cloudFailed', { detail: raw.slice('cloud:'.length) });
   if (raw.startsWith('transcribe:')) {
     return t('import.failedTranscribe', { detail: raw.slice('transcribe:'.length) });
   }
@@ -128,7 +136,7 @@ async function startImport(
   await VideoStorage.updateVideoRecord(record);
   notify();
   try {
-    await invoke('start_import', { id, source, lang, quality });
+    await invoke('start_import', { id, source, lang, quality, ...engineArgs() });
   } catch (err) {
     const rec = await VideoStorage.getVideoRecord(id);
     if (!rec?.importJob) return;
@@ -168,7 +176,9 @@ export async function retryImport(id: string): Promise<void> {
   await VideoStorage.updateVideoRecord({ ...rec, importJob: next });
   notify();
   try {
-    await invoke('start_import', { id, source: job.source, lang, quality });
+    // Uses the engine picked in Settings now, not the one this card started
+    // with: switching to the cloud after a failed download is a way out.
+    await invoke('start_import', { id, source: job.source, lang, quality, ...engineArgs() });
   } catch (err) {
     const fresh = await VideoStorage.getVideoRecord(id);
     if (!fresh?.importJob) return;
@@ -185,10 +195,11 @@ export async function retryImport(id: string): Promise<void> {
 
 export type ImportTools = { whisper: boolean; youtube: boolean };
 
-// whisper: the transcription parts are on this Mac (else the first import downloads
-// them). youtube: yt-dlp is installed by hand, so the link box is worth showing.
+// whisper: the transcription parts for the model picked in Settings are on this
+// machine (else the first local import downloads them). youtube: yt-dlp is
+// installed by hand, so the link box is worth showing.
 export async function importTools(): Promise<ImportTools> {
-  return invoke('import_tools');
+  return invoke('import_tools', { model: getTranscribeConfig().localModel });
 }
 
 export async function probeImportSizes(url: string): Promise<QualitySizes> {

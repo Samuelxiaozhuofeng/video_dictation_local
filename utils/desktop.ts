@@ -6,6 +6,7 @@ import { homeDir, join } from '@tauri-apps/api/path';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
+import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
 import { exists, readTextFile } from '@tauri-apps/plugin-fs';
 import { IS_WINDOWS } from './platform';
 
@@ -122,4 +123,20 @@ export async function synthesizeSpeech(text: string, voice: string): Promise<Arr
 // proxy. Resolves to the raw response text; rejects with "HTTP 502: …" etc.
 export async function ankiRequest(url: string, body: string): Promise<string> {
   return invoke<string>('anki_request', { url, body });
+}
+
+// A web page in the user's browser (e.g. where to get a Groq key).
+export async function openExternal(url: string): Promise<void> {
+  await openUrl(url);
+}
+
+// Finder / Explorer with the file selected.
+export async function revealInFolder(path: string): Promise<void> {
+  await revealItemInDir(path);
+}
+
+// Where local transcription keeps its parts, and the model file this size
+// actually uses (null = not downloaded yet). src-tauri/src/whisper_setup.rs.
+export async function transcribeLocation(model: string): Promise<{ dir: string; model: string | null }> {
+  return invoke('transcribe_location', { model });
 }

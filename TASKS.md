@@ -1,3 +1,23 @@
+# 转录标签页 + 云端转录（Groq）+ 本机标准/轻量
+
+用户拍板：长视频先压缩（Mac AAC），压不下就切段；云端失败 = 卡片提示 + 重试，不自动换本机；本机只开「标准 / 轻量」两档。
+
+- [x] 实测轻量模型 ggml-small-q5_1 + DTW "small" 能出逐词时间
+- [x] Rust whisper_setup：按档位找 / 下载模型；import_tools(model)；新命令 transcribe_location(model)
+- [x] Rust cloud_asr.rs：wav 切段（静音处下刀）→ Mac 压 AAC / Windows 原样 → Groq verbose_json → 补标点、合词、拼 SRT；错误码 cloud:key / cloud:quota / cloud:network / cloud:toolarge
+- [x] Rust import.rs：start_import 带 engine/model/apiKey；云端不跑 ensure；transcribe 用档位对应 DTW 预设
+- [x] cargo test（补 cloud_asr 单测：补标点 / 合词 / 切段）
+- [x] 前端 utils/transcribeConfig.ts（localStorage）+ desktop.ts 打开网址 / 在访达显示
+- [x] SettingsTranscribe.tsx + Settings.tsx 加标签；中英文案
+- [x] importJob.ts 传参 + 云端报错翻译 + 云端阶段文案；AddVideo.tsx 按模式改提示 / 没密钥拦住
+- [x] browserMock 补 transcribe_location / reveal
+- [x] tsc + node test-*.mjs
+- [x] 浏览器实测设置页 + 添加视频弹窗
+- [x] 真调 Groq（19 秒英文 + 11 分钟西语切 3 段；修：Groq 逐词时间有 0.1–0.3 秒回退，夹平而不是整份丢弃）
+- [x] docs/import.md 更新
+- [x] 复审（codex 卡住，改用 agy gemini-3.8-flash-high：能合，无实缺陷）
+- [x] npm run release + 验收路径
+
 # 攒一批送 codex-review（2026-09-24 已审）
 
 - [x] e36d182 复习里查词（useLookup 抽出、ReviewSession 接查词 / 记下这个词 / Esc 顺序）

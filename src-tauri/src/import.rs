@@ -13,9 +13,9 @@ const EVENT: &str = "import-progress";
 // sub-word tokens. This is what lets the front end re-cut long lines by meaning.
 #[derive(Clone, serde::Serialize)]
 pub(crate) struct Word {
-  w: String,
-  from: u32,
-  to: u32,
+  pub(crate) w: String,
+  pub(crate) from: u32,
+  pub(crate) to: u32,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -461,6 +461,7 @@ pub(crate) fn transcribe(
   whisper: &Path,
   model: &Path,
   vad: &Path,
+  dtw: &str,
   lang: &str,
   wav: &Path,
   stem: &Path,
@@ -485,10 +486,10 @@ pub(crate) fn transcribe(
     vad_s,
     "-pp",
     // Token-level timestamps via DTW. It only runs with flash attention off,
-    // and the aheads preset has to match the model we pin above.
+    // and the aheads preset has to match the model (Tier::dtw).
     "-nfa",
     "--dtw",
-    "large.v3.turbo",
+    dtw,
     "-f",
     wav_s,
     "-osrt",
@@ -606,15 +607,27 @@ pub(crate) fn read_words(json_path: &Path) -> Result<Vec<Word>, String> {
   Ok(words)
 }
 
-fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str, quality: u32) -> Result<(), String> {
+// Settings → Transcription: this machine (with a model size) or Groq's cloud.
+pub(crate) enum Engine {
+  Local(crate::whisper_setup::Tier),
+  Cloud { api_key: String },
+}
+
+fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str, quality: u32, engine: &Engine) -> Result<(), String> {
   let dir = movies_dir()?;
   std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
 
   // First import on a new Mac: fetch the transcription parts before anything
   // else, so a failure here never leaves a half-downloaded video behind.
-  let parts = crate::whisper_setup::ensure(|pct| {
-    emit(app, ImportProgress::stage(id, "setup", Some(pct)));
-  })?;
+  let parts = match engine {
+    Engine::Local(tier) => Some((
+      crate::whisper_setup::ensure(*tier, |pct| {
+        emit(app, ImportProgress::stage(id, "setup", Some(pct)));
+      })?,
+      *tier,
+    )),
+    Engine::Cloud { .. } => None,
+  };
 
   let video = if is_url(source) {
     if !is_youtube_url(source) {
@@ -651,10 +664,24 @@ fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str, quality: u32)
   emit(app, ImportProgress::stage(id, "extract", None));
   extract_wav(&video, &wav)?;
 
-  emit(app, ImportProgress::stage(id, "transcribe", Some(0)));
-  let on_pct = |pct| emit(app, ImportProgress::stage(id, "transcribe", Some(pct)));
-  let result = transcribe(on_pct, &parts.whisper, &parts.model, &parts.vad, lang, &wav, &work)
-    .and_then(|()| std::fs::rename(work.with_extension("srt"), &srt).map_err(|e| format!("transcribe:{e}")));
+  let result = match (&parts, engine) {
+    (Some((parts, tier)), _) => {
+      emit(app, ImportProgress::stage(id, "transcribe", Some(0)));
+      let on_pct = |pct| emit(app, ImportProgress::stage(id, "transcribe", Some(pct)));
+      transcribe(on_pct, &parts.whisper, &parts.model, &parts.vad, tier.dtw(), lang, &wav, &work).map(|()| None)
+    }
+    (None, Engine::Cloud { api_key }) => {
+      emit(app, ImportProgress::stage(id, "cloud", Some(0)));
+      let on_pct = |pct| emit(app, ImportProgress::stage(id, "cloud", Some(pct)));
+      // Writes <work>.srt like whisper-cli; the words come back directly.
+      crate::cloud_asr::transcribe(on_pct, api_key, lang, &wav, &work).map(Some)
+    }
+    (None, Engine::Local(_)) => unreachable!("local engine always has parts"),
+  }
+  .and_then(|words| {
+    std::fs::rename(work.with_extension("srt"), &srt).map_err(|e| format!("transcribe:{e}"))?;
+    Ok(words)
+  });
   let _ = std::fs::remove_file(&wav);
   if result.is_err() {
     // Whisper may have left a half-written json behind; it holds the whole
@@ -662,7 +689,7 @@ fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str, quality: u32)
     let _ = std::fs::remove_file(&json);
     let _ = std::fs::remove_file(work.with_extension("srt"));
   }
-  result?;
+  let cloud_words = result?;
 
   let subtitle_text = std::fs::read_to_string(&srt).map_err(|e| {
     let _ = std::fs::remove_file(&json);
@@ -670,7 +697,9 @@ fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str, quality: u32)
   })?;
   // Word timings are a bonus: if they are missing the front end just keeps
   // whisper's own line breaks, so a failure here must not fail the import.
-  let words = read_words(&json).ok().filter(|w: &Vec<Word>| !w.is_empty());
+  let words = cloud_words
+    .or_else(|| read_words(&json).ok())
+    .filter(|w: &Vec<Word>| !w.is_empty());
   let _ = std::fs::remove_file(&json);
   // Only whisper can produce these, so keep them for "break it down" before
   // `done` lets the front end open the record. Named by record id, never by
@@ -707,6 +736,9 @@ pub fn start_import(
   source: String,
   lang: String,
   quality: u32,
+  engine: Option<String>,
+  model: Option<String>,
+  api_key: Option<String>,
 ) -> Result<(), String> {
   if id.trim().is_empty() || source.trim().is_empty() {
     return Err("missing id or source".into());
@@ -722,8 +754,20 @@ pub fn start_import(
   if !matches!(quality, 1080 | 720 | 480) {
     return Err("bad-quality".into());
   }
+  // Older front ends send no engine: that is the local standard model.
+  let engine = match engine.as_deref().unwrap_or("local") {
+    "local" => Engine::Local(crate::whisper_setup::Tier::parse(model.as_deref().unwrap_or("standard"))?),
+    "cloud" => {
+      let key = api_key.unwrap_or_default().trim().to_string();
+      if key.is_empty() {
+        return Err("cloud:key".into());
+      }
+      Engine::Cloud { api_key: key }
+    }
+    _ => return Err("bad-engine".into()),
+  };
   thread::spawn(move || {
-    if let Err(e) = run_import(&app, &id, &source, &lang, quality) {
+    if let Err(e) = run_import(&app, &id, &source, &lang, quality, &engine) {
       emit(
         &app,
         ImportProgress {

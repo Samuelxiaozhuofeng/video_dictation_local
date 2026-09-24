@@ -58,6 +58,17 @@ const MODEL: Asset = Asset {
     "https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q5_0.bin",
   ],
 };
+// The "light" choice in Settings for slow machines: a third of the size, a few
+// times faster, less accurate. DTW preset "small" gives its word timings.
+const LIGHT_MODEL: Asset = Asset {
+  name: "ggml-small-q5_1.bin",
+  size: 190_085_487,
+  sha256: "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
+  urls: &[
+    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin",
+    "https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin",
+  ],
+};
 const VAD: Asset = Asset {
   name: "ggml-silero-v5.1.2.bin",
   size: 885_098,
@@ -67,7 +78,44 @@ const VAD: Asset = Asset {
     "https://hf-mirror.com/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin",
   ],
 };
-const FULL_MODEL: &str = "ggml-large-v3-turbo.bin";
+
+// Which model a local transcription uses (Settings → Transcription).
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum Tier {
+  Standard,
+  Light,
+}
+
+impl Tier {
+  pub fn parse(s: &str) -> Result<Self, String> {
+    match s {
+      "standard" => Ok(Self::Standard),
+      "light" => Ok(Self::Light),
+      _ => Err("bad-model".into()),
+    }
+  }
+  fn asset(self) -> &'static Asset {
+    match self {
+      Self::Standard => &MODEL,
+      Self::Light => &LIGHT_MODEL,
+    }
+  }
+  // Also accepted when found in ~/.cache/whisper.cpp (a hand install).
+  fn cached_names(self) -> [&'static str; 2] {
+    match self {
+      Self::Standard => ["ggml-large-v3-turbo.bin", MODEL.name],
+      Self::Light => ["ggml-small.bin", LIGHT_MODEL.name],
+    }
+  }
+  // whisper-cli's DTW alignment-head preset; it must match the model or there
+  // are no word timings.
+  pub fn dtw(self) -> &'static str {
+    match self {
+      Self::Standard => "large.v3.turbo",
+      Self::Light => "small",
+    }
+  }
+}
 
 const STALL: Duration = Duration::from_secs(30);
 
@@ -99,26 +147,27 @@ fn find_whisper() -> Option<PathBuf> {
     .or_else(|| crate::import::find_bin("whisper-cli").ok())
 }
 
-fn find_model() -> Option<PathBuf> {
+fn find_model(tier: Tier) -> Option<PathBuf> {
   let cache = home().join(".cache/whisper.cpp");
-  first_file(vec![parts_dir().join(MODEL.name), cache.join(FULL_MODEL), cache.join(MODEL.name)])
+  let [a, b] = tier.cached_names();
+  first_file(vec![parts_dir().join(tier.asset().name), cache.join(a), cache.join(b)])
 }
 
 fn find_vad() -> Option<PathBuf> {
   first_file(vec![parts_dir().join(VAD.name), home().join(".cache/whisper.cpp").join(VAD.name)])
 }
 
-pub fn find() -> Option<Parts> {
-  Some(Parts { whisper: find_whisper()?, model: find_model()?, vad: find_vad()? })
+pub fn find(tier: Tier) -> Option<Parts> {
+  Some(Parts { whisper: find_whisper()?, model: find_model(tier)?, vad: find_vad()? })
 }
 
-fn missing() -> Vec<&'static Asset> {
+fn missing(tier: Tier) -> Vec<&'static Asset> {
   let mut out = Vec::new();
   if find_whisper().is_none() {
     out.push(&WHISPER_CLI);
   }
-  if find_model().is_none() {
-    out.push(&MODEL);
+  if find_model(tier).is_none() {
+    out.push(tier.asset());
   }
   if find_vad().is_none() {
     out.push(&VAD);
@@ -129,9 +178,9 @@ fn missing() -> Vec<&'static Asset> {
 // Returns the parts, downloading any that are missing first. `on_pct` gets the
 // overall percent across everything still to fetch; it is not called at all
 // when nothing is missing.
-pub fn ensure(mut on_pct: impl FnMut(u32)) -> Result<Parts, String> {
+pub fn ensure(tier: Tier, mut on_pct: impl FnMut(u32)) -> Result<Parts, String> {
   let _guard = INSTALLING.lock().unwrap_or_else(|e| e.into_inner());
-  let todo = missing();
+  let todo = missing(tier);
   if !todo.is_empty() {
     let dir = parts_dir();
     std::fs::create_dir_all(&dir).map_err(|e| format!("setup:{e}"))?;
@@ -149,7 +198,7 @@ pub fn ensure(mut on_pct: impl FnMut(u32)) -> Result<Parts, String> {
       before += asset.size;
     }
   }
-  find().ok_or_else(|| "setup:parts still missing after download".into())
+  find(tier).ok_or_else(|| "setup:parts still missing after download".into())
 }
 
 async fn fetch(asset: &Asset, dir: &Path, mut on_bytes: impl FnMut(u64)) -> Result<(), String> {
@@ -281,13 +330,32 @@ pub struct ImportTools {
 }
 
 // What the add-video dialog needs to know before the user starts: whether the
-// first import will download the transcription parts, and whether this Mac has
-// the (hand-installed) YouTube downloader at all.
+// first import will download the transcription parts (for the model picked in
+// Settings), and whether this Mac has the (hand-installed) YouTube downloader.
 #[tauri::command]
-pub fn import_tools() -> ImportTools {
+pub fn import_tools(model: Option<String>) -> ImportTools {
+  let tier = model.as_deref().and_then(|m| Tier::parse(m).ok()).unwrap_or(Tier::Standard);
   // No YouTube on Windows: Chrome there encrypts cookies so yt-dlp cannot sign in.
   let youtube = !cfg!(windows) && crate::import::find_bin("yt-dlp").is_ok();
-  ImportTools { whisper: find().is_some(), youtube }
+  ImportTools { whisper: find(tier).is_some(), youtube }
+}
+
+#[derive(serde::Serialize)]
+pub struct TranscribeLocation {
+  // Where we download parts to (may not exist yet).
+  dir: String,
+  // The model file actually in use for this tier, wherever it was found.
+  model: Option<String>,
+}
+
+// Settings → Transcription: "show in Finder" for the model in use.
+#[tauri::command]
+pub fn transcribe_location(model: String) -> Result<TranscribeLocation, String> {
+  let tier = Tier::parse(&model)?;
+  Ok(TranscribeLocation {
+    dir: parts_dir().to_string_lossy().into_owned(),
+    model: find_model(tier).map(|p| p.to_string_lossy().into_owned()),
+  })
 }
 
 #[cfg(test)]
@@ -340,9 +408,9 @@ mod tests {
     std::fs::remove_dir_all(&dir).unwrap();
   }
 
-  // The whole local chain on this OS, as an import runs it: parts (found or
-  // downloaded), audio out of a video, whisper with word timings. On Windows CI
-  // nothing is installed, so this also downloads ~580MB.
+  // The whole local chain on this OS, as an import runs it, for both model
+  // sizes: parts (found or downloaded), audio out of a video, whisper with word
+  // timings. On Windows CI nothing is installed, so this also downloads ~770MB.
   // Run with: cargo test --manifest-path src-tauri/Cargo.toml -- --ignored transcribes_speech
   #[test]
   #[ignore]
@@ -350,25 +418,27 @@ mod tests {
     let dir = std::env::temp_dir().join(format!("lc-e2e-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&dir).unwrap();
     let rt = tokio::runtime::Runtime::new().unwrap();
-    let mut get = |found: Option<PathBuf>, asset: &Asset, installed: &str| {
+    let get = |found: Option<PathBuf>, asset: &Asset, installed: &str| {
       found.unwrap_or_else(|| {
         rt.block_on(fetch(asset, &dir, |_| {})).unwrap();
         dir.join(installed)
       })
     };
     let whisper = get(find_whisper(), &WHISPER_CLI, WHISPER_EXE);
-    let model = get(find_model(), &MODEL, MODEL.name);
     let vad = get(find_vad(), &VAD, VAD.name);
-
     let video = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/speech.m4v");
     let wav = dir.join("speech.wav");
     crate::import::extract_wav(&video, &wav).unwrap();
-    let stem = dir.join("speech");
-    crate::import::transcribe(|_| {}, &whisper, &model, &vad, "en", &wav, &stem).unwrap();
-    let srt = std::fs::read_to_string(stem.with_extension("srt")).unwrap().to_lowercase();
-    assert!(srt.contains("quick brown fox"), "{srt}");
-    let words = crate::import::read_words(&stem.with_extension("json")).unwrap();
-    assert!(words.len() >= 10, "{} words", words.len());
+    for tier in [Tier::Standard, Tier::Light] {
+      let model = get(find_model(tier), tier.asset(), tier.asset().name);
+      let stem = dir.join(format!("speech-{tier:?}"));
+      crate::import::transcribe(|_| {}, &whisper, &model, &vad, tier.dtw(), "en", &wav, &stem).unwrap();
+      let srt = std::fs::read_to_string(stem.with_extension("srt")).unwrap().to_lowercase();
+      assert!(srt.contains("quick brown fox"), "{tier:?}: {srt}");
+      let words = crate::import::read_words(&stem.with_extension("json")).unwrap();
+      assert!(words.len() >= 10, "{tier:?}: {} words", words.len());
+      eprintln!("{tier:?}: {}", words.iter().map(|w| format!("{}@{}", w.w, w.from)).collect::<Vec<_>>().join(" "));
+    }
     std::fs::remove_dir_all(&dir).unwrap();
   }
 }

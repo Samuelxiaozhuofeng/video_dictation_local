@@ -219,6 +219,7 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
     if (job.stage === 'setup') return t('import.stageSetup', { pct });
     if (job.stage === 'download') return t('import.stageDownload', { pct });
     if (job.stage === 'transcribe') return t('import.stageTranscribe', { pct });
+    if (job.stage === 'cloud') return t('import.stageCloud', { pct });
     if (job.stage === 'segment') return t('import.stageSegment');
     return t('import.stageExtract');
   };

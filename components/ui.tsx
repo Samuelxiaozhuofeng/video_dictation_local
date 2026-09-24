@@ -111,7 +111,12 @@ export const H: React.FC<{ children: React.ReactNode; sub?: React.ReactNode; bad
 export const Field: React.FC<{ label: React.ReactNode; hint?: React.ReactNode; right?: React.ReactNode; children: React.ReactNode; className?: string }> = ({
   label, hint, right, children, className = '',
 }) => (
-  <label className={`block ${className}`}>
+  // A click on the label's text or hint "clicks" its first control; when that is a
+  // Seg button it would silently switch the setting to the first option.
+  <label
+    className={`block ${className}`}
+    onClick={e => { if (e.currentTarget.control instanceof HTMLButtonElement && !(e.target as Element).closest('button, input, select, textarea')) e.preventDefault(); }}
+  >
     <span className="flex items-baseline justify-between mb-1.5">
       <span className="text-sm font-medium">{label}</span>
       {right && <span className="text-xs text-mute">{right}</span>}

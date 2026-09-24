@@ -1,5 +1,6 @@
 mod anki;
 mod cache;
+mod cloud_asr;
 mod decode;
 mod import;
 mod paths;
@@ -31,6 +32,7 @@ pub fn run() {
       cache::write_cache,
       tts::tts,
       whisper_setup::import_tools,
+      whisper_setup::transcribe_location,
       trash_file
     ])
     .run(tauri::generate_context!())

@@ -49,7 +49,8 @@ export default defineConfig(({ command }) => {
       // and the mock thinks it exists.
       appType: browserDev ? 'mpa' : 'spa',
       server: {
-        port: 3000,
+        // tauri dev expects 3000; a browser preview takes the port it is handed.
+        port: browserDev && process.env.PORT ? Number(process.env.PORT) : 3000,
         host: browserDev ? '127.0.0.1' : '0.0.0.0',
         ...(browserDev && {
           fs: {

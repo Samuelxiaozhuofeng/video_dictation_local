@@ -136,7 +136,7 @@ export interface VideoRecord {
   // Present while a YouTube/local import is generating subtitles (or failed).
   // Cleared once videoPath / subtitleText / totalSubtitles are filled in.
   importJob?: {
-    stage: 'setup' | 'download' | 'extract' | 'transcribe' | 'segment';
+    stage: 'setup' | 'download' | 'extract' | 'transcribe' | 'cloud' | 'segment';
     percent?: number;
     error?: string;
     source: string;
