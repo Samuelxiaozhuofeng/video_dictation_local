@@ -66,7 +66,7 @@ const Studio: React.FC = () => {
       if (!cancelled) setClozeProgress(job && job.total ? { done: job.done, total: job.total } : null);
     };
     const unsubscribe = subscribeCloze(sync);
-    prepareCloze(videoId, lineTexts).then(ranked => {
+    prepareCloze(videoId, lineTexts, true).then(ranked => {
       if (cancelled) return;
       setRankedLines(ranked);
       setClozeProgress(null);

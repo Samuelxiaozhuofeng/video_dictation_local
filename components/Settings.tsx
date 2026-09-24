@@ -37,6 +37,7 @@ const Settings: React.FC = () => {
   const [aiSegmentModel, setAiSegmentModel] = useState('');
   const [aiAutoBreakdown, setAiAutoBreakdown] = useState(false);
   const [aiAutoCloze, setAiAutoCloze] = useState(false);
+  const [aiLimits, setAiLimits] = useState<NonNullable<AIConfig['limits']>>({});
 
   const [sectionLength, setSectionLength] = useState(Storage.DEFAULT_SECTION_LENGTH);
   const [audioPadding, setAudioPadding] = useState<AudioPaddingConfig>({ startPadding: 100, endPadding: 200 });
@@ -75,6 +76,7 @@ const Settings: React.FC = () => {
     setAiSegmentModel(savedAI.segmentModel || '');
     setAiAutoBreakdown(!!savedAI.autoBreakdown);
     setAiAutoCloze(!!savedAI.autoCloze);
+    setAiLimits(savedAI.limits || {});
 
     const savedPractice = Storage.getPracticeConfig();
     setSectionLength(savedPractice.sectionLength);
@@ -118,6 +120,7 @@ const Settings: React.FC = () => {
       segmentModel: next.segmentModel ?? aiSegmentModel,
       autoBreakdown: next.autoBreakdown ?? aiAutoBreakdown,
       autoCloze: next.autoCloze ?? aiAutoCloze,
+      limits: next.limits ?? aiLimits,
     });
     flashSaved();
   };
@@ -200,6 +203,11 @@ const Settings: React.FC = () => {
           setAiAutoCloze={(v) => {
             setAiAutoCloze(v);
             saveAI({ autoCloze: v });
+          }}
+          aiLimits={aiLimits}
+          setAiLimits={(v) => {
+            setAiLimits(v);
+            saveAI({ limits: v });
           }}
         />
       )}

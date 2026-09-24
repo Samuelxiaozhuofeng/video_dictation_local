@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import * as AI from '../utils/ai';
 import { Btn, Field, inputCls } from './ui';
 import { useT } from '../utils/i18n';
+import { AIConfig } from '../types';
+import { AiKind, LIMIT_DEFAULTS, LIMIT_MAX } from '../utils/aiLimit';
+
+type Limits = NonNullable<AIConfig['limits']>;
+const LIMIT_KINDS: AiKind[] = ['segment', 'breakdown', 'cloze'];
 
 interface SettingsAIProps {
   aiModel: string;
@@ -20,6 +25,8 @@ interface SettingsAIProps {
   setAiAutoBreakdown: (value: boolean) => void;
   aiAutoCloze: boolean;
   setAiAutoCloze: (value: boolean) => void;
+  aiLimits: Limits;
+  setAiLimits: (value: Limits) => void;
 }
 
 const Check: React.FC<{ checked: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }> = ({ checked, onChange, label, disabled }) => (
@@ -62,6 +69,8 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
   setAiAutoBreakdown,
   aiAutoCloze,
   setAiAutoCloze,
+  aiLimits,
+  setAiLimits,
 }) => {
   const t = useT();
   const [models, setModels] = useState<string[]>(() => AI.getCachedModels());
@@ -164,6 +173,31 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
           <Check checked={aiAutoCloze} onChange={setAiAutoCloze} disabled={!aiReady} label={t('settingsAI.autoCloze')} />
         </div>
         <span className="block mt-1.5 text-xs text-mute leading-relaxed">{aiReady ? t('settingsAI.afterImportHint') : t('settingsAI.afterImportNeedAi')}</span>
+      </div>
+
+      <div>
+        <span className="block text-sm font-medium mb-2.5">{t('settingsAI.limits')}</span>
+        <div className="grid grid-cols-3 gap-3">
+          {LIMIT_KINDS.map(kind => (
+            <label key={kind} className="block">
+              <span className="block text-xs text-mute mb-1">{t(`settingsAI.limit_${kind}`)}</span>
+              <input
+                type="number"
+                min={1}
+                max={LIMIT_MAX}
+                step={1}
+                value={aiLimits[kind] ?? ''}
+                placeholder={String(LIMIT_DEFAULTS[kind])}
+                onChange={(e) => {
+                  const n = parseInt(e.target.value, 10);
+                  setAiLimits({ ...aiLimits, [kind]: Number.isFinite(n) ? Math.min(Math.max(n, 1), LIMIT_MAX) : undefined });
+                }}
+                className={`${inputCls} font-mono`}
+              />
+            </label>
+          ))}
+        </div>
+        <span className="block mt-1.5 text-xs text-mute leading-relaxed">{t('settingsAI.limitsHint', { max: LIMIT_MAX })}</span>
       </div>
 
       <Field

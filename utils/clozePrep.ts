@@ -6,7 +6,7 @@ import { parseSRT } from './srtParser';
 // Blanks, auto-run after an import) and the practice page, so the two never ask
 // the AI twice for the same video. Module-level: leaving a page does not stop it.
 
-type ClozeJob = { done: number; total: number; cancelled?: boolean; saving?: Promise<void>; promise: Promise<(number[] | null)[]> };
+type ClozeJob = { done: number; total: number; urgent: boolean; cancelled?: boolean; saving?: Promise<void>; promise: Promise<(number[] | null)[]> };
 const jobs = new Map<string, ClozeJob>();
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach(fn => fn());
@@ -31,10 +31,12 @@ export async function cancelCloze(recordId: string): Promise<void> {
 }
 
 // Ranked word indices per line, from the cache plus the AI for lines not ranked yet.
-export function prepareCloze(recordId: string | null, lineTexts: string[]): Promise<(number[] | null)[]> {
+// urgent: the practice page is waiting on it, so its calls go ahead of the
+// shelf's — even when the shelf started this very job first.
+export function prepareCloze(recordId: string | null, lineTexts: string[], urgent = false): Promise<(number[] | null)[]> {
   const running = recordId ? jobs.get(recordId) : undefined;
-  if (running) return running.promise;
-  const job: ClozeJob = { done: 0, total: 0, promise: Promise.resolve([]) };
+  if (running) { running.urgent ||= urgent; return running.promise; }
+  const job: ClozeJob = { done: 0, total: 0, urgent, promise: Promise.resolve([]) };
   job.promise = loadOrBuildCloze({
     lineTexts,
     recordId,
@@ -47,6 +49,7 @@ export function prepareCloze(recordId: string | null, lineTexts: string[]): Prom
       return job.saving;
     },
     onProgress: (done, total) => { job.done = done; job.total = total; notify(); },
+    urgent: () => job.urgent,
   }).finally(() => {
     if (recordId && jobs.get(recordId) === job) jobs.delete(recordId);
     notify();

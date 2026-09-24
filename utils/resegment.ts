@@ -1,5 +1,6 @@
 import { fetch } from '@tauri-apps/plugin-http';
 import { getAIConfig, getEndpoint, readJsonBody } from './aiConfig';
+import { withAiSlot } from './aiLimit';
 
 // Whisper breaks a transcript wherever its decoder happened to stop, which
 // regularly lands you a 12-second, 30-word line. Dictation on a line that long
@@ -164,19 +165,17 @@ export async function resegment(words: Word[]): Promise<string | null> {
   if (!canResegment() || words.length === 0) return null;
   try {
     const groups = batches(words);
-    // An hour of speech is a dozen-odd calls at ~12s each; run a few at a time
-    // so a long video is not stuck on this step for minutes.
+    // An hour of speech is a dozen-odd calls at ~12s each; run them side by
+    // side (up to the user's cap) so a long video is not stuck here for minutes.
     const offsets: number[] = [];
     let running = 0;
     for (const group of groups) { offsets.push(running); running += group.length; }
-    const results: number[][] = new Array(groups.length);
-    let next = 0;
-    await Promise.all(Array.from({ length: Math.min(4, groups.length) }, async () => {
-      while (next < groups.length) {
-        const i = next++;
-        results[i] = await ask(groups[i]);
-      }
-    }));
+    // One failed batch sinks the whole re-cut, so the rest stop asking.
+    let failed = false;
+    const results = await Promise.all(groups.map(g => withAiSlot('segment', async () => {
+      if (failed) return [];
+      try { return await ask(g); } catch (err) { failed = true; throw err; }
+    })));
     const starts: number[] = [];
     results.forEach((local, i) => { for (const n of local) starts.push(offsets[i] + n); });
     const srt = buildSrt(words, enforceCeiling(starts, words.length));

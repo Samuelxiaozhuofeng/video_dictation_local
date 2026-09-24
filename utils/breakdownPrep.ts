@@ -1,5 +1,6 @@
 import { fetch } from '@tauri-apps/plugin-http';
 import { readJsonBody } from './aiConfig';
+import { withAiSlot } from './aiLimit';
 import { BREAKDOWN_MIN_WORDS, Breakdown, breakdownRules, clozeRouter, spaceWords, validateBreakdown } from './aiDrills';
 import { readCacheText, writeCacheText } from './desktop';
 import { parseSRT } from './srtParser';
@@ -12,7 +13,6 @@ import { parseSRT } from './srtParser';
 // Each line asks for up to three notes, so answers run long: ten lines a batch
 // keeps the model careful to the last line, and a bad answer only costs ten.
 export const PREP_BATCH_LINES = 10;
-const MAX_INFLIGHT = 8;
 const REQUEST_TIMEOUT_MS = 120_000;
 
 export type BreakdownCache = { v: 1; lang: 'zh' | 'en'; lines: Record<string, Breakdown> };
@@ -151,20 +151,17 @@ export async function prepareBreakdowns(recordId: string, subtitleText: string, 
       const body = JSON.stringify(cache);
       job.saving = job.saving!.then(() => (job.cancelled ? undefined : writeCacheText(recordId, 'breakdown', body))).catch(() => {});
     };
-    let next = 0;
-    await Promise.all(Array.from({ length: Math.min(MAX_INFLIGHT, batches.length) }, async () => {
-      while (next < batches.length && !job.cancelled) {
-        const lines = batches[next++];
-        let answers: (Breakdown | null)[] = [];
-        try { answers = await askBatch(lines, lang); } catch {
-          try { answers = await askBatch(lines, lang); } catch { /* these lines fall back to asking on click */ }
-        }
-        answers.forEach((a, i) => { if (a) cache.lines[lines[i]] = a; });
-        if (answers.some(Boolean)) save();
-        job.done++;
-        notify();
+    await Promise.all(batches.map(lines => withAiSlot('breakdown', async () => {
+      if (job.cancelled) return;
+      let answers: (Breakdown | null)[] = [];
+      try { answers = await askBatch(lines, lang); } catch {
+        try { answers = await askBatch(lines, lang); } catch { /* these lines fall back to asking on click */ }
       }
-    }));
+      answers.forEach((a, i) => { if (a) cache.lines[lines[i]] = a; });
+      if (answers.some(Boolean)) save();
+      job.done++;
+      notify();
+    })));
     await job.saving;
   } finally {
     jobs.delete(recordId);

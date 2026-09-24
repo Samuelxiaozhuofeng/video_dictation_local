@@ -1,6 +1,7 @@
 import { fetch } from '@tauri-apps/plugin-http';
 import { ClozeLevel } from '../types';
 import { readJsonBody } from './aiConfig';
+import { withAiSlot } from './aiLimit';
 import { getRouter } from './resegment';
 import { tokenizeText, getWordTokens } from './textTokenizer';
 
@@ -13,7 +14,6 @@ import { tokenizeText, getWordTokens } from './textTokenizer';
 // here — the word cap alone does not bound how many answers we ask for at once.
 export const BATCH_WORDS = 250;
 export const BATCH_LINES = 25;
-const MAX_INFLIGHT = 8;
 const REQUEST_TIMEOUT_MS = 90_000;
 
 export function lineWordCount(text: string): number {
@@ -167,6 +167,7 @@ async function ask(texts: string[]): Promise<(number[] | null)[]> {
 export async function generateCloze(
   texts: string[],
   onProgress?: (done: number, total: number) => void,
+  urgent?: () => boolean,
 ): Promise<(number[] | null)[]> {
   if (texts.length === 0) return [];
   const results: (number[] | null)[] = texts.map(() => null);
@@ -174,22 +175,17 @@ export async function generateCloze(
     if (!canCloze()) return results;
     const groups = batchLinesByWords(texts);
     onProgress?.(0, groups.length);
-    let next = 0;
     let done = 0;
-    await Promise.all(Array.from({ length: Math.min(MAX_INFLIGHT, groups.length) }, async () => {
-      while (next < groups.length) {
-        const i = next++;
-        const { start, end } = groups[i];
-        try {
-          const ranked = await ask(texts.slice(start, end));
-          for (let j = 0; j < ranked.length; j++) results[start + j] = ranked[j];
-        } catch {
-          // this batch stays null → those lines practise as full write
-        }
-        done++;
-        onProgress?.(done, groups.length);
+    await Promise.all(groups.map(({ start, end }) => withAiSlot('cloze', async () => {
+      try {
+        const ranked = await ask(texts.slice(start, end));
+        for (let j = 0; j < ranked.length; j++) results[start + j] = ranked[j];
+      } catch {
+        // this batch stays null → those lines practise as full write
       }
-    }));
+      done++;
+      onProgress?.(done, groups.length);
+    }, urgent)));
     return results;
   } catch {
     return results;
@@ -203,6 +199,7 @@ export async function loadOrBuildCloze(opts: {
   readText: (id: string) => Promise<string | null>;
   writeText: (id: string, text: string) => Promise<void>;
   onProgress?: (done: number, total: number) => void;
+  urgent?: () => boolean;
 }): Promise<(number[] | null)[]> {
   const counts = opts.lineTexts.map(lineWordCount);
   const srt = hashSrt(opts.subtitleText);
@@ -218,7 +215,7 @@ export async function loadOrBuildCloze(opts: {
   // instead of being cached as "no blanks" for good.
   const missing = counts.flatMap((n, i) => (n > 0 && !result[i] ? [i] : []));
   if (missing.length === 0) return result;
-  const generated = await generateCloze(missing.map(i => opts.lineTexts[i]), opts.onProgress);
+  const generated = await generateCloze(missing.map(i => opts.lineTexts[i]), opts.onProgress, opts.urgent);
   missing.forEach((li, k) => { result[li] = generated[k] ?? null; });
   if (opts.recordId && generated.some(Boolean)) {
     const body = JSON.stringify({ v: 1, srt, lines: result });
