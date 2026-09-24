@@ -3,6 +3,7 @@ import { PracticeMode, Subtitle, VideoSection } from '../types';
 import * as Storage from '../utils/storage';
 import { parseSRT } from '../utils/srtParser';
 import { buildSections } from '../utils/sections';
+import { countLine } from '../utils/today';
 
 export interface UsePracticeSessionParams {
   videoId: string | null;
@@ -85,6 +86,7 @@ export function usePracticeSession(params: UsePracticeSessionParams): UsePractic
     onPracticeComplete: () => void,
     onAnkiStatusChange: (status: string) => void
   ) => {
+    countLine();
     if (currentSubtitleIndex < subtitles.length - 1) {
       setCurrentSubtitleIndex(prev => prev + 1);
       setMode(PracticeMode.LISTENING);

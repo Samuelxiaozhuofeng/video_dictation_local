@@ -16,6 +16,7 @@ import { canCloze } from '../utils/aiDrills';
 import { cancelPrep, getPrepJob, prepStatus, prepareBreakdowns, subscribePrep } from '../utils/breakdownPrep';
 import { cancelCloze, clozeStatus, getClozeJob, linesOf, prepareCloze, subscribeCloze } from '../utils/clozePrep';
 import { countForVideo, deckCounts, getAllCards, subscribeCards } from '../utils/review';
+import { getToday } from '../utils/today';
 
 // Home does two things: pick up the video you were on, and add a new one.
 // As a list the most recent video leads and the rest are quiet rows; as cards
@@ -120,11 +121,13 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
 
   // "3 lines · 2 words due": a quiet link to the review page, only when something is due.
   const [reviewDue, setReviewDue] = useState<string | null>(null);
+  const [remembered, setRemembered] = useState(0);
   useEffect(() => {
     const load = () => getAllCards().then(cards => {
       const { line, word } = deckCounts(cards);
       const what = [line.due && t('home.reviewLine', { n: line.due }), word.due && t('home.reviewWord', { n: word.due })].filter(Boolean).join(' · ');
       setReviewDue(what ? t('home.reviewDue', { what }) : null);
+      setRemembered(line.remembered);
     }).catch(() => setReviewDue(null));
     load();
     return subscribeCards(load);
@@ -297,6 +300,9 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
     );
   };
 
+  // "Today: 12 min · 18 lines · 34 lines remembered" — each part only once it's above zero.
+  const today = getToday();
+  const todayWhat = [today.sec >= 60 && t('home.todayMin', { n: Math.floor(today.sec / 60) }), today.lines && t('home.reviewLine', { n: today.lines })].filter(Boolean).join(' · ');
   const addBtn = <Btn size="sm" flat className="-mr-3" onClick={() => setAdding({ path: null })}><Plus size={15} /> {t('home.addVideo')}</Btn>;
   const lead = videos?.find(v => !v.importJob);
   const rest = (videos ?? []).filter(v => v !== lead);
@@ -321,9 +327,13 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
       ) : (
         <>
           <div className="pt-4 flex items-center justify-end gap-3">
-            {reviewDue && onOpenReview && (
-              <button type="button" onClick={onOpenReview} className="mr-auto text-sm text-mute hover:text-ink underline-offset-4 hover:underline">{reviewDue}</button>
-            )}
+            <div className="mr-auto flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm text-mute">
+              {todayWhat && <span>{t('home.today', { what: todayWhat })}</span>}
+              {remembered > 0 && <span title={t('home.rememberedTitle')}>{t('home.remembered', { n: remembered })}</span>}
+              {reviewDue && onOpenReview && (
+                <button type="button" onClick={onOpenReview} className="hover:text-ink underline-offset-4 hover:underline">{reviewDue}</button>
+              )}
+            </div>
             <Seg<View> size="sm" value={view} onChange={setView} options={[
               { value: 'list', label: <List size={14} />, title: t('home.viewList') },
               { value: 'cards', label: <LayoutGrid size={14} />, title: t('home.viewCards') },

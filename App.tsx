@@ -20,6 +20,7 @@ import { fileNameFromPath, pathExists, pickVideoPath, videoSrcFromPath } from '.
 import { t, useLang } from './utils/i18n';
 import { markInterruptedJobs, startImportListener } from './utils/importJob';
 import { matches } from './utils/shortcuts';
+import { countLine } from './utils/today';
 
 export default function App() {
   const lang = useLang();
@@ -85,6 +86,8 @@ export default function App() {
     subtitles, currentSubtitleIndex, mode, shouldAutoAdvance, learningMode, blurPlaybackMode,
     onModeChange: setMode,
     onAutoAdvance: () => {
+      // Continuous blur play rolls past lines on its own; those aren't practised.
+      if (!(learningMode === LearningMode.BLUR && blurPlaybackMode === BlurPlaybackMode.CONTINUOUS)) countLine();
       if (currentSubtitleIndex < subtitles.length - 1) {
         setCurrentSubtitleIndex(prev => prev + 1);
         setMode(PracticeMode.LISTENING);

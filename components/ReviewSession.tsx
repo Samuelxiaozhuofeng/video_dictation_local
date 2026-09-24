@@ -11,6 +11,7 @@ import DefinitionPanel from './DefinitionPanel';
 import { useLookup } from '../hooks/useLookup';
 import { detectLang } from '../utils/dictionary';
 import { useT } from '../utils/i18n';
+import { countLine, usePracticeClock } from '../utils/today';
 
 // A review round: one card at a time over the whole window, graded by how the
 // dictation went. Also opened on top of the practice page, so it owns its keys.
@@ -100,13 +101,13 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
   const [idx, setIdx] = useState(0);
   const [mode, setMode] = useState<PracticeMode>(PracticeMode.INPUT);
   const [found, setFound] = useState<{ id: string; path: string | null } | null>(null);
-  const [firstTry, setFirstTry] = useState(0);
   const [more, setMore] = useState<ReviewCard[] | null>(null);
   const relinked = useRef(new Map<string, string>());
   const writes = useRef<Promise<unknown>[]>([]);
   const clip = useClip();
   const rootRef = useRef<HTMLDivElement>(null);
 
+  usePracticeClock();
   const card = queue[idx] as ReviewCard | undefined;
   const done = idx >= queue.length;
   const path = card && found?.id === card.id ? found.path : undefined; // undefined = still looking
@@ -158,7 +159,7 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
 
   const result = (o: Outcome) => {
     if (!card) return;
-    if (o.correct && !o.helped) setFirstTry(n => n + 1);
+    if (!isWord) countLine();
     const videoPath = relinked.current.get(card.videoId) ?? card.videoPath;
     writes.current.push(recordOutcome({ ...card, videoPath }, o).catch(console.error));
   };
@@ -192,7 +193,6 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
     setQueue(more);
     setRound(r => r + 1);
     setIdx(0);
-    setFirstTry(0);
     setMode(PracticeMode.INPUT);
   };
 
@@ -230,7 +230,7 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
             <Card className="w-full max-w-md mx-auto mt-16 fade-in">
               <div className="px-7 pt-7 pb-5 space-y-3">
                 <h2 className="font-serif text-[30px] leading-tight">{t('session.doneTitle')}</h2>
-                <p className="text-sm text-mute leading-relaxed">{t('session.doneBody', { n: queue.length, ok: firstTry })}</p>
+                <p className="text-sm text-mute leading-relaxed">{t('session.doneBody', { n: queue.length })}</p>
               </div>
               <div className="px-7 py-4 border-t border-line flex justify-end gap-2">
                 {!!more?.length && <Btn onClick={again}>{t('session.doneMore', { n: more.length })}</Btn>}

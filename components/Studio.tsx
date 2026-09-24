@@ -18,6 +18,7 @@ import { canCloze, pickBlanks } from '../utils/aiDrills';
 import { getClozeJob, prepareCloze, subscribeCloze } from '../utils/clozePrep';
 import { IS_WINDOWS } from '../utils/platform';
 import { matches, formatCombo, useShortcuts } from '../utils/shortcuts';
+import { usePracticeClock } from '../utils/today';
 import { addLine, addWord, getAllCards, hasAudio, lineCardId, Reason, ReviewCard } from '../utils/review';
 import ReviewSession from './ReviewSession';
 
@@ -42,6 +43,7 @@ const Studio: React.FC = () => {
   const lineTexts = useMemo(() => fullSubtitles.map(s => s.text), [fullSubtitles]);
   // The record id alone keys the cache; the line texts ride along in the hash
   // inside the cache file, so a re-cut subtitle invalidates it there, not here.
+  usePracticeClock();
   const clozeKey = videoId ?? '';
   const lineIndex = currentSub ? fullSubtitles.findIndex(s => s.id === currentSub.id) : -1;
   const wordN = currentSub ? getWordTokens(tokenizeText(currentSub.text)).length : 0;

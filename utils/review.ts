@@ -84,6 +84,10 @@ export const dueQueue = (cards: ReviewCard[], deck: Deck, now = Date.now(), limi
 
 export const isNew = (c: ReviewCard) => c.fsrs.state === State.New;
 
+// "Remembered" on the home screen: a line likely still recalled a week from now.
+export const REMEMBERED_DAYS = 7;
+export const isRemembered = (c: ReviewCard) => c.deck === 'line' && hasAudio(c) && c.fsrs.stability >= REMEMBERED_DAYS;
+
 // Which word to blank in a word card: the first token equal to it, ignoring case and punctuation.
 export const wordIndexIn = (words: string[], word: string): number => {
   const norm = (w: string) => w.toLowerCase().replace(/[^\p{L}\p{N}'’-]/gu, '');
@@ -221,6 +225,7 @@ export const deckCounts = (cards: ReviewCard[], now = Date.now()) => {
   const count = (deck: Deck) => ({
     due: cards.filter(c => c.deck === deck && isDue(c, now)).length,
     total: cards.filter(c => c.deck === deck).length,
+    remembered: cards.filter(c => c.deck === deck && isRemembered(c)).length,
   });
   return { line: count('line'), word: count('word') };
 };

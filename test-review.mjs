@@ -64,7 +64,7 @@ const q = R.dueQueue(cards, 'line', now);
 assert.equal(q.length, R.SESSION_SIZE);
 assert.deepEqual(q.slice(0, 2).map(x => x.id), ['a', 'b']);
 assert.ok(!q.some(x => x.id === 'future' || x.id === 'w' || x.id === 'mute'));
-assert.deepEqual(R.deckCounts(cards, now), { line: { due: 22, total: 24 }, word: { due: 1, total: 1 } });
+assert.deepEqual(R.deckCounts(cards, now), { line: { due: 22, total: 24, remembered: 0 }, word: { due: 1, total: 1, remembered: 0 } });
 
 // Ids: one sentence card per video line; word cards hang off it.
 assert.equal(R.lineCardId('v1', 12.3), 'v1|12.30');
@@ -86,5 +86,14 @@ assert.equal(hit.start, 65);
 assert.equal(hit.end, 67.5);
 assert.equal(R.matchLegacy({ text: 'Yeah.', videoName: 'gone.mp4', timeDisplay: '00:01' }, records), null);
 assert.equal(R.matchLegacy({ text: 'Nope.', videoName: 'a.mp4', timeDisplay: '00:01' }, records), null);
+
+// "Remembered" on the home screen: a line stable for a week or more; words and silent lines never count.
+const stable = { ...fresh, fsrs: { ...fresh.fsrs, stability: R.REMEMBERED_DAYS } };
+assert.ok(R.isRemembered(stable));
+assert.ok(!R.isRemembered({ ...stable, fsrs: { ...stable.fsrs, stability: R.REMEMBERED_DAYS - 0.1 } }));
+assert.ok(!R.isRemembered({ ...stable, deck: 'word' }));
+assert.ok(!R.isRemembered({ ...stable, start: -1 }));
+assert.ok(!R.isRemembered(fresh));
+assert.equal(R.deckCounts([stable, fresh], now).line.remembered, 1);
 
 console.log('test-review: all passed');
