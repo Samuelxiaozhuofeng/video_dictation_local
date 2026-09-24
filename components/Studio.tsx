@@ -91,9 +91,13 @@ const Studio: React.FC = () => {
   const [stuck, setStuck] = useState<Set<string>>(new Set());
   const [retry, setRetry] = useState<ReviewCard[] | null>(null);
   useEffect(() => setStuck(new Set()), [currentSectionIndex]);
+  // Writes still in flight, so "redo" can wait for the last line's card instead of missing it.
+  const pending = useRef(new Set<Promise<void>>());
   const record = (reason: Reason) => {
     if (!currentSub || !videoId) return;
-    addLine({ videoId, videoName, text: currentSub.text, start: currentSub.startTime, end: currentSub.endTime }, reason).catch(console.error);
+    const p = addLine({ videoId, videoName, text: currentSub.text, start: currentSub.startTime, end: currentSub.endTime }, reason).catch(console.error);
+    pending.current.add(p);
+    p.finally(() => pending.current.delete(p));
     setStuck(prev => new Set(prev).add(lineCardId(videoId, currentSub.startTime)));
   };
   const keepWord = (word: string, definition: string, example: string) => {
@@ -102,7 +106,10 @@ const Studio: React.FC = () => {
   };
   const openRetry = () => {
     if (isPlaying) actions.onTogglePlay();
-    getAllCards().then(all => setRetry(all.filter(c => stuck.has(c.id) && hasAudio(c)))).catch(console.error);
+    Promise.allSettled([...pending.current])
+      .then(() => getAllCards())
+      .then(all => setRetry(all.filter(c => stuck.has(c.id) && hasAudio(c))))
+      .catch(console.error);
   };
   const retryBtn = stuck.size > 0 && <Btn onClick={openRetry}><Repeat size={16} /> {t('studio.retryStuck', { n: stuck.size })}</Btn>;
   useEffect(() => { if (bdActive) record('breakdown'); }, [bdActive?.lineId]); // eslint-disable-line react-hooks/exhaustive-deps

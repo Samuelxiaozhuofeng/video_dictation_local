@@ -138,14 +138,33 @@ const tx = async <T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRe
   });
 };
 
+const finished = (t: IDBTransaction) => new Promise<void>((resolve, reject) => {
+  t.oncomplete = () => resolve();
+  t.onerror = t.onabort = () => reject(t.error ?? new Error('Review database write failed'));
+});
+
+// Read, merge and write one card inside a single transaction, so two writes to
+// the same card (stuck + bookmarked at once) queue up instead of the later one
+// clobbering the earlier. `next` returns the new card, null to delete, undefined to leave it.
+const update = async (id: string, next: (old: ReviewCard | null) => ReviewCard | null | undefined) => {
+  await migrateSavedLines().catch(console.error);
+  const t = (await db()).transaction(STORE, 'readwrite');
+  const s = t.objectStore(STORE);
+  const r = s.get(id);
+  r.onsuccess = () => {
+    const card = next((r.result as ReviewCard | undefined) ?? null);
+    if (card === null) s.delete(id);
+    else if (card) s.put(card);
+  };
+  await finished(t);
+  changed();
+};
+
 const listeners = new Set<() => void>();
 export const subscribeCards = (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; };
 const changed = () => listeners.forEach(fn => fn());
 
 export const getAllCards = async (): Promise<ReviewCard[]> => (await tx<ReviewCard[]>('readonly', s => s.getAll())) ?? [];
-const getCard = async (id: string) => (await tx<ReviewCard>('readonly', s => s.get(id))) ?? null;
-const putCards = async (cards: ReviewCard[]) => { await tx('readwrite', s => { cards.forEach(c => s.put(c)); }); changed(); };
-export const putCard = (card: ReviewCard) => putCards([card]);
 export const deleteCard = async (id: string) => { await tx('readwrite', s => s.delete(id)); changed(); };
 
 export interface LineRef { videoId: string; videoName: string; videoPath?: string; text: string; start: number; end: number }
@@ -158,38 +177,45 @@ const withPath = async (ref: LineRef): Promise<LineRef> =>
 export const addLine = async (ref: LineRef, reason: Reason) => {
   if (!ref.videoId) return;
   const id = lineCardId(ref.videoId, ref.start);
-  const [old, full] = await Promise.all([getCard(id), withPath(ref)]);
-  await putCard(old ? withReason({ ...old, videoPath: full.videoPath ?? old.videoPath }, reason) : newCard({ id, deck: 'line', ...full }, reason));
+  const full = await withPath(ref);
+  await update(id, old => old ? withReason({ ...old, videoPath: full.videoPath ?? old.videoPath }, reason) : newCard({ id, deck: 'line', ...full }, reason));
 };
 
 export const addWord = async (ref: LineRef, word: string, definition: string, example: string) => {
   if (!ref.videoId || !word) return;
   const id = wordCardId(ref.videoId, ref.start, word);
-  const [old, full] = await Promise.all([getCard(id), withPath(ref)]);
-  await putCard(old ? { ...old, definition, example } : newCard({ id, deck: 'word', ...full, word, definition, example }, 'lookup'));
+  const full = await withPath(ref);
+  await update(id, old => old ? { ...old, definition, example } : newCard({ id, deck: 'word', ...full, word, definition, example }, 'lookup'));
 };
 
-export const hasWord = async (videoId: string, start: number, word: string) => !!(await getCard(wordCardId(videoId, start, word)));
 
 // Un-bookmark: a card that is only a bookmark goes; a line you also got stuck on stays.
-export const unsaveLine = async (videoId: string, start: number) => {
-  const old = await getCard(lineCardId(videoId, start));
-  if (!old) return;
+export const unsaveLine = (videoId: string, start: number) => update(lineCardId(videoId, start), old => {
+  if (!old) return undefined;
   const reasons = old.reasons.filter(r => r !== 'saved');
-  if (reasons.length === 0) await deleteCard(old.id);
-  else await putCard({ ...old, reasons, saved: false });
-};
+  return reasons.length === 0 ? null : { ...old, reasons, saved: false };
+});
 
 // Start times of this video's bookmarked lines, for the practice page's bookmark icons.
 export const savedStarts = async (videoId: string): Promise<Set<string>> =>
   new Set((await getAllCards()).filter(c => c.deck === 'line' && c.saved && c.videoId === videoId).map(c => c.start.toFixed(2)));
 
-export const recordOutcome = async (card: ReviewCard, o: Outcome) => putCard(schedule(card, o));
+// Schedules from the stored card (not the round's snapshot) and only touches the schedule
+// and path; a card deleted meanwhile stays deleted.
+export const recordOutcome = (card: ReviewCard, o: Outcome) =>
+  update(card.id, old => old ? { ...old, videoPath: card.videoPath ?? old.videoPath, fsrs: schedule(old, o).fsrs } : undefined);
 
 export const countForVideo = async (videoId: string) => (await getAllCards()).filter(c => c.videoId === videoId).length;
 
-export const repointVideo = async (videoId: string, videoPath: string) =>
-  putCards((await getAllCards()).filter(c => c.videoId === videoId).map(c => ({ ...c, videoPath })));
+export const repointVideo = async (videoId: string, videoPath: string) => {
+  await migrateSavedLines().catch(console.error);
+  const t = (await db()).transaction(STORE, 'readwrite');
+  const s = t.objectStore(STORE);
+  const r = s.getAll();
+  r.onsuccess = () => (r.result as ReviewCard[]).filter(c => c.videoId === videoId).forEach(c => s.put({ ...c, videoPath }));
+  await finished(t);
+  changed();
+};
 
 export const deckCounts = (cards: ReviewCard[], now = Date.now()) => {
   const count = (deck: Deck) => ({
