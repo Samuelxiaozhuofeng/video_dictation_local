@@ -181,13 +181,13 @@ const AddVideo: React.FC<Props> = ({ initialPath, initialSrt, onClose, onPractic
           </div>
 
           <div className="flex items-center gap-3 min-w-0">
-            <Btn onClick={browse} className="shrink-0"><FileVideo size={16} /> {path ? t('add.change') : t('add.pickLocal')}</Btn>
+            <Btn onClick={browse} className="shrink-0 !bg-page !border-line hover:!bg-shade"><FileVideo size={16} /> {path ? t('add.change') : t('add.pickLocal')}</Btn>
             <span className={`min-w-0 truncate text-sm ${path ? 'text-ink' : 'text-mute'}`}>{path ? fileNameFromPath(path) : t('add.dragHint')}</span>
           </div>
 
           {!trimmed && (
             <div className="flex items-center gap-3 min-w-0">
-              <Btn onClick={browseSrt} className="shrink-0"><FileText size={16} /> {srt ? t('add.change') : t('add.pickSubtitle')}</Btn>
+              <Btn onClick={browseSrt} className="shrink-0 !bg-page !border-line hover:!bg-shade"><FileText size={16} /> {srt ? t('add.change') : t('add.pickSubtitle')}</Btn>
               <span className={`min-w-0 truncate text-sm ${srt ? 'text-ink' : 'text-mute'}`}>{srt ? fileNameFromPath(srt) : t('add.subtitleHint')}</span>
               {srt && <button type="button" onClick={() => setSrt(null)} className="shrink-0 text-sm text-mute hover:text-ink">{t('add.clearSubtitle')}</button>}
             </div>

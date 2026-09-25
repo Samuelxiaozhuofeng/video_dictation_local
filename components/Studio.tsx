@@ -300,7 +300,7 @@ const Studio: React.FC = () => {
       <section className="relative -mt-6 min-h-[340px] bg-page rounded-t-3xl flex flex-col" style={{ flex: `${100 - videoShare} 1 0` }}
         aria-label={t('studio.lineCount', { current: lineNo, total: practisedN })}>
         <div className="px-6 lg:px-24 pt-6">
-          <Timeline lines={subtitles} current={currentSubtitleIndex} watch={watch} onPick={actions.onJumpToSaved}
+          <Timeline lines={subtitles} current={currentSubtitleIndex} watch={watch} onPick={id => (id === currentSub?.id ? actions.onReplayCurrent() : actions.onJumpToSaved(id))}
             title={i => t('studio.lineCount', { current: i + 1, total: subtitles.length })} />
           <div className="mt-1.5 flex justify-between text-xs text-mute tabular-nums">
             <span>{t('studio.lineCount', { current: lineNo, total: practisedN })}</span>
@@ -444,10 +444,10 @@ const ListeningGhost: React.FC<{ text: string; blanks: number[]; splitVersion: n
 };
 
 const Overlay: React.FC<{ title: string; body: string; stats?: [string, string][]; children: React.ReactNode }> = ({ title, body, stats, children }) => (
-  <div className="absolute inset-0 z-20 bg-black/40 flex items-end">
-    <Card className="w-full !rounded-b-none !rounded-t-3xl !border-0 px-6 lg:px-24 pt-8 pb-8 flex flex-col md:flex-row md:items-end gap-8 fade-in">
+  <div className="absolute inset-0 z-20 flex items-end">
+    <Card className="w-full !rounded-b-none !rounded-t-3xl !border-0 !shadow-none px-6 lg:px-24 pt-8 pb-8 flex flex-col gap-6 fade-in">
       <div className="flex-1 space-y-3">
-        <h2 className="text-[34px] font-semibold tracking-[-0.02em] leading-tight">{title}</h2>
+        <h2 className="text-[28px] font-semibold tracking-[-0.02em] leading-tight">{title}</h2>
         <p className="text-sm text-mute leading-relaxed">{body}</p>
         {stats && (
           <div className="flex gap-10 pt-3">
@@ -460,7 +460,7 @@ const Overlay: React.FC<{ title: string; body: string; stats?: [string, string][
           </div>
         )}
       </div>
-      <div className="flex flex-wrap md:flex-col-reverse md:w-60 gap-2.5 [&>button]:justify-center">{children}</div>
+      <div className="flex flex-wrap flex-row-reverse justify-end gap-2.5">{children}</div>
     </Card>
   </div>
 );

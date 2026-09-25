@@ -57,7 +57,7 @@ const ReviewPage: React.FC<{ deck: Deck }> = ({ deck }) => {
             <span className="text-sm text-mute">{t('review.total', { n: n.total })}</span>
           </div>
         </div>
-        <div>
+        {n.total > 0 && <div>
           <h3 className="text-xs text-mute mb-2.5">{t('review.week')}</h3>
           <div className="flex items-end gap-2.5 h-[84px]">
             {week.map((d, i) => (
@@ -68,7 +68,7 @@ const ReviewPage: React.FC<{ deck: Deck }> = ({ deck }) => {
               </div>
             ))}
           </div>
-        </div>
+        </div>}
       </section>
 
       <CardsPage deck={deck} cards={cards} />

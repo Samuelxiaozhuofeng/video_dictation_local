@@ -210,7 +210,8 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
     return (
       <div className="w-full flex flex-col items-center gap-5">
         {/* The answer, in the same place and size as the boxes were. A wrong word turns
-            accent with what you typed struck out above it; click any word to look it up. */}
+            accent with what you typed struck out above it; a word left blank is only
+            underlined (seeing the answer is not an error); click any word to look it up. */}
         <p className={`${LINE} pt-4`}>
           {groups.map((g, gi) => {
             if (!g.word) return <span key={g.key} className="text-mute">{g.punct}</span>;
@@ -223,7 +224,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
                   </span>
                 )}
                 <button type="button" onClick={e => { e.currentTarget.blur(); lookup(wordAt(gi)); }} title={r ? t('dictation.expected', { word: r.targetWord }) : t('common.lookup')}
-                  className={`rounded-md -mx-1 px-1 hover:bg-accent-soft ${r ? 'text-accent underline decoration-2 underline-offset-[8px]' : ''}`}>
+                  className={`rounded-md -mx-1 px-1 hover:bg-accent-soft ${!r ? '' : r.inputWord ? 'text-accent underline decoration-2 underline-offset-[8px]' : 'underline decoration-faint decoration-2 underline-offset-[8px]'}`}>
                   {g.word.value}
                 </button>
                 <span className="text-mute">{g.punct}</span>
