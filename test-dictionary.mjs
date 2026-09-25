@@ -147,7 +147,7 @@ assert.equal(taberu[0].senses[0].pos, '他动词・一段/二类');
 assert.equal(taberu[0].senses[0].text[0], '吃。\n飲食物をいただく。');
 assert.match(taberu[0].senses[0].examples[0][0], /^君は.*食べるか.*\n你是吃/);
 const kana = parseYoudaoJa({"newjc": {"word": {"head": {"pjm": "たべる", "hw": "たべる"}, "homonymD": [{"head": {"pjm": "たべる", "tone": "②", "hw": "食べる"}, "sense": [{"phrList": [{"jmsyT": "飲食物をいただく。", "ljT": ["你们吃什么?我们要一斤水饺", "生鱼片你吃得来能吃吗?没问题"], "jmsy": "吃。", "lj": ["何を食べますか――水餃子を1斤お願いします", "刺身は食べられますか――大丈夫です"]}, {"jmsyT": "生計を立てる。", "ljT": ["到了三十岁才不为生活操心了", "靠工资维持生活"], "jmsy": "生活。", "lj": ["30歳になってようやく食べていけるようになった", "月給でたべる"]}], "cx": "他动词・一段/二类"}]}], "sense": [{"phrList": [{"ljT": ["你应该吃这里的菜。", "你喜欢在外面吃还是在家吃?"], "jmsy": " 吃", "lj": ["ここの料理をたべるべきだ。", "外食と家でたべるのとどちらが好きですか。"]}]}, {"phrList": [{"jmsy": " 生活"}]}]}}});
-assert.deepEqual(kana.map(e => e.word), ['食べる'], 'kana stub gives way to its real entry');
+assert.deepEqual(kana.map(e => e.word), ['たべる', '食べる'], 'a kana word leads with its own entry, then its kanji spellings');
 assert.equal(parseYoudaoJa({}), null);
 assert.equal(parseYoudaoJa({ newjc: { word: { head: { hw: 'x' }, sense: [] } } }), null);
 

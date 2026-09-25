@@ -15,7 +15,8 @@ export type Seg = string | { img: string };
 // One numbered meaning: what the user picks and sends to Anki on its own.
 // phrase = the set phrase it belongs to (Eudic, e.g. "llegar a ser").
 export interface Sense { pos: string; phrase?: string; text: Seg[]; examples: Seg[][] }
-export interface DictEntry { word: string; phonetic: string; senses: Sense[]; source: DictSource }
+// reading: the headword in kana (Japanese only).
+export interface DictEntry { word: string; phonetic: string; senses: Sense[]; source: DictSource; reading?: string }
 
 // First option = the default. Youdao barely splits Spanish/French/German into
 // meanings and has no examples there, so Eudic leads for those.
@@ -146,15 +147,15 @@ const jaEntry = (w: YdJaWord): DictEntry | null => {
   }));
   if (senses.length === 0) return null;
   const { hw = '', pjm = '', tone = '' } = w.head ?? {};
-  return { word: clean(hw), phonetic: clean(`${pjm !== hw ? pjm : ''} ${tone}`), senses, source: 'youdao' };
+  return { word: clean(hw), phonetic: clean(`${pjm !== hw ? pjm : ''} ${tone}`), senses, source: 'youdao', reading: clean(pjm || hw) };
 };
 
-// Youdao's Japanese-Chinese (`newjc`). A kana query (たべる) is a thin stub
-// whose real entries (食べる, …) sit in homonymD.
+// Youdao's Japanese-Chinese (`newjc`). A kana query lists its kanji spellings
+// in homonymD after its own entry, which leads: する is 干，做 before 擦る.
 export const parseYoudaoJa = (body: any): DictEntry[] | null => {
   const w: YdJaWord | undefined = body?.newjc?.word;
   if (!w) return null;
-  const found = (w.homonymD?.length ? w.homonymD : [w]).map(jaEntry).filter((e): e is DictEntry => !!e);
+  const found = [w, ...(w.homonymD ?? [])].map(jaEntry).filter((e): e is DictEntry => !!e);
   return found.length ? found : null;
 };
 
@@ -324,8 +325,10 @@ const fromSource = async (source: DictSource, word: string, lang: DictLang): Pro
     const found = pages.filter((p): p is DictEntry => !!p);
     return found.length ? found : null;
   }
+  // The older endpoint, asked for newjc alone, keeps to Japanese; jsonapi_s
+  // takes 高い or 皆さん for English and answers without newjc.
+  if (lang === 'ja') return parseYoudaoJa(await (await get(`https://dict.youdao.com/jsonapi?le=jap&dicts=${encodeURIComponent('{"count":99,"dicts":[["newjc"]]}')}&q=${q}`)).json());
   const body = await (await get(`https://dict.youdao.com/jsonapi_s?doctype=json&jsonversion=4&le=${lang}&q=${q}`)).json();
-  if (lang === 'ja') return parseYoudaoJa(body);
   const entry = parseYoudao(body, word);
   return entry ? [entry] : null;
 };

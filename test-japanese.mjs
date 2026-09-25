@@ -12,7 +12,7 @@ import { join } from 'node:path';
 
 const out = join(tmpdir(), `japanese-${process.pid}.mjs`);
 await build({
-  stdin: { contents: "export * from './utils/textTokenizer.ts'; export * from './utils/japanese.ts'; export * from './utils/jaSegments.ts';", resolveDir: process.cwd(), loader: 'ts' },
+  stdin: { contents: "export * from './utils/textTokenizer.ts'; export * from './utils/japanese.ts'; export * from './utils/jaSegments.ts'; export * from './utils/jaLookup.ts';", resolveDir: process.cwd(), loader: 'ts' },
   bundle: true,
   format: 'esm',
   platform: 'node',
@@ -90,7 +90,27 @@ for (const [group, lemma] of [['食べました', '食べる'], ['お茶を', '�
   assert.equal(ja.jaLemma(group), lemma, group);
 }
 
-assert.equal(ja.jaKana('皆さん'), 'みなさん');
-assert.equal(ja.jaKana('食べる'), 'たべる');
+// set phrases stay one group and are looked up whole; katakana nouns in a row are one word
+const groupsOf = text => ja.jaGroups(text).filter(g => !g.punct).map(g => g.value);
+assert.deepEqual(groupsOf('皆さんこんにちは。初めまして。'), ['皆さん', 'こんにちは', '初めまして']);
+assert.deepEqual(groupsOf('雨が降るかもしれない。'), ['雨が', '降る', 'かもしれない']);
+assert.deepEqual(groupsOf('よろしくお願いします。'), ['よろしくお願いします']);
+assert.deepEqual(groupsOf('日本について話す'), ['日本', 'について', '話す']);
+assert.deepEqual(groupsOf('スマートフォンを買った'), ['スマートフォンを', '買った']);
+assert.deepEqual(groupsOf('今日はいい天気ですね'), ['今日は', 'いい', '天気ですね'], 'こんにちは spelled 今日は is left alone');
+for (const [group, lemma] of [['初めまして。', '初めまして'], ['かもしれないです', 'かも知れない'], ['気をつけて', '気をつける'],
+  ['くださり', '下さる'], ['スマートフォンを', 'スマートフォン'], ['にもかかわらず', 'にもかかわらず']]) {
+  assert.equal(ja.jaLemma(group), lemma, group);
+}
+
+// which Youdao entries a click shows, in what order
+const entry = (word, reading, pos) => ({ word, reading, phonetic: '', senses: [{ pos, text: ['x'], examples: [] }], source: 'youdao' });
+assert.deepEqual(ja.rankJa([entry('くる', 'くる', '名词'), entry('来る', 'くる', '自动词'), entry('繰る', 'くる', '他动词')], 'くる').map(e => e.word),
+  ['来る', '繰る', 'くる'], 'a verb leads with verb entries');
+assert.deepEqual(ja.rankJa([entry('おいしい', 'おいしい', '形容词')], 'お話し'), [], 'an unrelated word Youdao answers with is dropped');
+assert.deepEqual(ja.rankJa([entry('今日は', 'こんにちは', '连语')], 'こんにちは').map(e => e.word), ['今日は'], 'same reading is kept');
+assert.deepEqual(ja.rankJa([entry('個々', 'ここ', '名词'), entry('ここ', 'ここ', '代词')], 'ここ').map(e => e.word), ['ここ', '個々'], 'a pronoun leads with pronoun entries');
+assert.deepEqual(ja.rankJa([entry('遣る', 'やる', '他动词')], '遣る').map(e => e.word), ['遣る']);
+assert.equal(ja.jaLemma('やって'), '遣る');
 
 console.log('test-japanese: all checks passed');

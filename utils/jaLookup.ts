@@ -1,0 +1,43 @@
+import { DictEntry, lookupWord } from './dictionary';
+import { jaLemma, jaMorphs, kanaFold } from './japanese';
+import { JA_ALSO } from './jaPhrases';
+
+// What a click on a Japanese group shows: Youdao's entries for its word in
+// dictionary form (食べました → 食べる), led by an entry for the clicked phrase
+// itself when Youdao has one (すみません, 見ている).
+
+// Youdao's part-of-speech labels, by ipadic's.
+const POS: Record<string, string> = { 動詞: '动词', 形容詞: '形容', 名詞: '名', 副詞: '副', 連体詞: '连体', 感動詞: '感' };
+const han = (s: string) => s.match(/\p{Script=Han}/gu) ?? [];
+
+// Youdao answers a word it lacks with some other word (お話し → おいしい): an
+// entry is kept only if it is spelled, read or written with a kanji like the
+// query. Then the entries of the query's part of speech lead, so a kana verb
+// shows 来る before くる「佝偻病」.
+export function rankJa(entries: DictEntry[], query: string): DictEntry[] {
+  const morphs = jaMorphs(query);
+  const reading = morphs && kanaFold(morphs.map(m => m.reading ?? m.s).join(''));
+  const last = morphs?.[morphs.length - 1];
+  const pos = last?.d1 === '代名詞' ? '代' : POS[last?.pos ?? ''];
+  const kept = entries.filter(e =>
+    e.word === query || (!!reading && kanaFold(e.reading ?? e.word) === reading) || han(e.word).some(c => query.includes(c)));
+  const fits = (e: DictEntry) => !!pos && e.senses.some(s => s.pos.includes(pos));
+  return [...kept.filter(fits), ...kept.filter(e => !fits(e))];
+}
+
+export async function lookupJa(word: string): Promise<DictEntry[] | null> {
+  const lemma = jaLemma(word);
+  // Only a group of several words can be a phrase of its own; a lone kana word
+  // would bring back the homophone its spelling fix avoids (くる「佝偻病」).
+  const several = (jaMorphs(word)?.filter(m => !m.punct).length ?? 0) > 1;
+  const [whole, base] = await Promise.all([several && lemma !== word ? lookupWord(word, 'ja') : null, lookupWord(lemma, 'ja')]);
+  const found = [...(whole ?? []).filter(e => e.word === word), ...rankJa(base ?? [], lemma)];
+  for (const r of await Promise.all((JA_ALSO[lemma] ?? []).map(v => lookupWord(v, 'ja')))) found.push(...(r ?? []));
+  // Katakana nouns in a row are grouped as one loanword (スマートフォン); two
+  // words Youdao has no entry for together (フランスパリ) are looked up apart.
+  const parts = jaMorphs(lemma)?.map(m => m.s) ?? [];
+  if (found.length === 0 && parts.length > 1 && parts.every(p => /^[\p{Script=Katakana}ー]+$/u.test(p))) {
+    for (const r of await Promise.all(parts.map(p => lookupWord(p, 'ja')))) found.push(...(r ?? []));
+  }
+  return found.length ? found : null;
+}

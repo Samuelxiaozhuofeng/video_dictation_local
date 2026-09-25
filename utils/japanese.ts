@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react';
 import DynamicDictionaries from 'kuromoji/src/dict/DynamicDictionaries';
 import Tokenizer from 'kuromoji/src/Tokenizer';
 import { jaDictStatus, installJaDict, removeJaDict, readBinaryFile, onJaDictProgress } from './desktop';
+import { JA_PHRASES, JA_PHRASE_LIST, JA_SPELLING } from './jaPhrases';
 
 // Japanese lines have no spaces, so they are split with kuromoji (ipadic, a
 // download of its own: src-tauri/src/ja_dict.rs) into phrase-sized groups — a
@@ -143,22 +144,39 @@ export function jaMorphs(text: string): Morph[] | null {
   return out.map(m => m.s).join('') === text ? out : null;
 }
 
+const KATAKANA = /^[\p{Script=Katakana}ー]+$/u;
+
 // Particles, auxiliaries, suffixes and dependent words ride on the word before;
-// the word after a prefix (お茶) rides on the prefix.
+// the word after a prefix (お茶) rides on the prefix; katakana nouns in a row
+// are one loanword (スマート + フォン).
 const sticks = (m: Morph, prev: Morph) =>
-  m.pos === '助詞' || m.pos === '助動詞' || m.d1 === '接尾' || m.d1 === '非自立' || prev.pos === '接頭詞';
+  m.pos === '助詞' || m.pos === '助動詞' || m.d1 === '接尾' || m.d1 === '非自立' || prev.pos === '接頭詞' ||
+  (m.pos === '名詞' && prev.pos === '名詞' && KATAKANA.test(m.s) && KATAKANA.test(prev.s));
 
 // Word morphs only (punctuation left out): the list the AI numbers.
 export const jaWordMorphs = (text: string) => jaMorphs(text)?.filter(m => !m.punct) ?? null;
 
-// Char offset of each group's first morph, by the default rule.
+// Char offset of each group's first morph, by the default rule; a set phrase
+// (jaPhrases.ts) that starts and ends on morph edges is one group of its own.
 export function defaultStarts(all: Morph[]): number[] {
-  const out: number[] = [];
+  const out = new Set<number>();
   all.forEach((m, i) => {
     const prev = all[i - 1];
-    if (!m.punct && (!prev || prev.punct || !sticks(m, prev))) out.push(m.at);
+    if (!m.punct && (!prev || prev.punct || !sticks(m, prev))) out.add(m.at);
   });
-  return out;
+  const text = all.map(m => m.s).join('');
+  const edges = new Set([...all.map(m => m.at), text.length]);
+  const taken: [number, number][] = [];
+  for (const p of JA_PHRASE_LIST) {
+    for (let at = text.indexOf(p); at >= 0; at = text.indexOf(p, at + 1)) {
+      const end = at + p.length;
+      if (!edges.has(at) || !edges.has(end) || taken.some(([a, b]) => at < b && end > a)) continue;
+      taken.push([at, end]);
+      for (const x of out) if (x > at && x < end) out.delete(x);
+      out.add(at);
+    }
+  }
+  return [...out].sort((a, b) => a - b);
 }
 
 export function jaGroups(text: string): JaGroup[] | null {
@@ -186,19 +204,21 @@ export const kanaFold = (s: string) =>
   s.normalize('NFKC').trim().toLowerCase().replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
 
 // What a clicked group is looked up as: its word in dictionary form, particles
-// and endings dropped (食べました → 食べる, お茶を → お茶). Unchanged when the
-// splitting dictionary is not loaded.
+// and endings dropped (食べました → 食べる, お茶を → お茶); a set phrase as
+// Youdao spells it. Unchanged when the splitting dictionary is not loaded.
 export function jaLemma(text: string): string {
+  const bare = text.replace(/^[\s\p{P}\p{S}]+/u, '');
+  const phrase = JA_PHRASE_LIST.find(p => bare.startsWith(p));
+  if (phrase) return JA_PHRASES[phrase];
   const head: Morph[] = [];
   for (const m of jaMorphs(text) ?? []) {
     if (m.punct) continue;
     if (head.length && (m.pos === '助詞' || m.pos === '助動詞' || m.d1 === '非自立')) break;
     head.push(m);
   }
-  if (head.length === 0) return text;
-  return head.slice(0, -1).map(m => m.s).join('') + head[head.length - 1].base;
+  if (head.length === 0) return JA_SPELLING[bare] ?? text;
+  // ipadic reads くださ(る) as くだす.
+  const last = head[head.length - 1];
+  const lemma = head.slice(0, -1).map(m => m.s).join('') + (last.s.startsWith('くださ') ? '下さる' : last.base);
+  return JA_SPELLING[lemma] ?? lemma;
 }
-
-// The word in hiragana (皆さん → みなさん), for when Youdao misreads a kanji
-// query as another language.
-export const jaKana = (text: string) => kanaFold((jaMorphs(text) ?? []).map(m => m.reading ?? m.s).join('')) || text;

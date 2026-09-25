@@ -22,8 +22,9 @@
 | `utils/videoStorage.ts` + `fileSystemAccess.ts` | 练习记录（IndexedDB） |
 | `utils/anki.ts` | AnkiConnect 请求（经 Tauri http 插件代发） |
 | `utils/aiConfig.ts` + `ai.ts` | AI 设置（用户自填 OpenAI 兼容地址 + key + 模型，无默认地址、无内置通道）与 AI 查词 |
-| `utils/dictionary.ts` | 词典查词（不用 AI）：按整段字幕认语言（英 / 西 / 法 / 德；日语不查词典，走 AI），查有道 JSON 或剑桥 / 欧路网页（借鉴 ODH）；每门语言用哪本存 localStorage `linguaclip_dict_choice`。查词顺序在 `Studio.tsx` 的 `lookup`：词典优先，查不到或英文界面且配了 AI 时走 AI。弹窗按条列释义（带例句），每条「＋」单独发 Anki（`senseToAnki`：释义进 definition、前 2 句例句进 example 栏位）；AI 只回答第几条（`ai.ts` 的 `pickSense`），不改写释义。剑桥 / 欧路连不上时自动改查有道 |
+| `utils/dictionary.ts` | 词典查词（不用 AI）：按整段字幕认语言（英 / 西 / 法 / 德 / 日，日语看假名占比），查有道 JSON 或剑桥 / 欧路网页（借鉴 ODH）；每门语言用哪本存 localStorage `linguaclip_dict_choice`。查词顺序在 `Studio.tsx` 的 `lookup`：词典优先，查不到或英文界面且配了 AI 时走 AI。弹窗按条列释义（带例句），每条「＋」单独发 Anki（`senseToAnki`：释义进 definition、前 2 句例句进 example 栏位）；AI 只回答第几条（`ai.ts` 的 `pickSense`），不改写释义。剑桥 / 欧路连不上时自动改查有道 |
 | `utils/japanese.ts` + `jaSegments.ts` + `components/JaSetup.tsx` + `src-tauri/src/ja_dict.rs` | 日语分词：含假名的句子用 kuromoji（ipadic）切成词组（助词、词尾粘前一个词），一格一个，带读音（打假名算对，`textTokenizer.ts` 判对时比）。词典不随包：12 个 .dat.gz 共 17MB，第一次练日语时练习页顶部提示下载（设置 → 练习里也能下 / 删），下到 App Support 的 `com.linguaclip.app/ja-dict`（复用 whisper_setup 的续传 + sha256）。设置 → AI 勾「AI 校对日语分词」后，AI 只回每句第几个片段起新词组，存 `<id>.segments.json`（键是句子原文）。**数格子只有 `tokenizeText` 一个来源，任何数格入口先 `settleSplits`**；词典不在且视频含假名时，挖空整份不读不写 |
+| `utils/jaLookup.ts` + `jaPhrases.ts` | 日语点词查词：词组还原原形（`jaLemma`）后查有道日汉（`newjc`，走老接口 `jsonapi?le=jap`，新接口 `jsonapi_s` 会把「高い」「皆さん」认成英语）；有道查不到的词会拿别的词顶上，按读音 / 汉字筛掉，再按词性排（くる 先给「来る」）。`jaPhrases.ts` 两张表：寒暄语 / 固定句型（初めまして、かもしれない…，只收有道有词条的）切词时整体一格、查词查整条；有道缺的或同音词排前面的假名词改查汉字写法（やる→遣る）。桌面版请求有道必须去掉 plugin-http 默认加的 `Origin: tauri://localhost`（有道回 400）：`get()` 传空 Origin + Cargo 开 `unsafe-headers` |
 | `utils/breakdownPrep.ts` + `clozePrep.ts` | 拆句 / 挖空的后台任务（首页「…」、导入后自动做、练习页共用同一个任务），结果存 `~/Movies/LinguaClip/<id>.breakdown/cloze.json`；cloze.json 带 `n`（排名时每句格数），格数变了（日语切法变了）那句作废重问 |
 | `components/AddVideo.tsx`（添加视频弹窗）+ `utils/importJob.ts` + `src-tauri/src/import.rs` + `whisper_setup.rs` | 自带字幕 / 本地转录（首次自动下载转录组件）/ YouTube 下载，见 [import.md](import.md) |
 | `utils/i18n.*.ts` | 中 / 英文案，两份都要改 |
