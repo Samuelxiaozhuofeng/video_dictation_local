@@ -97,6 +97,8 @@ export const useKeyboardShortcuts = (
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Keys typed into a Japanese/Chinese input method belong to it.
+      if (event.isComposing || event.keyCode === 229) return;
       for (const shortcut of shortcutsRef.current) {
         if (!shortcut) {
           continue;

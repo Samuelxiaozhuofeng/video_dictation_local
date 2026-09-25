@@ -1,17 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { tokenizeText, TokenType } from '../utils/textTokenizer';
 import { useT } from '../utils/i18n';
+import { useJaVersion } from '../utils/japanese';
 
 // Blur mode line: every word starts as a covered block. First click reveals it,
 // second click looks it up. Lookup itself lives in Studio (DefinitionPanel).
 // onReveal fires once per line, on the first covered word opened.
 const BlurLine: React.FC<{ text: string; onLookup: (word: string) => void; onReveal?: () => void }> = ({ text, onLookup, onReveal }) => {
   const t = useT();
-  const tokens = useMemo(() => tokenizeText(text), [text]);
+  const jaVersion = useJaVersion();
+  const tokens = useMemo(() => tokenizeText(text), [text, jaVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const [revealed, setRevealed] = useState<Set<number>>(new Set());
   const [picked, setPicked] = useState<number | null>(null);
 
-  useEffect(() => { setRevealed(new Set()); setPicked(null); }, [text]);
+  useEffect(() => { setRevealed(new Set()); setPicked(null); }, [text, jaVersion]);
 
   const click = (e: React.MouseEvent<HTMLButtonElement>, wordIdx: number, raw: string) => {
     e.currentTarget.blur(); // keep Space/Enter shortcuts from re-firing this button

@@ -12,6 +12,8 @@ import { useLookup } from '../hooks/useLookup';
 import { detectLang } from '../utils/dictionary';
 import { useT } from '../utils/i18n';
 import { countLine, usePracticeClock } from '../utils/today';
+import { hasKana, useJaVersion } from '../utils/japanese';
+import { settleSplits } from '../utils/jaSegments';
 
 // A review round: one card at a time over the whole window, graded by how the
 // dictation went. Also opened on top of the practice page, so it owns its keys.
@@ -112,9 +114,16 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
   const done = idx >= queue.length;
   const path = card && found?.id === card.id ? found.path : undefined; // undefined = still looking
   const isWord = card?.deck === 'word';
+  // Japanese cards split as on the practice page: the dictionary plus each video's AI check.
+  const jaVersion = useJaVersion();
+  useEffect(() => {
+    const byVideo = new Map<string, string[]>();
+    for (const c of queue) if (hasKana(c.text)) byVideo.set(c.videoId, [...byVideo.get(c.videoId) ?? [], c.text]);
+    byVideo.forEach((texts, id) => { settleSplits(id, texts).catch(() => {}); });
+  }, [queue]);
   const blanks = useMemo(
     () => card?.deck === 'word' ? [wordIndexIn(getWordTokens(tokenizeText(card.text)).map(w => w.value), card.word!)] : undefined,
-    [card],
+    [card, jaVersion], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // Words in the answer can be looked up, and kept, as on the practice page (no Anki: that records off the practice video).
@@ -202,6 +211,7 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
   keys.current = { onClose, next, mode, done, defOpen, closeDef };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.isComposing || e.keyCode === 229) return; // Esc / Enter inside a Japanese input method
       const inside = rootRef.current?.contains(e.target as Node);
       const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
       const k = keys.current;

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Search, Trash2, Volume2 } from 'lucide-react';
 import { ReviewCard, Deck, deleteCards, hasAudio, isDue, wordIndexIn } from '../utils/review';
+import { hasKana } from '../utils/japanese';
 import { Btn, H, Seg, Stamp, inputCls } from './ui';
 import { dialog } from './Dialog';
 import { findVideo, clipOf, useClip } from './ReviewSession';
@@ -63,6 +64,9 @@ const CardsPage: React.FC = () => {
 
   const text = (c: ReviewCard) => {
     if (c.deck !== 'word' || !c.word) return c.text;
+    // Japanese has no spaces: mark the word where it sits in the line.
+    const at = hasKana(c.text) ? c.text.indexOf(c.word) : -1;
+    if (at >= 0) return <>{c.text.slice(0, at)}<b className="text-accent font-semibold">{c.word}</b>{c.text.slice(at + c.word.length)}</>;
     const parts = c.text.split(/\s+/);
     const wi = wordIndexIn(parts, c.word);
     return parts.map((p, i) => (

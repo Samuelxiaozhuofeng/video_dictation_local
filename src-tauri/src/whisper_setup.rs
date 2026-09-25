@@ -16,13 +16,13 @@ pub struct Parts {
   pub vad: PathBuf,
 }
 
-struct Asset {
-  name: &'static str,
-  size: u64,
-  sha256: &'static str,
+pub(crate) struct Asset {
+  pub(crate) name: &'static str,
+  pub(crate) size: u64,
+  pub(crate) sha256: &'static str,
   // Tried in order; a partial file carries over to the next one. From mainland
   // China huggingface.co usually fails, hf-mirror.com usually works.
-  urls: &'static [&'static str],
+  pub(crate) urls: &'static [&'static str],
 }
 
 // macOS: built by scripts/build-whisper-cli.sh; links only system frameworks.
@@ -209,7 +209,7 @@ pub fn ensure(tier: Tier, mut on_pct: impl FnMut(u32)) -> Result<Parts, String> 
   find(tier).ok_or_else(|| "setup:parts still missing after download".into())
 }
 
-async fn fetch(asset: &Asset, dir: &Path, mut on_bytes: impl FnMut(u64)) -> Result<(), String> {
+pub(crate) async fn fetch(asset: &Asset, dir: &Path, mut on_bytes: impl FnMut(u64)) -> Result<(), String> {
   let part = dir.join(format!("{}.part", asset.name));
   let client = reqwest::Client::builder()
     .connect_timeout(Duration::from_secs(15))

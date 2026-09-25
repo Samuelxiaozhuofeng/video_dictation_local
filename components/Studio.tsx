@@ -5,7 +5,8 @@ import * as Storage from '../utils/storage';
 import { usePracticeContext } from '../hooks/usePracticeContext';
 import { useBreakdown } from '../hooks/useBreakdown';
 import { Btn, Card, Seg, MenuItem, Stamp } from './ui';
-import DictationLine, { LINE } from './DictationLine';
+import DictationLine, { LINE, slotEm } from './DictationLine';
+import { JaBanner } from './JaSetup';
 import BlurLine from './BlurLine';
 import Transport from './Transport';
 import SavedDrawer from './SavedDrawer';
@@ -16,6 +17,8 @@ import { useT } from '../utils/i18n';
 import { detectLang } from '../utils/dictionary';
 import { canCloze, pickBlanks } from '../utils/aiDrills';
 import { getClozeJob, prepareCloze, subscribeCloze } from '../utils/clozePrep';
+import { hasKana, jaReady, useJaVersion } from '../utils/japanese';
+import { jaCheckOn, prepareSegments, settleSplits } from '../utils/jaSegments';
 import { IS_WINDOWS } from '../utils/platform';
 import { matches, formatCombo, useShortcuts } from '../utils/shortcuts';
 import { usePracticeClock } from '../utils/today';
@@ -46,7 +49,15 @@ const Studio: React.FC = () => {
   usePracticeClock();
   const clozeKey = videoId ?? '';
   const lineIndex = currentSub ? fullSubtitles.findIndex(s => s.id === currentSub.id) : -1;
-  const wordN = currentSub ? getWordTokens(tokenizeText(currentSub.text)).length : 0;
+  // Japanese lines re-split when the dictionary loads or the AI check lands.
+  const jaVersion = useJaVersion();
+  const isJa = useMemo(() => lineTexts.some(hasKana), [lineTexts]);
+  const jaOn = jaReady();
+  useEffect(() => {
+    if (!isJa) return;
+    settleSplits(videoId, lineTexts).then(ok => { if (ok && videoId && jaCheckOn()) prepareSegments(videoId, lineTexts, true).catch(() => {}); });
+  }, [isJa, videoId, lineTexts, jaOn]);
+  const wordN = useMemo(() => currentSub ? getWordTokens(tokenizeText(currentSub.text)).length : 0, [currentSub, jaVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const blanks = useMemo(
     () => pickBlanks(rankedLines?.[lineIndex] ?? null, wordN, effectiveLevel),
     [rankedLines, lineIndex, wordN, effectiveLevel],
@@ -54,7 +65,7 @@ const Studio: React.FC = () => {
   useEffect(() => {
     setRankedLines(null);
     setClozeProgress(null);
-  }, [clozeKey]);
+  }, [clozeKey, jaVersion]);
 
   // Joins the video's shared job if the shelf already started one; progress is
   // read off that job, so a finished job clears "preparing" for good.
@@ -189,7 +200,7 @@ const Studio: React.FC = () => {
   // Esc closes whichever panel is open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape' || e.isComposing || e.keyCode === 229) return;
       if (showSavedList) actions.onToggleSavedList(false);
       else if (def.word) closeDef();
     };
@@ -274,6 +285,7 @@ const Studio: React.FC = () => {
         </div>
 
         <section style={{ '--share': 100 - videoShare } as React.CSSProperties} className="min-w-0 lg:[flex:var(--share)_1_0] flex flex-col gap-5 lg:max-h-[calc(100vh-190px)] lg:overflow-y-auto" aria-label={t('studio.lineCount', { current: currentSubtitleIndex + 1, total: subtitles.length })}>
+          {isJa && <JaBanner />}
           {past.map((i, k) => (
             <p key={subtitles[i].id} className={`font-serif text-xl leading-[28px] ${k === past.length - 1 ? 'opacity-40' : 'opacity-20'}`}>{subtitles[i].text}</p>
           ))}
@@ -389,7 +401,7 @@ const ListeningGhost: React.FC<{ text: string; blanks: number[] }> = ({ text, bl
   return (
     <div className={LINE}>
       {words.map((w, i) => set.has(i) ? (
-        <span key={i} className="inline-block relative top-2 h-[30px] border-b-[1.5px] border-ink/25" style={{ width: `${Math.max(2, w.value.length) * 0.46}em` }} />
+        <span key={i} className="inline-block relative top-2 h-[30px] border-b-[1.5px] border-ink/25" style={{ width: `${slotEm(w.value)}em` }} />
       ) : (
         <span key={i} className="text-ink/50">{w.value}</span>
       ))}

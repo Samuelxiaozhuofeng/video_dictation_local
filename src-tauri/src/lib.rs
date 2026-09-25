@@ -7,6 +7,7 @@ mod cloud_live_tests;
 mod decode;
 mod groq;
 mod import;
+mod ja_dict;
 mod paths;
 mod tts;
 mod whisper_setup;
@@ -37,6 +38,9 @@ pub fn run() {
       tts::tts,
       whisper_setup::import_tools,
       whisper_setup::transcribe_location,
+      ja_dict::ja_dict_status,
+      ja_dict::install_ja_dict,
+      ja_dict::remove_ja_dict,
       trash_file
     ])
     .run(tauri::generate_context!())

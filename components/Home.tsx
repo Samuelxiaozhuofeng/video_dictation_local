@@ -15,6 +15,7 @@ import AddVideo from './AddVideo';
 import { canCloze } from '../utils/aiDrills';
 import { cancelPrep, getPrepJob, prepStatus, prepareBreakdowns, subscribePrep } from '../utils/breakdownPrep';
 import { cancelCloze, clozeStatus, getClozeJob, linesOf, prepareCloze, subscribeCloze } from '../utils/clozePrep';
+import { cancelSegments, getSegJob, subscribeSeg } from '../utils/jaSegments';
 import { countForVideo, deckCounts, deleteVideoCards, getAllCards, subscribeCards } from '../utils/review';
 import { getToday } from '../utils/today';
 
@@ -135,7 +136,7 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
 
   useEffect(() => {
     const bump = () => setPrepTick(n => n + 1);
-    const offs = [subscribePrep(bump), subscribeCloze(bump)];
+    const offs = [subscribePrep(bump), subscribeCloze(bump), subscribeSeg(bump)];
     return () => offs.forEach(off => off());
   }, []);
   // A running job ticks faster than a read of every cache finishes, so reads are
@@ -193,7 +194,7 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
     );
     if (trash === null) return; // dismissed the file question: nothing is deleted
     setDeletingId(v.id);
-    await Promise.all([cancelPrep(v.id), cancelCloze(v.id)]);
+    await Promise.all([cancelPrep(v.id), cancelCloze(v.id), cancelSegments(v.id)]);
     try {
       await VideoStorage.deleteVideoRecord(v.id);
       setVideos(prev => (prev ? prev.filter(x => x.id !== v.id) : prev));
@@ -259,6 +260,8 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
   const prepLine = (v: VideoRecord) => {
     if (!hasAi || v.importJob) return null;
     const parts: string[] = [];
+    const seg = getSegJob(v.id);
+    if (seg?.total) parts.push(t('home.prepSegmentRunning', { done: seg.done, total: seg.total }));
     const one = (job: { done: number; total: number } | undefined, info: PrepInfo | undefined, kind: 'Breakdown' | 'Cloze') => {
       if (job) parts.push(t(`home.prep${kind}Running`, { done: job.done, total: job.total || '…' }));
       else if (info && info.eligible > 0 && info.missing < info.eligible) {

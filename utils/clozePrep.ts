@@ -1,5 +1,6 @@
 import { hashSrt, lineWordCount, loadOrBuildCloze, parseClozeCache } from './aiDrills';
 import { readCacheText, writeCacheText } from './desktop';
+import { settleSplits } from './jaSegments';
 import { parseSRT } from './srtParser';
 
 // Cloze ranking as a background job per video, shared by the shelf ("…" →
@@ -37,7 +38,9 @@ export function prepareCloze(recordId: string | null, lineTexts: string[], urgen
   const running = recordId ? jobs.get(recordId) : undefined;
   if (running) { running.urgent ||= urgent; return running.promise; }
   const job: ClozeJob = { done: 0, total: 0, urgent, promise: Promise.resolve([]) };
-  job.promise = loadOrBuildCloze({
+  // Boxes are counted on the settled split (the AI check first, if it is on).
+  // Japanese with no dictionary: nothing is read or written, lines stay whole.
+  job.promise = settleSplits(recordId, lineTexts, true).then(ok => !ok ? lineTexts.map(() => null) : loadOrBuildCloze({
     lineTexts,
     recordId,
     subtitleText: lineTexts.join('\n'),
@@ -50,7 +53,7 @@ export function prepareCloze(recordId: string | null, lineTexts: string[], urgen
     },
     onProgress: (done, total) => { job.done = done; job.total = total; notify(); },
     urgent: () => job.urgent,
-  }).finally(() => {
+  })).finally(() => {
     if (recordId && jobs.get(recordId) === job) jobs.delete(recordId);
     notify();
   });
@@ -61,9 +64,10 @@ export function prepareCloze(recordId: string | null, lineTexts: string[], urgen
 // How many lines still have no ranking, for the shelf.
 export async function clozeStatus(recordId: string, subtitleText: string): Promise<{ eligible: number; missing: number }> {
   const lineTexts = linesOf(subtitleText);
+  if (!await settleSplits(recordId, lineTexts)) return { eligible: 0, missing: 0 };
   const counts = lineTexts.map(lineWordCount);
   const raw = await readCacheText(recordId, 'cloze');
-  const cached = raw ? parseClozeCache(raw, hashSrt(lineTexts.join('\n')), counts) : null;
+  const cached = raw ? parseClozeCache(raw, hashSrt(lineTexts.join('\n')), counts, lineTexts) : null;
   const eligible = counts.filter(n => n > 0).length;
   const missing = counts.filter((n, i) => n > 0 && !cached?.[i]).length;
   return { eligible, missing };

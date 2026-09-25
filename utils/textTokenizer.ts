@@ -2,6 +2,7 @@
  * Text Tokenizer Utility
  * Separates text into words and punctuation tokens for practice input
  */
+import { hasKana, jaGroups, kanaFold } from './japanese';
 
 export enum TokenType {
   WORD = 'WORD',
@@ -13,6 +14,7 @@ export interface Token {
   type: TokenType;
   value: string;
   index: number; // Position in the token array
+  reading?: string; // Japanese: the word's reading, typing it in kana counts
 }
 
 /**
@@ -21,6 +23,14 @@ export interface Token {
  * Supports Unicode characters (Spanish ñ, ó, á, etc., Chinese, Arabic, etc.)
  */
 export const tokenizeText = (text: string): Token[] => {
+  // Japanese has no spaces: once the dictionary is loaded, split by phrase.
+  const ja = hasKana(text) ? jaGroups(text) : null;
+  if (ja) {
+    return ja.flatMap(g => g.punct
+      ? [...g.value].map(ch => ({ type: /\s/.test(ch) ? TokenType.SPACE : TokenType.PUNCTUATION, value: ch }))
+      : [{ type: TokenType.WORD, value: g.value, reading: g.reading }],
+    ).map((t, index) => ({ ...t, index }));
+  }
   const tokens: Token[] = [];
   let index = 0;
 
@@ -80,7 +90,11 @@ export const isInputCorrect = (input: string, target: string): boolean => {
  * @param target - Target word
  * @returns true if words match with flexible first letter case
  */
-export const isInputCorrectFlexibleCase = (input: string, target: string): boolean => {
+export const isInputCorrectFlexibleCase = (input: string, target: string, reading?: string): boolean => {
+  if (reading !== undefined && input.trim()) {
+    const typed = kanaFold(input);
+    if (typed === kanaFold(target) || typed === kanaFold(reading)) return true;
+  }
   const trimmedInput = input.trim();
   const trimmedTarget = target.trim();
 
@@ -149,7 +163,7 @@ export const areAllWordsCorrectFlexibleCase = (tokens: Token[], wordInputs: stri
 
   return wordTokens.every((token, index) => {
     const input = wordInputs[index];
-    return input && isInputCorrectFlexibleCase(input, token.value);
+    return input && isInputCorrectFlexibleCase(input, token.value, token.reading);
   });
 };
 
@@ -177,7 +191,7 @@ export const compareWords = (tokens: Token[], wordInputs: string[]): WordCompari
   for (let i = 0; i < wordTokens.length; i++) {
     const targetWord = wordTokens[i].value;
     const inputWord = wordInputs[i] || '';
-    const isCorrect = inputWord && isInputCorrectFlexibleCase(inputWord, targetWord);
+    const isCorrect = inputWord && isInputCorrectFlexibleCase(inputWord, targetWord, wordTokens[i].reading);
 
     results.push({
       targetWord,

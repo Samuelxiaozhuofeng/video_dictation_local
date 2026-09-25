@@ -89,6 +89,7 @@ export interface AIConfig {
   segmentModel?: string; // model used to re-cut transcript lines on import
   autoBreakdown?: boolean; // prepare breakdowns as soon as an import finishes
   autoCloze?: boolean;     // prepare cloze blanks as soon as an import finishes
+  jaSegmentAi?: boolean;   // have the AI check Japanese phrase splits (utils/jaSegments.ts)
   limits?: { segment?: number; breakdown?: number; cloze?: number }; // AI calls in flight per job kind (utils/aiLimit.ts)
 }
 

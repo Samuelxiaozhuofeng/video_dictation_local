@@ -5,6 +5,8 @@
  * - Local files are served by vite's /@fs route (allow-list in vite.config.ts).
  * - File dialogs return `window.__MOCK__.pick` if set, else a fixture clip.
  * - `window.__MOCK__.tools` sets what import_tools reports (both false by default).
+ * - `window.__MOCK__.jaDict`: is the Japanese dictionary "downloaded" (false by
+ *   default); its files are served from node_modules/kuromoji/dict.
  * - Rust commands are logged to `window.__MOCK__.calls`; fake import progress
  *   with `window.__MOCK__.emit('import-progress', {...})`.
  * - vite aliases @tauri-apps/plugin-http to this file, hence the `fetch` export;
@@ -28,6 +30,7 @@ const mock = {
   calls: [] as { cmd: string; args: unknown }[],
   // what import_tools reports; default = a stranger's Mac with nothing installed
   tools: { whisper: false, youtube: false },
+  jaDict: false,
   emit,
 };
 (window as any).__MOCK__ = mock;
@@ -43,6 +46,28 @@ async function handle(cmd: string, args: Args): Promise<unknown> {
     case 'plugin:fs|exists':
       if (cache.has(args.path)) return true;
       return (await fetch(fsUrl(args.path), { method: 'HEAD' })).ok;
+    case 'plugin:fs|read_file': {
+      const ja = /^\/__ja-dict\/([\w.]+)$/.exec(args.path);
+      const res = await fetch(ja ? `/node_modules/kuromoji/dict/${ja[1]}` : fsUrl(args.path));
+      if (!res.ok) throw new Error(`mock fs: ${res.status} ${args.path}`);
+      const buf = await res.arrayBuffer();
+      // vite sends .gz files with Content-Encoding: gzip, so the browser has
+      // already unpacked them; pack again to hand over what is on disk.
+      if (!ja || new Uint8Array(buf)[0] === 0x1f) return buf;
+      return new Response(new Blob([buf]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+    }
+    case 'ja_dict_status':
+      return { installed: mock.jaDict, dir: '/__ja-dict', bytes: 18_792_000 };
+    case 'install_ja_dict':
+      for (let pct = 0; pct < 100; pct += 20) {
+        await emit('ja-dict-progress', pct);
+        await new Promise(r => setTimeout(r, 300));
+      }
+      mock.jaDict = true;
+      return null;
+    case 'remove_ja_dict':
+      mock.jaDict = false;
+      return null;
     case 'plugin:fs|read_text_file': {
       const hit = cache.get(args.path);
       if (hit != null) return new TextEncoder().encode(hit).buffer;

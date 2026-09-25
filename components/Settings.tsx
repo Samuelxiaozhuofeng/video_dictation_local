@@ -37,6 +37,7 @@ const Settings: React.FC = () => {
   const [aiSegmentModel, setAiSegmentModel] = useState('');
   const [aiAutoBreakdown, setAiAutoBreakdown] = useState(false);
   const [aiAutoCloze, setAiAutoCloze] = useState(false);
+  const [aiJaCheck, setAiJaCheck] = useState(false);
   const [aiLimits, setAiLimits] = useState<NonNullable<AIConfig['limits']>>({});
 
   const [sectionLength, setSectionLength] = useState(Storage.DEFAULT_SECTION_LENGTH);
@@ -76,6 +77,7 @@ const Settings: React.FC = () => {
     setAiSegmentModel(savedAI.segmentModel || '');
     setAiAutoBreakdown(!!savedAI.autoBreakdown);
     setAiAutoCloze(!!savedAI.autoCloze);
+    setAiJaCheck(!!savedAI.jaSegmentAi);
     setAiLimits(savedAI.limits || {});
 
     const savedPractice = Storage.getPracticeConfig();
@@ -120,6 +122,7 @@ const Settings: React.FC = () => {
       segmentModel: next.segmentModel ?? aiSegmentModel,
       autoBreakdown: next.autoBreakdown ?? aiAutoBreakdown,
       autoCloze: next.autoCloze ?? aiAutoCloze,
+      jaSegmentAi: next.jaSegmentAi ?? aiJaCheck,
       limits: next.limits ?? aiLimits,
     });
     flashSaved();
@@ -203,6 +206,11 @@ const Settings: React.FC = () => {
           setAiAutoCloze={(v) => {
             setAiAutoCloze(v);
             saveAI({ autoCloze: v });
+          }}
+          aiJaCheck={aiJaCheck}
+          setAiJaCheck={(v) => {
+            setAiJaCheck(v);
+            saveAI({ jaSegmentAi: v });
           }}
           aiLimits={aiLimits}
           setAiLimits={(v) => {

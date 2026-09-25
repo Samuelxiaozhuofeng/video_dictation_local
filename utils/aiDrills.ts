@@ -4,6 +4,7 @@ import { readJsonBody } from './aiConfig';
 import { withAiSlot } from './aiLimit';
 import { getRouter } from './resegment';
 import { tokenizeText, getWordTokens } from './textTokenizer';
+import { hasKana } from './japanese';
 
 // Cloze drills: the model only returns word indices (never text), so it cannot
 // rewrite a line, and every index can be checked against tokenizeText.
@@ -65,7 +66,7 @@ export function validateIndices(value: unknown, wordCount: number): number[] | n
   return out;
 }
 
-function extractLines(content: string): unknown[] {
+export function extractLines(content: string): unknown[] {
   const fence = content.match(/```(?:json)?\s*([\s\S]*?)```/);
   const raw = fence ? fence[1] : content;
   const match = raw.match(/\{[\s\S]*\}/);
@@ -83,16 +84,22 @@ export function parseClozeResponse(content: string, counts: number[]): (number[]
   return lines.map((line, i) => validateIndices(line, counts[i]));
 }
 
-export type ClozeCacheFile = { v: 1; srt: string; lines: unknown[] };
+// n: each line's box count when it was ranked. A Japanese line's count moves
+// with its split (dictionary, AI check), and its indices with it.
+export type ClozeCacheFile = { v: 1; srt: string; lines: unknown[]; n?: number[] };
 
-export function parseClozeCache(raw: string, srtHash: string, counts: number[]): (number[] | null)[] | null {
+export function parseClozeCache(raw: string, srtHash: string, counts: number[], texts?: string[]): (number[] | null)[] | null {
   let data: ClozeCacheFile;
   try { data = JSON.parse(raw); } catch { return null; }
   if (data?.v !== 1 || data.srt !== srtHash || !Array.isArray(data.lines)) return null;
   if (data.lines.length !== counts.length) return null;
+  const n = Array.isArray(data.n) && data.n.length === counts.length ? data.n : null;
   // null, or [] for a line that has words (older caches saved failed batches
-  // that way), means "not ranked yet" and gets asked again.
+  // that way), means "not ranked yet" and gets asked again. So does a line
+  // whose boxes changed since — or, in a file from before n, any Japanese line
+  // (it was one box then).
   return data.lines.map((line, i) => {
+    if (n ? n[i] !== counts[i] : !!texts && hasKana(texts[i])) return null;
     const ranked = validateIndices(line, counts[i]);
     return ranked && (ranked.length > 0 || counts[i] === 0) ? ranked : null;
   });
@@ -207,7 +214,7 @@ export async function loadOrBuildCloze(opts: {
   if (opts.recordId) {
     try {
       const raw = await opts.readText(opts.recordId);
-      if (raw) cached = parseClozeCache(raw, srt, counts);
+      if (raw) cached = parseClozeCache(raw, srt, counts, opts.lineTexts);
     } catch { /* missing cache is fine */ }
   }
   const result = cached ?? counts.map(() => null);
@@ -218,7 +225,7 @@ export async function loadOrBuildCloze(opts: {
   const generated = await generateCloze(missing.map(i => opts.lineTexts[i]), opts.onProgress, opts.urgent);
   missing.forEach((li, k) => { result[li] = generated[k] ?? null; });
   if (opts.recordId && generated.some(Boolean)) {
-    const body = JSON.stringify({ v: 1, srt, lines: result });
+    const body = JSON.stringify({ v: 1, srt, lines: result, n: counts } satisfies ClozeCacheFile);
     try { await opts.writeText(opts.recordId, body); } catch { /* cache must not break practice */ }
   }
   return result;

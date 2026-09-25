@@ -4,10 +4,10 @@
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { homeDir, join } from '@tauri-apps/api/path';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
-import type { UnlistenFn } from '@tauri-apps/api/event';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener';
-import { exists, readTextFile } from '@tauri-apps/plugin-fs';
+import { exists, readFile, readTextFile } from '@tauri-apps/plugin-fs';
 import { IS_WINDOWS } from './platform';
 
 const VIDEO_FILTER = { name: 'Video', extensions: ['mp4', 'mov', 'm4v'] };
@@ -45,6 +45,17 @@ export async function readSubtitleFile(path: string): Promise<File> {
   return new File([text], fileNameFromPath(path), { type: 'text/plain' });
 }
 
+export async function readBinaryFile(path: string): Promise<Uint8Array> {
+  return readFile(path);
+}
+
+// Japanese word-splitting dictionary (src-tauri/src/ja_dict.rs).
+export type JaDictStatus = { installed: boolean; dir: string; bytes: number };
+export const jaDictStatus = () => invoke<JaDictStatus>('ja_dict_status');
+export const installJaDict = () => invoke<void>('install_ja_dict');
+export const removeJaDict = () => invoke<void>('remove_ja_dict');
+export const onJaDictProgress = (fn: (pct: number) => void) => listen<number>('ja-dict-progress', e => fn(e.payload));
+
 export type DragDropHandler = {
   onHover?: () => void;
   onLeave?: () => void;
@@ -60,7 +71,7 @@ export async function listenDragDrop(handler: DragDropHandler): Promise<Unlisten
   });
 }
 
-export type CacheKind = 'words' | 'cloze' | 'breakdown';
+export type CacheKind = 'words' | 'cloze' | 'breakdown' | 'segments';
 
 // ~/Movies/LinguaClip on macOS, ~/Videos/LinguaClip on Windows; must match
 // own_dir() in src-tauri/src/paths.rs.
@@ -88,7 +99,7 @@ export async function writeCacheText(id: string, kind: CacheKind, text: string):
 
 // Files that belong to a record besides the video: its .srt (generated ones sit
 // in ~/Movies/LinguaClip, hand-picked ones usually beside the video) and our
-// word/cloze/breakdown caches. Only paths that exist.
+// word/cloze/breakdown/segments caches. Only paths that exist.
 export async function relatedFilePaths(id: string, videoPath: string, subtitleFileName: string): Promise<string[]> {
   const ours = await ownDir();
   const videoDir = videoPath.slice(0, Math.max(videoPath.lastIndexOf('/'), videoPath.lastIndexOf('\\')));
@@ -98,12 +109,12 @@ export async function relatedFilePaths(id: string, videoPath: string, subtitleFi
   ]);
 }
 
-// Just our word/cloze/breakdown caches for a record, the ones that exist.
+// Just our word/cloze/breakdown/segments caches for a record, the ones that exist.
 export async function cacheFilePaths(id: string): Promise<string[]> {
   return existing(await cachePaths(id));
 }
 
-const cachePaths = (id: string) => Promise.all((['words', 'cloze', 'breakdown'] as const).map(k => cacheFilePath(id, k)));
+const cachePaths = (id: string) => Promise.all((['words', 'cloze', 'breakdown', 'segments'] as const).map(k => cacheFilePath(id, k)));
 
 async function existing(paths: string[]): Promise<string[]> {
   const unique = [...new Set(paths)];

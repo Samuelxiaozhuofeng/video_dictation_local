@@ -25,6 +25,8 @@ interface SettingsAIProps {
   setAiAutoBreakdown: (value: boolean) => void;
   aiAutoCloze: boolean;
   setAiAutoCloze: (value: boolean) => void;
+  aiJaCheck: boolean;
+  setAiJaCheck: (value: boolean) => void;
   aiLimits: Limits;
   setAiLimits: (value: Limits) => void;
 }
@@ -69,6 +71,8 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
   setAiAutoBreakdown,
   aiAutoCloze,
   setAiAutoCloze,
+  aiJaCheck,
+  setAiJaCheck,
   aiLimits,
   setAiLimits,
 }) => {
@@ -173,6 +177,11 @@ const SettingsAI: React.FC<SettingsAIProps> = ({
           <Check checked={aiAutoCloze} onChange={setAiAutoCloze} disabled={!aiReady} label={t('settingsAI.autoCloze')} />
         </div>
         <span className="block mt-1.5 text-xs text-mute leading-relaxed">{aiReady ? t('settingsAI.afterImportHint') : t('settingsAI.afterImportNeedAi')}</span>
+      </div>
+
+      <div>
+        <Check checked={aiJaCheck} onChange={setAiJaCheck} disabled={!aiReady} label={t('settingsAI.jaCheck')} />
+        <span className="block mt-1.5 text-xs text-mute leading-relaxed">{aiReady ? t('settingsAI.jaCheckHint') : t('settingsAI.afterImportNeedAi')}</span>
       </div>
 
       <div>

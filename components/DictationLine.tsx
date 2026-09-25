@@ -7,6 +7,7 @@ import {
 import { Btn } from './ui';
 import { useT } from '../utils/i18n';
 import { matches } from '../utils/shortcuts';
+import { useJaVersion } from '../utils/japanese';
 
 // Dictation line: one input box per word (INPUT), then a word-by-word comparison (FEEDBACK).
 // Word lookup is delegated to Studio via onLookup.
@@ -33,12 +34,28 @@ const letterRatio = (words: string[], i: number): number => {
   return total ? before / total : 0;
 };
 
+// Width of an empty slot for a word: Latin letters are narrow, kana and kanji about 1em.
+export const slotEm = (word: string) =>
+  Math.max(0.92, [...word].reduce((n, ch) => n + (/[\u3000-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(ch) ? 1 : 0.46), 0));
+
 // Typing and the answer share one setting, so submitting changes colours, not positions.
 export const LINE = 'flex flex-wrap items-baseline gap-x-[0.25em] font-serif text-[30px] leading-[42px]';
 
 const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay, onLookup, blanks, nextLabel, onResult, extra }) => {
   const t = useT();
-  const tokens = useMemo(() => tokenizeText(targetText), [targetText]);
+  // A Japanese line is re-split when its dictionary or AI cut points arrive, but
+  // never under the user's fingers: once something is typed the split holds.
+  // (A new set of blanks resets the line anyway, so it re-splits then too.)
+  const jaVersion = useJaVersion();
+  const [splitVersion, setSplitVersion] = useState(jaVersion);
+  const typedRef = useRef(false);
+  const lastBlanks = useRef(blanks);
+  useEffect(() => {
+    const reset = lastBlanks.current !== blanks;
+    lastBlanks.current = blanks;
+    if (reset || !typedRef.current) setSplitVersion(jaVersion);
+  }, [jaVersion, targetText, blanks]);
+  const tokens = useMemo(() => tokenizeText(targetText), [targetText, splitVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const wordTokens = useMemo(() => getWordTokens(tokens), [tokens]);
   // Each word carries the punctuation right after it, so a comma sits on its word, not a gap away.
   const groups = useMemo(() => {
@@ -67,6 +84,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
   };
 
   const [inputs, setInputs] = useState<string[]>([]);
+  typedRef.current = mode === PracticeMode.INPUT && inputs.some((w, i) => isBlank(i) && !!w);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
   const [peek, setPeek] = useState<number | null>(null);
   const peekTimer = useRef<number | null>(null);
@@ -104,11 +122,18 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
     peekTimer.current = window.setTimeout(() => { setPeek(null); peekTimer.current = null; }, 2000);
   };
 
-  const change = (i: number, value: string) => {
+  // composing: a Japanese (or Chinese) input method is still turning keystrokes
+  // into text; the word is only judged once it is committed.
+  const change = (i: number, value: string, composing = false) => {
     const next = [...inputs];
     next[i] = value;
     setInputs(next);
-    if (!isInputCorrectFlexibleCase(value, wordTokens[i].value)) return;
+    if (composing) return;
+    settle(i, next);
+  };
+
+  const settle = (i: number, next: string[]) => {
+    if (!isInputCorrectFlexibleCase(next[i] ?? '', wordTokens[i].value, wordTokens[i].reading)) return;
     const nxt = stepBlank(i, 1);
     if (nxt >= 0) {
       setTimeout(() => refs.current[nxt]?.focus(), 100);
@@ -131,6 +156,9 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
   };
 
   const keyDown = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Space picks a kanji and Enter commits it inside an input method; those keys
+    // are not ours. Safari reports the committing Enter with keyCode 229.
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (matches(e, 'reveal')) { e.preventDefault(); e.stopPropagation(); report(false); onComplete(false); return; }
     if (matches(e, 'replay')) { e.preventDefault(); e.stopPropagation(); clearReplay(); onReplay(false); return; }
     if (matches(e, 'playFrom')) { e.preventDefault(); e.stopPropagation(); clearReplay(); attempt.current.helped = true; onReplay(false, letterRatio(wordTokens.map(w => w.value), i)); return; }
@@ -173,7 +201,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
       <div className="w-full flex flex-col items-start gap-5">
         {/* The answer: click any word to look it up */}
         <p className={LINE}>
-          {targetText.split(/\s+/).filter(Boolean).map((part, i) => (
+          {(wordTokens.some(w => w.reading !== undefined) ? groups.map(g => (g.word?.value ?? '') + g.punct) : targetText.split(/\s+/)).filter(Boolean).map((part, i) => (
             <button key={i} type="button" onClick={e => { e.currentTarget.blur(); lookup(part); }} className="rounded hover:mark-yellow" title={t('common.lookup')}>{part}</button>
           ))}
         </p>
@@ -194,7 +222,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
                   </span>
                 ) : (
                   // Left blank: the same empty slot you saw while typing.
-                  <span title={t('dictation.expected', { word: r.targetWord })} className="inline-block relative top-1 border-b-[1.5px] border-ink/25" style={{ width: `${Math.max(2, r.targetWord.length) * 0.46}em`, height: '1em' }} />
+                  <span title={t('dictation.expected', { word: r.targetWord })} className="inline-block relative top-1 border-b-[1.5px] border-ink/25" style={{ width: `${slotEm(r.targetWord)}em`, height: '1em' }} />
                 )}
                 <span className="text-mute">{g.punct}</span>
               </span>
@@ -222,17 +250,18 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
           if (!isBlank(i)) {
             return <span key={g.key} className="text-ink/50 select-none">{tk.value}{punct}</span>;
           }
-          const ok = !!inputs[i] && isInputCorrectFlexibleCase(inputs[i], tk.value);
+          const ok = !!inputs[i] && isInputCorrectFlexibleCase(inputs[i], tk.value, tk.reading);
           return (
             <span key={g.key} className="relative inline-flex items-baseline">
               {/* The slot grows with what you type; once the word is right it shrinks to fit, so the line reads like prose. */}
-              <span className="inline-grid" style={{ minWidth: ok ? 0 : `${Math.max(2, tk.value.length) * 0.46 + 0.3}em` }}>
+              <span className="inline-grid" style={{ minWidth: ok ? 0 : `${slotEm(tk.value) + 0.3}em` }}>
                 <input
                   ref={el => { refs.current[i] = el; }}
                   type="text"
                   size={1}
                   value={inputs[i] || ''}
-                  onChange={e => change(i, e.target.value)}
+                  onChange={e => change(i, e.target.value, (e.nativeEvent as InputEvent).isComposing)}
+                  onCompositionEnd={e => settle(i, Object.assign([...inputs], { [i]: e.currentTarget.value }))}
                   onKeyDown={e => keyDown(i, e)}
                   onPaste={paste}
                   // A 34px box keeps the underline just under the letters (not under the descenders), so a comma or full stop sits on it.

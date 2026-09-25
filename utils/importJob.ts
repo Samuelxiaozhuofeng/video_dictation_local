@@ -7,6 +7,8 @@ import { getAIConfig } from './aiConfig';
 import { canCloze } from './aiDrills';
 import { prepareBreakdowns } from './breakdownPrep';
 import { linesOf, prepareCloze } from './clozePrep';
+import { jaCheckOn, prepareSegments } from './jaSegments';
+import { hasKana, loadJa } from './japanese';
 import { parseSRT } from './srtParser';
 import { resegment, Word } from './resegment';
 import { engineArgs, getTranscribeConfig } from './transcribeConfig';
@@ -249,6 +251,10 @@ async function applyProgress(payload: ImportProgressPayload): Promise<void> {
     const ai = getAIConfig();
     if (ai.autoBreakdown && canCloze()) prepareBreakdowns(rec.id, subtitleText, getLang()).catch(err => console.error(err));
     if (ai.autoCloze && canCloze()) prepareCloze(rec.id, linesOf(subtitleText)).catch(err => console.error(err));
+    // Japanese: the AI check of phrase splits (auto blanks above wait for it anyway).
+    else if (jaCheckOn() && hasKana(subtitleText)) {
+      loadJa().then(ok => { if (ok) return prepareSegments(rec.id, linesOf(subtitleText)); }).catch(err => console.error(err));
+    }
     return;
   }
 

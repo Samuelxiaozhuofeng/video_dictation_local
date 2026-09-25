@@ -27,7 +27,7 @@ await build({
       b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
         contents: `const no = () => { throw new Error('tauri'); };
           export const fetch = globalThis.fetch, invoke = no, convertFileSrc = no, open = no, readTextFile = no,
-            exists = no, homeDir = no, join = no, getCurrentWebview = no, getCurrentWindow = no, openUrl = no, revealItemInDir = no;`,
+            exists = no, readFile = no, listen = no, homeDir = no, join = no, getCurrentWebview = no, getCurrentWindow = no, openUrl = no, revealItemInDir = no;`,
       }));
     },
   }],

@@ -73,6 +73,10 @@ assert.equal(R.wordCardId('v1', 12.3, 'Friend'), 'v1|12.30|w|friend');
 // Which word to blank.
 assert.equal(R.wordIndexIn(['Hello', 'there,', 'friend.'], 'friend'), 2);
 assert.equal(R.wordIndexIn(['I', "don't", 'know'], "Don't"), 1);
+// Japanese: a word kept under another split still finds its box; English does not guess.
+assert.equal(R.wordIndexIn(['今日は', 'いい', '天気ですね'], '天気'), 2);
+assert.equal(R.wordIndexIn(['今日は', 'いい天気', 'ですね'], '天気ですね'), 1);
+assert.equal(R.wordIndexIn(['Hello', 'there'], 'the'), 0);
 
 // Old bookmarks find their line by file name + text, nearest mm:ss wins.
 const srt = '1\n00:00:01,000 --> 00:00:02,000\nYeah.\n\n2\n00:01:05,000 --> 00:01:07,500\nYeah.\n\n3\n00:01:10,000 --> 00:01:12,000\nOther line.\n';

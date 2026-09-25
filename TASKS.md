@@ -1,3 +1,22 @@
+# 日语分词（按需下载 kuromoji 词典 + AI 校对）
+
+用户拍板：打假名读音也算对；设置里勾「AI 校对日语分词」后台整部校；助词粘前一个词（今日は 一格）；词典不进安装包，第一次遇到日语时提示下载。
+
+- [ ] 设计门（segments 缓存 / cloze 缓存加 n / 删视频级联 / 词典目录）
+- [ ] Rust ja_dict：下载（复用 whisper_setup::fetch）、状态、删除；lib.rs 注册；browserMock 补
+- [ ] utils/japanese.ts：读词典建 kuromoji、切词组（带读音）、AI 结果覆盖、版本订阅；下载状态共用
+- [ ] textTokenizer：含假名的句子走日语切法；判对接受读音
+- [ ] DictationLine：输入法打字中不抢空格 / 回车、不自动跳格；答案行按词点；格子宽度按字宽
+- [ ] BlurLine / Studio（预告、挖空格数）/ ReviewSession / CardsPage 跟版本刷新
+- [ ] 练习页提示条（下载 / 进度 / 重试 / ✕）；设置通用页词典行；AI 页勾选
+- [ ] AI 校对任务 jaSegments.ts（只回序号，逐句校验，存 segments.json），挖空先等它；导入后自动跑
+- [ ] 挖空缓存加 n，旧日语缓存作废
+- [ ] 中英文案；docs 更新
+- [ ] tsc + test-*.mjs + 新 test-japanese.mjs + cargo test
+- [ ] 浏览器实测
+- [ ] codex-review + 错题本
+- [ ] npm run release + 验收路径
+
 # 转录标签页 + 云端转录（Groq）+ 本机标准/轻量
 
 用户拍板：长视频先压缩（Mac AAC），压不下就切段；云端失败 = 卡片提示 + 重试，不自动换本机；本机只开「标准 / 轻量」两档。
