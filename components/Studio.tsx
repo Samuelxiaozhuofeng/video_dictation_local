@@ -312,7 +312,7 @@ const Studio: React.FC = () => {
       <section className="relative -mt-6 min-h-[340px] bg-page rounded-t-3xl flex flex-col" style={{ flex: `${100 - videoShare} 1 0` }}
         aria-label={t('studio.lineCount', { current: stripAt + 1, total: stripLines.length })}>
         <div className="px-6 lg:px-24 pt-6">
-          <Timeline lines={stripLines} current={stripAt} watch={watch} onPick={id => (id === currentSub?.id ? actions.onReplayCurrent() : actions.onJumpToSaved(id))}
+          <Timeline lines={stripLines} current={stripAt} watch={watch} onPick={id => (id === currentSub?.id ? actions.onReplayCurrent() : subtitles.some(s => s.id === id) && actions.onJumpToSaved(id))}
             title={i => t('studio.lineCount', { current: i + 1, total: stripLines.length })} />
           <div className="mt-1.5 flex justify-end text-xs text-mute tabular-nums">
             <span>{timeLabel}</span>

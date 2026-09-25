@@ -369,7 +369,7 @@ const Home: React.FC<HomeProps> = ({ onResume, onEmptyChange, addAsked, onAddHan
                     <p className="text-xl font-semibold leading-snug truncate" title={lead.displayName}>{lead.displayName}</p>
                     <div className="mt-2 flex items-center gap-3 text-[13px] text-mute min-w-0">
                       {ticks(lead)}
-                      <span className="truncate">{w.text} · {w.pct >= 100 && (shelfPosition.get(lead.id)?.part ?? 0) + 1 >= (shelfPosition.get(lead.id)?.parts ?? 1) ? t('home.finished') : t('home.continueMode', { mode: modeName(lastMode(lead)) })}{prepLine(lead)}</span>
+                      <span className="truncate">{w.text} · {w.pct >= 100 && (shelfPosition.get(lead.id)?.customSec || (shelfPosition.get(lead.id)?.part ?? 0) + 1 >= (shelfPosition.get(lead.id)?.parts ?? 1)) ? t('home.finished') : t('home.continueMode', { mode: modeName(lastMode(lead)) })}{prepLine(lead)}</span>
                     </div>
                   </div>
                   {more(lead, 'lg')}
