@@ -309,7 +309,7 @@ const Studio: React.FC = () => {
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-6 lg:px-24 py-5 flex flex-col">
-          <div className="my-auto w-full max-w-4xl mx-auto flex flex-col items-center gap-4 text-center">
+          <div className="mt-[5vh] w-full max-w-4xl mx-auto flex flex-col items-center gap-4 text-center">
               {isJa && <JaBanner />}
               {!currentSub ? (
                 <span className="font-serif italic text-mute text-xl">{t('studio.endOfPart')}</span>
@@ -433,9 +433,9 @@ const ListeningGhost: React.FC<{ text: string; blanks: number[]; splitVersion: n
   const words = useMemo(() => getWordTokens(tokenizeText(text)), [text, splitVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = new Set(blanks);
   return (
-    <div className={LINE}>
+    <div className={`${LINE} pt-4`}>
       {words.map((w, i) => set.has(i) ? (
-        <span key={i} className="inline-block relative top-2.5 h-[38px] border-b-2 border-line" style={{ width: `${slotEm(w.value)}em` }} />
+        <span key={i} className="inline-block relative top-2.5 h-[38px] border-b-2 border-faint" style={{ width: `${slotEm(w.value)}em` }} />
       ) : (
         <span key={i} className="text-ink/40">{w.value}</span>
       ))}

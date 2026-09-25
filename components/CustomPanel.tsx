@@ -155,7 +155,7 @@ const CustomPanel: React.FC<{
           </>}
           {status && <div className="text-sm text-mute" aria-live="polite">{status}</div>}
         </div>
-        <div className="px-6 py-4 flex justify-end gap-3 border-t border-line">
+        <div className="px-6 pt-2 pb-6 flex justify-end gap-3">
           <Btn onClick={onCancel}>{t('dialog.cancel')}</Btn>
           <Btn tone="accent" onClick={() => start()} disabled={!!empty || (want && failed) || waiting} autoFocus>
             {waiting ? t('custom.waiting') : t('custom.start')}

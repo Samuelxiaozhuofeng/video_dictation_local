@@ -266,7 +266,7 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
         )}
 
         <div className="flex-1 min-h-0 overflow-y-auto px-6 lg:px-24 py-5 flex flex-col">
-          <div className="my-auto w-full max-w-4xl mx-auto flex flex-col items-center gap-6 text-center">
+          <div className="mt-[5vh] w-full max-w-4xl mx-auto flex flex-col items-center gap-6 text-center">
             {done ? (
               <div className="flex flex-col items-center gap-3 fade-in">
                 <h2 className="text-[34px] font-semibold tracking-[-0.02em] leading-tight">{t('session.doneTitle')}</h2>

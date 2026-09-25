@@ -153,7 +153,7 @@ const DefinitionPanel: React.FC<{
             ) : (
               <div className="space-y-2">
                 <Btn tone="white" size="sm" onClick={onExplain} className="w-full"><Sparkles size={14} /> {t('definition.explain')}</Btn>
-                {def.aiError && <div className="rounded-md bg-shade text-ink p-3 text-sm whitespace-pre-wrap break-words">{def.aiError}</div>}
+                {def.aiError && <div className="text-sm text-mute leading-relaxed whitespace-pre-wrap break-words">{def.aiError}</div>}
               </div>
             )
           )}
@@ -188,7 +188,7 @@ const DefinitionPanel: React.FC<{
       ) : def.failed ? (
         <div className="space-y-3">
           <h4 className="font-serif text-3xl leading-none break-words">{def.word}</h4>
-          <div className="rounded-md bg-shade text-ink p-3 text-sm whitespace-pre-wrap break-words">{def.error}</div>
+          <div className="text-sm text-mute leading-relaxed whitespace-pre-wrap break-words">{def.error}</div>
         </div>
       ) : (
         <p className="text-sm text-mute">{t('definition.emptyHint')}</p>

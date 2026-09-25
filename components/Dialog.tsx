@@ -63,7 +63,7 @@ export const DialogHost: React.FC = () => {
           <h3 className="text-xl font-semibold leading-tight">{p.title}</h3>
         </div>
         {p.body && <p className="px-6 pb-5 text-sm text-mute leading-relaxed whitespace-pre-line">{p.body}</p>}
-        <div className="px-6 py-4 flex justify-end gap-3 border-t border-line">
+        <div className="px-6 pt-2 pb-6 flex justify-end gap-3">
           {p.kind === 'confirm' && <Btn onClick={() => close(false)}>{p.cancel}</Btn>}
           <Btn tone={p.kind === 'confirm' && p.tone === 'shade' ? 'ink' : 'accent'} onClick={() => close(true)} autoFocus>{p.ok}</Btn>
         </div>

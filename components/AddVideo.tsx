@@ -221,7 +221,7 @@ const AddVideo: React.FC<Props> = ({ initialPath, initialSrt, onClose, onPractic
           {!ownSubtitles && cloud && <p className={`text-sm ${noKey ? 'text-ink' : 'text-mute'}`}>{t(noKey ? 'add.cloudNoKey' : 'add.cloudNote', { name: t(cloud.name) })}</p>}
         </div>
 
-        <div className="px-7 py-4 border-t border-line flex items-center justify-end gap-3">
+        <div className="px-7 pt-2 pb-7 flex items-center justify-end gap-3">
           <div className="flex gap-2">
             <Btn flat onClick={onClose}>{t('dialog.cancel')}</Btn>
             <Btn tone="accent" disabled={!ready || busy} onClick={start}>{t(ownSubtitles ? 'add.startPractice' : needsSetup ? 'add.startSetup' : 'add.start')}</Btn>

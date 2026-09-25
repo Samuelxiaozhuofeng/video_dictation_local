@@ -77,7 +77,7 @@ const CardsPage: React.FC<{ deck: Deck; cards: ReviewCard[] | null }> = ({ deck,
 
   return (
     <div>
-      <div className="pt-6 pb-2 flex items-center gap-2 min-h-[52px]">
+      {inDeck.length > 0 && <div className="pt-6 pb-2 flex items-center gap-2 min-h-[52px]">
         <Seg<Status> size="sm" value={status} onChange={setStatus} options={[
           { value: 'all', label: t('cards.all') },
           { value: 'due', label: t('cards.due') },
@@ -103,7 +103,7 @@ const CardsPage: React.FC<{ deck: Deck; cards: ReviewCard[] | null }> = ({ deck,
             </>
           )}
         </span>
-      </div>
+      </div>}
 
       {cards !== null && list.length === 0 ? (
         <p className="py-10 text-center text-sm text-mute">{inDeck.length ? t('cards.noMatch') : deck === 'line' ? t('review.emptyLine') : t('review.emptyWord')}</p>
@@ -132,7 +132,7 @@ const CardsPage: React.FC<{ deck: Deck; cards: ReviewCard[] | null }> = ({ deck,
                   <span className="w-4 shrink-0 text-ink" title={c.saved ? t('review.saved') : undefined}>{c.saved && <Bookmark size={14} fill="currentColor" />}</span>
                 </>
               )}
-              <span className={`w-24 shrink-0 text-right text-[13px] ${due(c) ? 'text-accent' : 'text-mute'}`} title={sub(c)}>{when(c)}</span>
+              <span className={`w-24 shrink-0 text-right text-[13px] ${due(c) ? 'text-ink font-medium' : 'text-mute'}`} title={sub(c)}>{when(c)}</span>
               {!picked && (
                 <Btn square size="sm" flat onClick={() => { remove(c).catch(console.error); }} title={t('review.remove')} aria-label={t('review.remove')}
                   className="shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"><Trash2 size={15} /></Btn>

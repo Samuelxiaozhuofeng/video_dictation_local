@@ -4,7 +4,7 @@ import {
   tokenizeText, getWordTokens, Token, TokenType, compareWords,
   isInputCorrectFlexibleCase, areAllWordsCorrectFlexibleCase,
 } from '../utils/textTokenizer';
-import { RotateCcw, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Btn } from './ui';
 import { useT } from '../utils/i18n';
 import { matches } from '../utils/shortcuts';
@@ -194,6 +194,15 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
     if (w) onLookup(w);
   };
 
+  // The word to look up at group gi: a curly-apostrophe contraction (don’t) splits into
+  // two words here (no space between), so either half looks up the whole; a closing ’ before a space does not join.
+  const wordAt = (gi: number) => {
+    const g = groups[gi], prev = groups[gi - 1], next = groups[gi + 1];
+    if (g.punct === '\u2019' && next?.word && next.word.index === g.word!.index + 2) return `${g.word!.value}\u2019${next.word.value}`;
+    if (prev?.word && prev.punct === '\u2019' && g.word!.index === prev.word.index + 2) return `${prev.word.value}\u2019${g.word!.value}`;
+    return g.word!.value;
+  };
+
   if (mode === PracticeMode.FEEDBACK) {
     const results = compareWords(tokens, inputs);
     const wrong = new Map(results.filter(r => !r.isCorrect).map(r => [r.tokenIndex, r]));
@@ -203,17 +212,17 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
         {/* The answer, in the same place and size as the boxes were. A wrong word turns
             accent with what you typed struck out above it; click any word to look it up. */}
         <p className={`${LINE} pt-4`}>
-          {groups.map(g => {
+          {groups.map((g, gi) => {
             if (!g.word) return <span key={g.key} className="text-mute">{g.punct}</span>;
             const r = isBlank(g.wi) ? wrong.get(g.word.index) : undefined;
             return (
               <span key={g.key} className="relative inline-flex items-baseline">
-                {r && (
+                {r?.inputWord && (
                   <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-sans text-sm leading-none text-mute line-through whitespace-nowrap" title={t('dictation.youTyped')}>
-                    {r.inputWord || '—'}
+                    {r.inputWord}
                   </span>
                 )}
-                <button type="button" onClick={e => { e.currentTarget.blur(); lookup(g.word!.value); }} title={r ? t('dictation.expected', { word: r.targetWord }) : t('common.lookup')}
+                <button type="button" onClick={e => { e.currentTarget.blur(); lookup(wordAt(gi)); }} title={r ? t('dictation.expected', { word: r.targetWord }) : t('common.lookup')}
                   className={`rounded-md -mx-1 px-1 hover:bg-accent-soft ${r ? 'text-accent underline decoration-2 underline-offset-[8px]' : ''}`}>
                   {g.word.value}
                 </button>
@@ -226,7 +235,6 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
         <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
           <span className="text-[13px] text-mute">{t('dictation.score', { right: typed - wrong.size, total: typed })}</span>
           <div className="flex gap-2.5">
-            <Btn onClick={() => onReplay(false)}><RotateCcw size={15} /> {t('dictation.hearAgain')}</Btn>
             <Btn tone="accent" onClick={() => onComplete(true)}>{nextLabel ?? t('common.nextLine')} <ArrowRight size={15} /></Btn>
             {extra}
           </div>
@@ -238,7 +246,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
   // INPUT mode
   return (
     <div className="w-full">
-      <form onSubmit={submit} className={LINE}>
+      <form onSubmit={submit} className={`${LINE} pt-4`}>
         {groups.map(g => {
           const punct = g.punct && <span className="text-mute select-none">{g.punct}</span>;
           if (g.wi < 0) return <span key={g.key}>{punct}</span>;
