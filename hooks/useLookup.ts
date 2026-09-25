@@ -3,11 +3,21 @@ import * as AI from '../utils/ai';
 import { DefinitionState, emptyDefinition } from '../components/DefinitionPanel';
 import { useT, getLang } from '../utils/i18n';
 import { DictLang, lookupWord, senseList, DictEntry } from '../utils/dictionary';
+import { jaLemma } from '../utils/japanese';
 
 // Word lookup behind the definition popup, shared by the practice page and review.
 // Dictionary first. AI answers instead when the dictionary has nothing (or no
 // dictionary covers the language), and first when the UI is English, since
 // the dictionaries only give Chinese.
+// Japanese: the word in dictionary form (食べました → 食べる), led by an entry
+// for the clicked phrase itself when Youdao has one (すみません, 見ている).
+const lookupJa = async (word: string): Promise<DictEntry[] | null> => {
+  const lemma = jaLemma(word);
+  const [whole, base] = await Promise.all([lemma !== word ? lookupWord(word, 'ja') : null, lookupWord(lemma, 'ja')]);
+  const found = [...(whole ?? []).filter(e => e.word === word), ...(base ?? [])];
+  return found.length ? found : null;
+};
+
 export const useLookup = (dictLang: DictLang | null, context: string) => {
   const t = useT();
   const [def, setDef] = useState<DefinitionState>(emptyDefinition);
@@ -21,7 +31,7 @@ export const useLookup = (dictLang: DictLang | null, context: string) => {
     let dict: DictEntry[] | null = null;
     let offline = false;
     if (dictLang && !(ai && getLang() === 'en')) {
-      try { dict = await lookupWord(word, dictLang); } catch (e) { offline = true; console.error('Dictionary lookup failed:', e); }
+      try { dict = dictLang === 'ja' ? await lookupJa(word) : await lookupWord(word, dictLang); } catch (e) { offline = true; console.error('Dictionary lookup failed:', e); }
     }
     if (!mine()) return;
     if (dict) return setDef({ ...emptyDefinition, word, dict, context });

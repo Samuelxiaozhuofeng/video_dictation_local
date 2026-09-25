@@ -22,7 +22,7 @@ const DictionaryPicker: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
   return (
     <Field label={t('settingsGeneral.dictionary')} hint={t('settingsGeneral.dictionaryHint')}>
       <div className="space-y-2.5">
-        {(Object.keys(DICT_OPTIONS) as DictLang[]).map(lang => (
+        {(Object.keys(DICT_OPTIONS) as DictLang[]).filter(lang => DICT_OPTIONS[lang].length > 1).map(lang => (
           <div key={lang} className="flex items-center gap-4">
             <span className="w-20 text-sm text-mute">{t(`dict.${lang}`)}</span>
             <Seg

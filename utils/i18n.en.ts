@@ -241,6 +241,7 @@ export const en = {
   'dict.es': 'Spanish',
   'dict.fr': 'French',
   'dict.de': 'German',
+  'dict.ja': 'Japanese',
   'settingsGeneral.dictionary': 'Dictionary',
   'settingsGeneral.dictionaryHint': "Which dictionary to use when you click a word; the video's language is detected from its subtitles. Dictionaries give Chinese definitions, so with an English interface and AI set up, words go straight to AI.",
 

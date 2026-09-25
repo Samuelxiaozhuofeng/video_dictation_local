@@ -242,8 +242,9 @@ export const zh: Record<keyof typeof en, string> = {
   'dict.es': '西班牙语',
   'dict.fr': '法语',
   'dict.de': '德语',
+  'dict.ja': '日语',
   'settingsGeneral.dictionary': '查词词典',
-  'settingsGeneral.dictionaryHint': '点字幕里的单词时用哪本词典，视频语言按字幕自动认。日语、中文等没有词典，配了 AI 会直接问 AI。',
+  'settingsGeneral.dictionaryHint': '点字幕里的单词时用哪本词典，视频语言按字幕自动认。日语固定用有道；中文等没有词典，配了 AI 会直接问 AI。',
 
   // --- BlurLine.tsx ---
   'blur.reveal': '显示',

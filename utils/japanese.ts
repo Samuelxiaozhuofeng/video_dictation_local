@@ -13,7 +13,7 @@ import { jaDictStatus, installJaDict, removeJaDict, readBinaryFile, onJaDictProg
 export const hasKana = (text: string) => /[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(text);
 
 export type JaGroup = { value: string; reading?: string; punct: boolean };
-type Morph = { s: string; at: number; pos: string; d1: string; reading?: string; punct: boolean };
+type Morph = { s: string; at: number; pos: string; d1: string; base: string; reading?: string; punct: boolean };
 
 // --- State shared by every screen: dictionary, AI cut points, a version to re-render on ---
 
@@ -132,6 +132,7 @@ export function jaMorphs(text: string): Morph[] | null {
       at,
       pos: t.pos as string,
       d1: t.pos_detail_1 as string,
+      base: t.basic_form && t.basic_form !== '*' ? t.basic_form as string : t.surface_form as string,
       reading: t.reading && t.reading !== '*' ? t.reading as string : undefined,
       punct: isPunct({ pos: t.pos, s: t.surface_form }),
     };
@@ -183,3 +184,17 @@ export function jaGroups(text: string): JaGroup[] | null {
 // Kana typed for a kanji word counts: compare in hiragana, full-width folded.
 export const kanaFold = (s: string) =>
   s.normalize('NFKC').trim().toLowerCase().replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
+
+// What a clicked group is looked up as: its word in dictionary form, particles
+// and endings dropped (食べました → 食べる, お茶を → お茶). Unchanged when the
+// splitting dictionary is not loaded.
+export function jaLemma(text: string): string {
+  const head: Morph[] = [];
+  for (const m of jaMorphs(text) ?? []) {
+    if (m.punct) continue;
+    if (head.length && (m.pos === '助詞' || m.pos === '助動詞' || m.d1 === '非自立')) break;
+    head.push(m);
+  }
+  if (head.length === 0) return text;
+  return head.slice(0, -1).map(m => m.s).join('') + head[head.length - 1].base;
+}

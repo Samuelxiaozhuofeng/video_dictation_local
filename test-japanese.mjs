@@ -84,4 +84,10 @@ assert.deepEqual(words("Don't stop, Mary."), ["Don't", 'stop', 'Mary']);
 assert.ok(isInputCorrectFlexibleCase('mary', 'Mary'));
 assert.ok(!isInputCorrectFlexibleCase('MARY', 'Mary'));
 
+// --- what a clicked group is looked up as ---
+for (const [group, lemma] of [['食べました', '食べる'], ['お茶を', 'お茶'], ['今日は', '今日'], ['行きたくない', '行く'],
+  ['見ている', '見る'], ['美しかった', '美しい'], ['天気ですね', '天気'], ['日本人', '日本人'], ['です', 'です']]) {
+  assert.equal(ja.jaLemma(group), lemma, group);
+}
+
 console.log('test-japanese: all checks passed');

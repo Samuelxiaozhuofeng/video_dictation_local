@@ -6,7 +6,7 @@ import { fetch } from '@tauri-apps/plugin-http';
 // and parsed here. None of these is an official API — a site redesign breaks
 // its parser, and the caller falls back to AI when it can.
 
-export type DictLang = 'en' | 'es' | 'fr' | 'de';
+export type DictLang = 'en' | 'es' | 'fr' | 'de' | 'ja';
 export type DictSource = 'youdao' | 'cambridge' | 'eudic';
 
 // Eudic draws some Chinese characters as tiny images (anti-scraping), so a
@@ -24,6 +24,7 @@ export const DICT_OPTIONS: Record<DictLang, DictSource[]> = {
   es: ['eudic', 'youdao'],
   fr: ['eudic', 'youdao'],
   de: ['eudic', 'youdao'],
+  ja: ['youdao'],
 };
 
 const STORAGE_KEY = 'linguaclip_dict_choice';
@@ -55,23 +56,26 @@ export const saveDictChoice = (lang: DictLang, source: DictSource) => {
 
 // One word says little about its language (parler is also an English
 // headword), so the whole subtitle file votes with its function words.
-const STOPWORDS: Record<DictLang, string[]> = {
+const STOPWORDS: Record<Exclude<DictLang, 'ja'>, string[]> = {
   en: ['the', 'and', 'is', 'you', 'to', 'of', 'it', 'that', 'what', 'this', 'have', 'with', 'are', 'was', 'i', 'my', "it's", "don't"],
   es: ['el', 'la', 'que', 'y', 'los', 'las', 'es', 'por', 'se', 'una', 'con', 'para', 'lo', 'qué', 'está', 'pero', 'yo', 'muy'],
   fr: ['le', 'la', 'les', 'et', 'est', 'que', 'je', 'vous', 'pas', 'une', 'des', 'du', 'il', 'ce', 'qui', "c'est", 'ne', 'mais'],
   de: ['der', 'die', 'das', 'und', 'ist', 'ich', 'nicht', 'zu', 'ein', 'eine', 'sie', 'es', 'mit', 'den', 'dem', 'auf', 'wir', 'du'],
 };
 
-// null = a language with no dictionary here (Japanese, Chinese, …): spaceless
-// scripts arrive as whole clauses anyway, which no dictionary can look up.
+// null = a language with no dictionary here (Chinese, …). Japanese is told by
+// its kana, which Chinese never has.
 export const detectLang = (texts: string[]): DictLang | null => {
+  const letters = texts.join('').match(/\p{L}/gu)?.length ?? 0;
+  const kana = texts.join('').match(/[\p{Script=Hiragana}\p{Script=Katakana}]/gu)?.length ?? 0;
+  if (kana >= 5 && kana / letters >= 0.2) return 'ja';
   const words = texts.join(' ').toLowerCase().replace(/[’`]/g, "'").match(/[\p{L}']+/gu) ?? [];
   if (words.length === 0) return null;
   const latin = words.filter(w => /^[\p{Script=Latin}']+$/u.test(w)).length;
   if (latin / words.length < 0.8) return null;
   let best: DictLang | null = null;
   let bestScore = 0;
-  for (const lang of Object.keys(STOPWORDS) as DictLang[]) {
+  for (const lang of Object.keys(STOPWORDS) as (keyof typeof STOPWORDS)[]) {
     const set = new Set(STOPWORDS[lang]);
     const score = words.filter(w => set.has(w)).length;
     if (score > bestScore) { best = lang; bestScore = score; }
@@ -129,6 +133,31 @@ export const parseYoudao = (body: any, word: string): DictEntry | null => {
   };
 };
 
+type YdJaPhr = { jmsy?: string; jmsyT?: string; lj?: string[]; ljT?: string[] };
+type YdJaWord = { head?: { hw?: string; pjm?: string; tone?: string }; sense?: { cx?: string; phrList?: YdJaPhr[] }[]; homonymD?: YdJaWord[] };
+
+const jaEntry = (w: YdJaWord): DictEntry | null => {
+  const senses: Sense[] = (w.sense ?? []).flatMap(s => (s.phrList ?? []).flatMap(p => {
+    const zh = stripTags(p.jmsy ?? '');
+    if (!zh) return [];
+    const ja = stripTags(p.jmsyT ?? '');
+    const examples = (p.lj ?? []).map((l, i) => [[stripTags(l), stripTags(p.ljT?.[i] ?? '')].filter(Boolean).join('\n')]).filter(e => e[0]);
+    return [{ pos: clean(s.cx), text: [ja ? `${zh}\n${ja}` : zh], examples }];
+  }));
+  if (senses.length === 0) return null;
+  const { hw = '', pjm = '', tone = '' } = w.head ?? {};
+  return { word: clean(hw), phonetic: clean(`${pjm !== hw ? pjm : ''} ${tone}`), senses, source: 'youdao' };
+};
+
+// Youdao's Japanese-Chinese (`newjc`). A kana query (たべる) is a thin stub
+// whose real entries (食べる, …) sit in homonymD.
+export const parseYoudaoJa = (body: any): DictEntry[] | null => {
+  const w: YdJaWord | undefined = body?.newjc?.word;
+  if (!w) return null;
+  const found = (w.homonymD?.length ? w.homonymD : [w]).map(jaEntry).filter((e): e is DictEntry => !!e);
+  return found.length ? found : null;
+};
+
 const parseHtml = (html: string) => new DOMParser().parseFromString(html, 'text/html');
 
 export const parseCambridge = (html: string, word: string): DictEntry | null => {
@@ -154,7 +183,7 @@ export const parseCambridge = (html: string, word: string): DictEntry | null => 
   return { word: clean(first?.querySelector('.headword')?.textContent) || word, phonetic: ipa ? `/${ipa}/` : '', senses, source: 'cambridge' };
 };
 
-const EUDIC_HOST: Record<Exclude<DictLang, 'en'>, string> = {
+const EUDIC_HOST: Record<Exclude<DictLang, 'en' | 'ja'>, string> = {
   es: 'https://www.esdict.cn',
   fr: 'https://www.frdic.com',
   de: 'https://www.godic.net',
@@ -285,7 +314,7 @@ const fromSource = async (source: DictSource, word: string, lang: DictLang): Pro
     const entry = parseCambridge(html, word);
     return entry ? [entry] : null;
   }
-  if (source === 'eudic' && lang !== 'en') {
+  if (source === 'eudic' && lang !== 'en' && lang !== 'ja') {
     const host = EUDIC_HOST[lang];
     const terms = pickEudicTerms(await (await get(`${host}/dicts/prefix/${q}`)).json(), word);
     const pages = await Promise.all(terms.map(async t =>
@@ -294,6 +323,7 @@ const fromSource = async (source: DictSource, word: string, lang: DictLang): Pro
     return found.length ? found : null;
   }
   const body = await (await get(`https://dict.youdao.com/jsonapi_s?doctype=json&jsonversion=4&le=${lang}&q=${q}`)).json();
+  if (lang === 'ja') return parseYoudaoJa(body);
   const entry = parseYoudao(body, word);
   return entry ? [entry] : null;
 };
