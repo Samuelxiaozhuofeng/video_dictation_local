@@ -88,17 +88,25 @@ export const isNew = (c: ReviewCard) => c.fsrs.state === State.New;
 export const REMEMBERED_DAYS = 7;
 export const isRemembered = (c: ReviewCard) => c.deck === 'line' && hasAudio(c) && c.fsrs.stability >= REMEMBERED_DAYS;
 
-// Which word to blank in a word card: the first token equal to it, ignoring case
-// and punctuation. A Japanese word kept under another split (天気 vs 天気ですね)
-// falls back to the box where it starts in the line.
-export const wordIndexIn = (words: string[], word: string): number => {
+// Which boxes to blank in a word card: the first token equal to the word,
+// ignoring case and punctuation. A Japanese word kept under another split
+// (天気 vs 天気ですね, or a whole line kept by an older version) blanks every box
+// it overlaps in the line.
+export const wordBoxes = (words: string[], word: string): number[] => {
   const norm = (w: string) => w.toLowerCase().replace(/[^\p{L}\p{N}'’-]/gu, '');
   const i = words.findIndex(w => norm(w) === norm(word));
-  if (i >= 0 || !/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(word + words.join(''))) return Math.max(i, 0);
+  if (i >= 0 || !/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(word + words.join(''))) return [Math.max(i, 0)];
   const at = words.join('').indexOf(word);
-  let end = 0;
-  return at < 0 ? 0 : words.findIndex(w => (end += w.length) > at);
+  if (at < 0) return [0];
+  let start = 0;
+  return words.flatMap((w, k) => {
+    const hit = start < at + word.length && start + w.length > at;
+    start += w.length;
+    return hit ? [k] : [];
+  });
 };
+
+export const wordIndexIn = (words: string[], word: string): number => wordBoxes(words, word)[0];
 
 // Old bookmark (text + file name + mm:ss) → the line it came from, or null.
 export const matchLegacy = (

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PracticeMode } from '../types';
-import { ReviewCard, Outcome, recordOutcome, repointVideo, getAllCards, dueQueue, wordIndexIn, addWord } from '../utils/review';
+import { ReviewCard, Outcome, recordOutcome, repointVideo, getAllCards, dueQueue, wordBoxes, addWord } from '../utils/review';
 import { getVideoRecord, patchVideoRecord } from '../utils/videoStorage';
 import { getAudioPaddingConfig } from '../utils/storage';
 import { videoSrcFromPath, pathExists, pickVideoPath } from '../utils/desktop';
@@ -122,7 +122,7 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
     byVideo.forEach((texts, id) => { settleSplits(id, texts).catch(() => {}); });
   }, [queue]);
   const blanks = useMemo(
-    () => card?.deck === 'word' ? [wordIndexIn(getWordTokens(tokenizeText(card.text)).map(w => w.value), card.word!)] : undefined,
+    () => card?.deck === 'word' ? wordBoxes(getWordTokens(tokenizeText(card.text)).map(w => w.value), card.word!) : undefined,
     [card, jaVersion], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
