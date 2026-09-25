@@ -234,7 +234,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
-          <span className="text-[13px] text-mute">{t('dictation.score', { right: typed - wrong.size, total: typed })}</span>
+          <span className="text-[13px] text-mute">{inputs.some((w, i) => isBlank(i) && w.trim()) ? t('dictation.score', { right: typed - wrong.size, total: typed }) : t('dictation.revealed')}</span>
           <div className="flex gap-2.5">
             <Btn tone="accent" onClick={() => onComplete(true)}>{nextLabel ?? t('common.nextLine')} <ArrowRight size={15} /></Btn>
             {extra}

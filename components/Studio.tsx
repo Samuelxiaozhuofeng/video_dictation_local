@@ -453,7 +453,7 @@ const Overlay: React.FC<{ title: string; body: string; stats?: [string, string][
           <div className="flex gap-10 pt-3">
             {stats.map(([n, label]) => (
               <div key={label}>
-                <div className="text-[28px] font-semibold leading-none tabular-nums">{n}</div>
+                <div className="text-2xl leading-none tabular-nums">{n}</div>
                 <div className="text-xs text-mute mt-1.5">{label}</div>
               </div>
             ))}

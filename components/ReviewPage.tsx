@@ -51,9 +51,11 @@ const ReviewPage: React.FC<{ deck: Deck }> = ({ deck }) => {
           <h1 className="text-[34px] font-semibold tracking-[-0.02em] leading-tight">{isLine ? t('nav.saved') : t('nav.cards')}</h1>
           <p className="mt-2 text-sm text-mute">{isLine ? t('review.deckLineHint') : t('review.deckWordHint')}</p>
           <div className="mt-5 flex items-center gap-4">
-            <Btn tone="accent" size="lg" disabled={n.due === 0} onClick={() => setSession(dueQueue(all, deck))}>
-              {n.due === 0 ? t('review.nothingDue') : <><Play size={15} fill="currentColor" /> {t('review.start')} · {n.due}</>}
-            </Btn>
+            {n.due === 0 ? <span className="text-sm text-mute">{t('review.nothingDue')}</span> : (
+              <Btn tone="accent" size="lg" onClick={() => setSession(dueQueue(all, deck))}>
+                <Play size={15} fill="currentColor" /> {t('review.start')} · {n.due}
+              </Btn>
+            )}
             <span className="text-sm text-mute">{t('review.total', { n: n.total })}</span>
           </div>
         </div>

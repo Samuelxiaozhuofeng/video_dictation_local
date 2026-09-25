@@ -345,6 +345,7 @@ export const en = {
   'dictation.expected': 'Expected: {word}',
   'dictation.hearAgain': 'Hear again',
   'dictation.score': '{right} of {total} words right · click any word to look it up',
+  'dictation.revealed': 'Answer shown · click any word to look it up',
   'dictation.nextStep': 'Next step',
 
   // --- SavedDrawer.tsx ---
@@ -371,6 +372,7 @@ export const en = {
   'home.dropRelease': 'Drop to add this video',
   'home.onlyOne': 'That is your only video so far.',
   'home.others': 'Other videos',
+  'home.finished': 'Finished',
   'home.practiceAs': 'Practise with {mode}',
   'add.title': 'Add a video',
   'add.pickLocal': 'Choose a video on this Mac',

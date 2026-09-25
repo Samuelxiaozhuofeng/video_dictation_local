@@ -106,7 +106,7 @@ const CardsPage: React.FC<{ deck: Deck; cards: ReviewCard[] | null }> = ({ deck,
       </div>}
 
       {cards !== null && list.length === 0 ? (
-        <p className="py-10 text-center text-sm text-mute">{inDeck.length ? t('cards.noMatch') : deck === 'line' ? t('review.emptyLine') : t('review.emptyWord')}</p>
+        <p className="py-8 text-sm text-mute">{inDeck.length ? t('cards.noMatch') : deck === 'line' ? t('review.emptyLine') : t('review.emptyWord')}</p>
       ) : (
         <ul>
           {list.map(c => (
