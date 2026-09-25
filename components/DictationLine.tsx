@@ -9,6 +9,8 @@ import { Btn } from './ui';
 import { useT } from '../utils/i18n';
 import { matches } from '../utils/shortcuts';
 import { useJaVersion } from '../utils/japanese';
+import { wordSpans } from '../utils/wordTimes';
+import type { Word } from '../utils/resegment';
 
 // Dictation line: one input box per word (INPUT), then a word-by-word comparison (FEEDBACK).
 // Word lookup is delegated to Studio via onLookup.
@@ -16,7 +18,8 @@ interface Props {
   targetText: string;
   mode: PracticeMode;
   onComplete: (wasCorrect: boolean) => void;
-  onReplay: (autoAdvanceAfter?: boolean, fromRatio?: number) => void; // fromRatio: 0..1 into the line
+  // fromRatio / toRatio: 0..1 into the line; toRatio set = stop there (one word).
+  onReplay: (autoAdvanceAfter?: boolean, fromRatio?: number, toRatio?: number) => void;
   onLookup: (word: string) => void;
   blanks?: number[]; // word indices the user types; omit = every word
   nextLabel?: string; // feedback's forward button; defaults to "next line"
@@ -27,6 +30,7 @@ interface Props {
   // Japanese: when the line may re-split (the practice page decides, so its blanks
   // and these boxes always count the same split). Omitted: re-split until typed in.
   splitVersion?: number;
+  timedWords?: Word[]; // the line's spoken words, times as 0..1 of the line (wordsInLine)
 }
 
 // How far into the line word i starts, by letters: a rough stand-in for time when
@@ -45,7 +49,7 @@ export const slotEm = (word: string) =>
 // Typing and the answer share one setting, so submitting changes colours, not positions.
 export const LINE = 'flex flex-wrap justify-center items-baseline gap-x-[0.3em] font-serif text-[38px] leading-[54px]';
 
-const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay, onLookup, blanks, nextLabel, onResult, extra, splitVersion }) => {
+const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay, onLookup, blanks, nextLabel, onResult, extra, splitVersion, timedWords }) => {
   const t = useT();
   // A Japanese line is re-split when its dictionary or AI cut points arrive, but
   // never under the user's fingers: once something is typed the split holds.
@@ -56,6 +60,12 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
   const version = splitVersion ?? ownVersion;
   const tokens = useMemo(() => tokenizeText(targetText), [targetText, version]); // eslint-disable-line react-hooks/exhaustive-deps
   const wordTokens = useMemo(() => getWordTokens(tokens), [tokens]);
+  // Each box's time in the line; without word timings, a guess by letters.
+  const spans = useMemo(() => wordSpans(wordTokens.map(w => w.value), timedWords), [wordTokens, timedWords]);
+  const spanOf = (i: number): [number, number] => {
+    const values = wordTokens.map(w => w.value);
+    return spans?.[i] ?? [letterRatio(values, i), letterRatio(values, i + 1)];
+  };
   // Each word carries the punctuation right after it, so a comma sits on its word, not a gap away.
   const groups = useMemo(() => {
     const out: { key: number; wi: number; word?: Token; punct: string }[] = [];
@@ -160,7 +170,8 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (matches(e, 'reveal')) { e.preventDefault(); e.stopPropagation(); report(false); onComplete(false); return; }
     if (matches(e, 'replay')) { e.preventDefault(); e.stopPropagation(); clearReplay(); onReplay(false); return; }
-    if (matches(e, 'playFrom')) { e.preventDefault(); e.stopPropagation(); clearReplay(); attempt.current.helped = true; onReplay(false, letterRatio(wordTokens.map(w => w.value), i)); return; }
+    if (matches(e, 'playFrom')) { e.preventDefault(); e.stopPropagation(); clearReplay(); attempt.current.helped = true; onReplay(false, spanOf(i)[0]); return; }
+    if (matches(e, 'playWord')) { e.preventDefault(); e.stopPropagation(); clearReplay(); attempt.current.helped = true; onReplay(false, ...spanOf(i)); return; }
     if (matches(e, 'peek')) { e.preventDefault(); showPeek(i); return; }
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();

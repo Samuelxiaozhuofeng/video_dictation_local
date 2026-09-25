@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Subtitle, PracticeMode, LearningMode, BlurPlaybackMode } from '../types';
+import { playSpan } from '../utils/wordTimes';
 
 export interface UseVideoPlayerParams {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -30,10 +31,8 @@ export interface UseVideoPlayerReturn {
   setProgress: (value: number) => void;
   togglePlay: () => void;
   handleProgressSeek: (e: React.ChangeEvent<HTMLInputElement>, sections: any[], currentSectionIndex: number, onSectionChange: (index: number, subIndex: number) => void) => void;
-  handleReplayCurrent: (autoAdvanceAfter?: boolean, fromRatio?: number) => void;
+  handleReplayCurrent: (autoAdvanceAfter?: boolean, fromRatio?: number, toRatio?: number) => void;
 }
-
-const PLAY_FROM_LEAD_SEC = 0.35;
 
 export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerReturn {
   const {
@@ -60,6 +59,9 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
   const blurAutoAdvanceRef = useRef(false);
   const userPausedRef = useRef(false); // Track if user manually paused in continuous mode
   const flowRef = useRef(false); // the last line was only watched: play straight on into this one
+  // "Play just this word": pause here, not at the line's end. Any pause, seek or new line drops it.
+  const stopAtRef = useRef<number | null>(null);
+  useEffect(() => { if (!isPlaying) stopAtRef.current = null; }, [isPlaying]);
 
   // A new line list (next section, next custom set) counts as a new line even
   // when the index stays 0, or a one-line set would never advance.
@@ -82,7 +84,11 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
     const isBlurContinuous = learningMode === LearningMode.BLUR && blurPlaybackMode === BlurPlaybackMode.CONTINUOUS;
     const watching = !!watch?.has(currentSub.id);
 
-    if (isPlaying) {
+    if (isPlaying && stopAtRef.current !== null && video.currentTime >= stopAtRef.current) {
+      stopAtRef.current = null;
+      video.pause();
+      setIsPlaying(false);
+    } else if (isPlaying) {
       if (video.currentTime >= currentSub.endTime) {
         if (isBlurContinuous || watching) {
           if (!blurAutoAdvanceRef.current) {
@@ -162,6 +168,7 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
     const playing = isPlayingRef.current;
     const flowing = flowRef.current;
     flowRef.current = false;
+    stopAtRef.current = null;
 
     const tolerance = 0.5;
     const early = video.currentTime < currentSub.startTime - tolerance;
@@ -177,15 +184,14 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
     video.play().catch(e => { console.error("Autoplay blocked", e); setIsPlaying(false); });
   }, [currentSubtitleIndex, subtitles, mode, videoRef, learningMode, blurPlaybackMode, jumpGaps]);
 
-  // fromRatio: where in the line to start, 0 = its start. Used by "play from this
-  // word", which only knows how far into the line's letters the word sits; start
-  // a little early so the word's onset isn't clipped. The line still stops at its end.
-  const handleReplayCurrent = useCallback((autoAdvanceAfter: boolean = false, fromRatio: number = 0) => {
+  // fromRatio / toRatio: where in the line to start and stop (0..1), for "play
+  // from this word" and "play just this word"; without toRatio the line plays to its end.
+  const handleReplayCurrent = useCallback((autoAdvanceAfter: boolean = false, fromRatio: number = 0, toRatio?: number) => {
     const sub = subtitles[currentSubtitleIndex];
     if (videoRef.current && sub) {
-      // ponytail: letter-count estimate, off by up to a word; words.json timings (newer imports only) would be exact.
-      const from = sub.startTime + fromRatio * (sub.endTime - sub.startTime) - (fromRatio > 0 ? PLAY_FROM_LEAD_SEC : 0);
-      videoRef.current.currentTime = Math.max(sub.startTime, from);
+      const [from, to] = playSpan(sub.startTime, sub.endTime, fromRatio, toRatio);
+      videoRef.current.currentTime = from;
+      stopAtRef.current = toRatio === undefined ? null : to;
       setIsPlaying(true);
       videoRef.current.play().catch(e => { console.error("Play blocked", e); setIsPlaying(false); });
       onShouldAutoAdvanceChange?.(autoAdvanceAfter);
@@ -210,6 +216,7 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
       if (mode === PracticeMode.INPUT || mode === PracticeMode.FEEDBACK || atLineEnd) {
         handleReplayCurrent();
       } else {
+        stopAtRef.current = null;
         setIsPlaying(true);
         videoRef.current.play().catch(e => { console.error("Play failed", e); setIsPlaying(false); });
         // Clear user pause flag when resuming
@@ -228,6 +235,7 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
   ) => {
     if (videoRef.current && videoRef.current.duration) {
       const newTime = (Number(e.target.value) / 100) * videoRef.current.duration;
+      stopAtRef.current = null;
       videoRef.current.currentTime = newTime;
       setProgress(Number(e.target.value));
       

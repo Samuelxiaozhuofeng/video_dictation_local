@@ -11,6 +11,8 @@
 
 `components/AddVideo.tsx`（主页「添加视频」弹窗，拖入视频也打开它）→ `utils/importJob.ts`（先建一条带 `importJob` 的 VideoRecord 占位，再 `invoke('start_import')`）→ `src-tauri/src/import.rs`（独立线程：yt-dlp → ffmpeg → whisper-cli，`app.emit("import-progress")` 推进度）→ `importJob.ts` 常驻监听（在 `App.tsx` 挂，不在首页挂，否则用户在练习页时会漏事件）写回记录；完成时删 `importJob` 并填 `videoPath / subtitleText / totalSubtitles`。
 
+逐词时间：转录完成时 `import.rs` 把每个词的起止毫秒存成 `~/Movies/LinguaClip/<记录id>.words.json`（只有「只有视频」这条路有，自带 .srt 的没有）。前端 `utils/wordTimes.ts` 读它，按字母把每个空格对到那串词上，给听写的 ⌘K（只播这个词）和 ⌘J（从这个词播）定位；没有或对不上就按字母数估。
+
 ## 转录组件（whisper_setup.rs）
 
 - 查找顺序：我们下载的目录 → whisper-cli 回落到 Homebrew（`find_bin`），模型回落到 `~/.cache/whisper.cpp`（完整版和 q5_0 都认）。作者本机的老安装不用重下。

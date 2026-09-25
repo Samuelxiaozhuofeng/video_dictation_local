@@ -23,6 +23,7 @@ node test-dictionary.mjs  # 查词：认语言 + 有道解析 + 欧路挑词（�
 node test-anki.mjs        # Anki 旧配置合并成一种卡 + 单词加粗（同上）
 node test-japanese.mjs    # 日语切词组 + 假名判对 + AI 校对回答校验（读 node_modules/kuromoji/dict）
 node test-custom.mjs      # 定制练习：挑句（水平区间、时长、照常播放 / 跳过、从头再挑）+ AI 分级回答 / 缓存校验
+node test-wordtimes.mjs   # 逐词时间：空格对到 words.json 的哪一段 + ⌘K / ⌘J 实际播放区间
 ```
 
 前端没有测试框架，逻辑自检就是根目录那几个 `node` 脚本（`test-tokenizer.js` / `test-flexible-case.js` 是早期的复制逻辑版，参考价值有限）。
