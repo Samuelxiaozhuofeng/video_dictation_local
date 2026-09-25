@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, MoreHorizontal, Loader2, Play } from 'lucide-react';
 import { LearningMode, VideoRecord } from '../types';
 import * as VideoStorage from '../utils/videoStorage';
-import { forgetCustomPos, getPracticeConfig } from '../utils/storage';
+import { forgetCustomPos, formatTimeCode, getCustomConfig, getCustomPos, getPracticeConfig } from '../utils/storage';
 import { parseSRT } from '../utils/srtParser';
 import { buildSections } from '../utils/sections';
 import { fileNameFromPath, listenDragDrop, trashFile, relatedFilePaths, cacheFilePaths } from '../utils/desktop';
@@ -69,11 +69,17 @@ const Home: React.FC<HomeProps> = ({ onResume, onEmptyChange, addAsked, onAddHan
   // Computed the same way the practice page cuts the video, so the two agree.
   const sectionLength = getPracticeConfig().sectionLength;
   const shelfPosition = useMemo(() => {
-    const byId = new Map<string, { part: number; parts: number; line: number; lines: number }>();
+    const byId = new Map<string, { part: number; parts: number; line: number; lines: number; customSec?: number; customPct?: number }>();
+    // The start panel opens on custom when that was the last choice; the card then
+    // shows where the custom sets reached, since that is where "start" goes on.
+    const customOn = getCustomConfig().on;
     for (const v of videos ?? []) {
       if (v.importJob || !v.subtitleText) continue;
       try {
-        const sections = buildSections(parseSRT(v.subtitleText), sectionLength);
+        const subs = parseSRT(v.subtitleText);
+        const customSec = customOn ? getCustomPos(v.id) : 0;
+        const end = subs[subs.length - 1]?.endTime ?? 0;
+        const sections = buildSections(subs, sectionLength);
         if (sections.length === 0) continue;
         const part = Math.min(Math.max(v.currentSectionIndex, 0), sections.length - 1);
         const lines = sections[part].subtitles.length;
@@ -82,6 +88,7 @@ const Home: React.FC<HomeProps> = ({ onResume, onEmptyChange, addAsked, onAddHan
           parts: sections.length,
           line: Math.min(Math.max(v.currentSubtitleIndex, 0), lines),
           lines,
+          ...(customSec > 0 ? { customSec, customPct: end ? Math.min(100, customSec / end * 100) : 0 } : {}),
         });
       } catch { /* a record we cannot parse just falls back to percent */ }
     }
@@ -235,6 +242,7 @@ const Home: React.FC<HomeProps> = ({ onResume, onEmptyChange, addAsked, onAddHan
   const where = (v: VideoRecord) => {
     const pos = shelfPosition.get(v.id);
     if (!pos) return { text: `${v.completionRate}%`, pct: v.completionRate };
+    if (pos.customSec) return { text: t('home.customAt', { time: formatTimeCode(pos.customSec) }), pct: pos.customPct ?? 0 };
     const pct = pos.lines ? (pos.line / pos.lines) * 100 : 0;
     if (pos.parts > 1) return { text: t('home.partOf', { current: pos.part + 1, total: pos.parts }), pct };
     return { text: t('home.linesCount', { current: pos.line, total: pos.lines }), pct };
@@ -316,7 +324,7 @@ const Home: React.FC<HomeProps> = ({ onResume, onEmptyChange, addAsked, onAddHan
   // Where you are in this part: one tick per line when they fit, else a bar.
   const ticks = (v: VideoRecord) => {
     const pos = shelfPosition.get(v.id);
-    if (!pos || pos.lines > 32) return <Line pct={where(v).pct} className="w-[160px]" />;
+    if (!pos || pos.customSec || pos.lines > 32) return <Line pct={where(v).pct} className="w-[160px]" />;
     return (
       <span className="flex gap-[3px]">
         {Array.from({ length: pos.lines }, (_, i) => (

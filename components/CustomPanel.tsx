@@ -116,7 +116,10 @@ const CustomPanel: React.FC<{
     } else if (empty) {
       status = cfg.level ? t('custom.empty', { level: cfg.level }) : t('custom.emptyAny');
     } else if (preview) {
-      status = t('custom.preview', { n: preview.practise.length, time: formatTimeCode(subs[preview.lines[0]].startTime) });
+      const from = subs[preview.lines[0]].startTime;
+      const saved = getCustomPos(record.id);
+      // A pick that fell back to the top (nothing left after the saved spot) is not a resume.
+      status = t(saved > 0 && from >= saved ? 'custom.previewResume' : 'custom.preview', { n: preview.practise.length, time: formatTimeCode(from) });
     }
   }
 

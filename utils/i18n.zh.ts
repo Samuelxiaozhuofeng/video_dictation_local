@@ -32,6 +32,7 @@ export const zh: Record<keyof typeof en, string> = {
   'custom.empty': '这个视频里没挑出适合 {level} 的句子，换个水平试试。',
   'custom.emptyAny': '这个视频里没挑出值得练的句子。',
   'custom.preview': '这次练 {n} 句，从 {time} 开始',
+  'custom.previewResume': '接着上次，从 {time} 开始，这次练 {n} 句',
   'custom.start': '开始练习',
   'custom.waiting': '等分级完成…',
 
@@ -72,6 +73,7 @@ export const zh: Record<keyof typeof en, string> = {
   'home.nothingHereHint': '添加一个视频，带上字幕文件就能直接练，没有字幕 App 会自动生成。也可以直接把视频拖进窗口。',
   'home.linesCount': '{current} / {total} 句',
   'home.partOf': '{current} / {total} 段',
+  'home.customAt': '定制练到 {time}',
   'home.deleteTitle': '删除这个视频？',
   'home.deleteBody': '“{name}”和它的进度都会被删除。',
   'home.deleteOk': '删除',

@@ -38,10 +38,14 @@ const Studio: React.FC = () => {
   const { ankiStatus } = anki;
 
   const currentSub = subtitles[currentSubtitleIndex];
-  // Custom set: watch-only lines play past untouched, and only practised lines are counted.
+  // Custom set: watch-only lines play past untouched. Each set starts where the last
+  // one stopped, so the count and strip are the whole video's, not the set's —
+  // otherwise every set looks like starting over.
   const watching = !!(watch && currentSub && watch.has(currentSub.id));
+  const lineIndex = currentSub ? fullSubtitles.findIndex(s => s.id === currentSub.id) : -1;
   const practisedN = watch ? subtitles.filter(s => !watch.has(s.id)).length : subtitles.length;
-  const lineNo = watch ? Math.max(1, subtitles.slice(0, currentSubtitleIndex + 1).filter(s => !watch.has(s.id)).length) : currentSubtitleIndex + 1;
+  const stripLines = watch ? fullSubtitles : subtitles;
+  const stripAt = watch ? Math.max(0, lineIndex) : currentSubtitleIndex;
   const isBlur = learningMode === LearningMode.BLUR;
   const isStep = blurPlaybackMode === BlurPlaybackMode.SENTENCE_BY_SENTENCE;
   const hasClozeAi = canCloze();
@@ -55,7 +59,6 @@ const Studio: React.FC = () => {
   // inside the cache file, so a re-cut subtitle invalidates it there, not here.
   usePracticeClock();
   const clozeKey = videoId ?? '';
-  const lineIndex = currentSub ? fullSubtitles.findIndex(s => s.id === currentSub.id) : -1;
   // Japanese lines re-split when the dictionary loads, this video's saved AI
   // splits are read, or blanks arrive — but a line on screen keeps its boxes
   // while an AI check lands mid-line; the new split shows from the next line.
@@ -297,17 +300,17 @@ const Studio: React.FC = () => {
             )}
           </div>
           <span className="shrink-0 h-[42px] px-4 rounded-full bg-page border border-line text-ink flex items-center tabular-nums">
-            {t('studio.lineCount', { current: lineNo, total: practisedN })}
+            {t('studio.lineCount', { current: stripAt + 1, total: stripLines.length })}
           </span>
         </header>
       </div>
 
       {/* --- The white sheet: where you are in the part, the line you work on, the remote --- */}
       <section className="relative -mt-6 min-h-[340px] bg-page rounded-t-3xl flex flex-col" style={{ flex: `${100 - videoShare} 1 0` }}
-        aria-label={t('studio.lineCount', { current: lineNo, total: practisedN })}>
+        aria-label={t('studio.lineCount', { current: stripAt + 1, total: stripLines.length })}>
         <div className="px-6 lg:px-24 pt-6">
-          <Timeline lines={subtitles} current={currentSubtitleIndex} watch={watch} onPick={id => (id === currentSub?.id ? actions.onReplayCurrent() : actions.onJumpToSaved(id))}
-            title={i => t('studio.lineCount', { current: i + 1, total: subtitles.length })} />
+          <Timeline lines={stripLines} current={stripAt} watch={watch} onPick={id => (id === currentSub?.id ? actions.onReplayCurrent() : actions.onJumpToSaved(id))}
+            title={i => t('studio.lineCount', { current: i + 1, total: stripLines.length })} />
           <div className="mt-1.5 flex justify-end text-xs text-mute tabular-nums">
             <span>{timeLabel}</span>
           </div>

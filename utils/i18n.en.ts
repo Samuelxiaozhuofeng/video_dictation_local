@@ -31,6 +31,7 @@ export const en = {
   'custom.empty': 'No lines in this video suit {level}. Try another level.',
   'custom.emptyAny': 'No lines worth practising in this video.',
   'custom.preview': '{n} lines this time, from {time}',
+  'custom.previewResume': 'Picking up from {time}, {n} lines this time',
   'custom.start': 'Start',
   'custom.waiting': 'Waiting for grading…',
 
@@ -71,6 +72,7 @@ export const en = {
   'home.nothingHereHint': 'Add a video with its subtitle file to start right away, or let the app write the subtitles. You can also drop one onto the window.',
   'home.linesCount': '{current} / {total} lines',
   'home.partOf': 'Part {current} / {total}',
+  'home.customAt': 'Custom: up to {time}',
   'home.deleteTitle': 'Delete this video?',
   'home.deleteBody': '"{name}" and its progress will be removed.',
   'home.deleteOk': 'Delete',
