@@ -75,11 +75,7 @@ export function usePracticeActions(params: UsePracticeActionsParams) {
     videoPlayerHandleProgressSeek,
   } = params;
 
-  // Recording an Anki clip plays the video itself; moving it now would record the wrong audio.
-  const recording = ankiStatus === 'recording';
-
   const handleSkip = useCallback((direction: 'prev' | 'next') => {
-    if (recording) return;
     if (direction === 'prev' && currentSubtitleIndex > 0) {
       setCurrentSubtitleIndex(prev => (typeof prev === 'number' ? prev - 1 : currentSubtitleIndex - 1));
       setMode(PracticeMode.LISTENING);
@@ -89,10 +85,9 @@ export function usePracticeActions(params: UsePracticeActionsParams) {
       setMode(PracticeMode.LISTENING);
       setAnkiStatus('idle');
     }
-  }, [recording, currentSubtitleIndex, subtitles.length, setCurrentSubtitleIndex, setMode, setAnkiStatus]);
+  }, [currentSubtitleIndex, subtitles.length, setCurrentSubtitleIndex, setMode, setAnkiStatus]);
 
   const handleProgressSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (recording) return;
     videoPlayerHandleProgressSeek(e, sections, currentSectionIndex, (sectionIndex, subIndex) => {
       if (sectionIndex !== currentSectionIndex) {
         const newSection = sections[sectionIndex];
@@ -106,7 +101,6 @@ export function usePracticeActions(params: UsePracticeActionsParams) {
       setAnkiStatus('idle');
     });
   }, [
-    recording,
     videoPlayerHandleProgressSeek,
     sections,
     currentSectionIndex,
@@ -126,21 +120,25 @@ export function usePracticeActions(params: UsePracticeActionsParams) {
   const handleAddToAnki = useCallback(async () => {
     const currentSub = subtitles[currentSubtitleIndex];
     if (!currentSub) return;
+    // Pause first: the clip plays past the line's end, where "playing" would pause or advance it.
+    videoRef.current?.pause();
+    setIsPlaying(false);
     await ankiHandleAddToAnki(currentSub);
-  }, [subtitles, currentSubtitleIndex, ankiHandleAddToAnki]);
+  }, [subtitles, currentSubtitleIndex, ankiHandleAddToAnki, videoRef, setIsPlaying]);
 
   const handleWordToAnki = useCallback(async (word: string, definition: string, example?: string) => {
     const currentSub = subtitles[currentSubtitleIndex];
     if (!currentSub) return;
+    videoRef.current?.pause();
+    setIsPlaying(false);
     await ankiHandleWordToAnki(word, definition, currentSub, example);
-  }, [subtitles, currentSubtitleIndex, ankiHandleWordToAnki]);
+  }, [subtitles, currentSubtitleIndex, ankiHandleWordToAnki, videoRef, setIsPlaying]);
 
   const deleteSavedItem = useCallback((id: number, e: React.MouseEvent) => {
     savedLinesDeleteSavedItem(id, e);
   }, [savedLinesDeleteSavedItem]);
 
   const jumpToSaved = useCallback((id: number) => {
-    if (recording) return;
     const sub = fullSubtitles.find(s => s.id === id);
     if (!sub) return;
 
@@ -161,7 +159,6 @@ export function usePracticeActions(params: UsePracticeActionsParams) {
     setAnkiStatus('idle');
     setShowSavedList(false);
   }, [
-    recording,
     fullSubtitles,
     sections,
     currentSectionIndex,

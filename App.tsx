@@ -323,7 +323,10 @@ export default function App() {
   };
 
   // --- Keyboard ---
-  const inPractice = appState === AppState.PRACTICE && !showSectionComplete && !showComplete;
+  // Recording an Anki clip plays the video itself: nothing may move or pause it meanwhile.
+  const recording = ankiStatus === 'recording';
+  const unlessRecording = <A extends unknown[]>(fn: (...a: A) => void) => (...a: A) => { if (!recording) fn(...a); };
+  const inPractice = appState === AppState.PRACTICE && !showSectionComplete && !showComplete && !recording;
   const blurStepPaused = learningMode === LearningMode.BLUR && blurPlaybackMode === BlurPlaybackMode.SENTENCE_BY_SENTENCE && !isPlaying;
 
   const keyboardShortcuts = useMemo(() => ([
@@ -367,25 +370,25 @@ export default function App() {
         onExit: exitPractice,
         onRestart: restartPractice,
         onNextSet: nextSet,
-        onSwitchSection: (index: number) => switchSection(index, videoRef, setIsPlaying),
+        onSwitchSection: unlessRecording((index: number) => switchSection(index, videoRef, setIsPlaying)),
         onToggleSavedList: setShowSavedList,
-        onTogglePlay: togglePlayOrStep,
-        onReplayCurrent: replayCurrent,
+        onTogglePlay: unlessRecording(togglePlayOrStep),
+        onReplayCurrent: unlessRecording(replayCurrent),
         onSetStepReplay: setStepReplay,
-        onSkip: handleSkip,
-        onProgressSeek: handleProgressSeek,
+        onSkip: unlessRecording(handleSkip),
+        onProgressSeek: unlessRecording(handleProgressSeek),
         onToggleSaveCurrent: toggleSaveCurrent,
         onAddToAnki: handleAddToAnki,
         onWordToAnki: handleWordToAnki,
-        onNextSection: handleNextSectionClick,
+        onNextSection: unlessRecording(handleNextSectionClick),
         onStopAfterSection: stopAfterSection,
         onSetShowSectionComplete: setShowSectionComplete,
         onSetVolume: setVolume,
         onSetPlaybackSpeed: setPlaybackSpeed,
         onInputComplete: handleInputComplete,
-        onContinue: handleContinue,
+        onContinue: unlessRecording(handleContinue),
         onDeleteSavedItem: deleteSavedItem,
-        onJumpToSaved: jumpToSaved,
+        onJumpToSaved: unlessRecording(jumpToSaved),
         onSetBlurPlaybackMode: setBlurPlaybackMode,
       }}
     >
