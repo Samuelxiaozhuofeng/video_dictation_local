@@ -300,11 +300,17 @@ export function useAnkiIntegration(params: UseAnkiIntegrationParams): UseAnkiInt
       }
   }, [ankiConfig, captureMedia, videoFileName]);
 
+  // Moving to another line clears the badge, but never one still recording or
+  // adding: that card isn't done, and its own finish sets the badge.
+  const clearAnkiStatus = useCallback((status: AnkiStatus) => {
+    setAnkiStatus(s => (status === 'idle' && (s === 'recording' || s === 'adding') ? s : status));
+  }, []);
+
   return {
     ankiConfig,
     ankiStatus,
     setAnkiConfig,
-    setAnkiStatus,
+    setAnkiStatus: clearAnkiStatus,
     handleAddToAnki,
     handleWordToAnki,
     reloadConfig

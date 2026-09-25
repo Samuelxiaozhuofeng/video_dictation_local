@@ -1,24 +1,18 @@
 import React from 'react';
 import { Play, Pause, SkipBack, SkipForward, RotateCcw, Bookmark, PlusCircle, Volume2, VolumeX, Mic, Check, X, Loader2, MoreHorizontal, Keyboard } from 'lucide-react';
-import { LearningMode } from '../types';
 import { usePracticeContext } from '../hooks/usePracticeContext';
 import { Btn, Menu, MenuItem, Seg } from './ui';
 import { useT } from '../utils/i18n';
 import { formatCombo, useShortcuts, ActionId } from '../utils/shortcuts';
-import ShortcutLegend from './ShortcutLegend';
-
-const PIN_KEY = 'linguaclip_keys_pinned';
-const readPinned = () => { try { return localStorage.getItem(PIN_KEY) === '1'; } catch { return false; } };
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5];
 
 // The remote along the bottom of the practice sheet: save / Anki / mute on the left,
 // the play controls in the middle, a "…" on the right for the rarer settings (speed,
 // plus whatever the page adds: cloze level, video size, breakdown, the key legend).
-const Transport: React.FC<{ menuItems: MenuItem[]; menuPanel?: React.ReactNode }> = ({ menuItems, menuPanel }) => {
+const Transport: React.FC<{ menuItems: MenuItem[]; menuPanel?: React.ReactNode; pinned: boolean; onTogglePinned: () => void }> = ({ menuItems, menuPanel, pinned, onTogglePinned }) => {
   const t = useT();
-  const { practice, video, saved, anki, actions } = usePracticeContext();
-  const { learningMode } = practice;
+  const { video, saved, anki, actions } = usePracticeContext();
   const { isPlaying, volume, playbackSpeed } = video;
   const { isCurrentSaved } = saved;
   const { ankiConfig, ankiStatus } = anki;
@@ -38,24 +32,10 @@ const Transport: React.FC<{ menuItems: MenuItem[]; menuPanel?: React.ReactNode }
   const af = ankiFace();
   const combos = useShortcuts();
   const withKey = (label: string, id: ActionId) => `${label} (${formatCombo(combos[id])})`;
-  const [pinned, setPinned] = React.useState(readPinned);
-  const togglePinned = () => {
-    setPinned(p => {
-      try { localStorage.setItem(PIN_KEY, p ? '0' : '1'); } catch { /* localStorage unavailable */ }
-      return !p;
-    });
-  };
-  const dictation = learningMode === LearningMode.DICTATION;
-  const items: MenuItem[] = [...menuItems, { label: <><Keyboard size={15} /> {pinned ? t('keys.hide') : t('keys.show')}</>, onClick: togglePinned }];
+  const items: MenuItem[] = [...menuItems, { label: <><Keyboard size={15} /> {pinned ? t('keys.hide') : t('keys.show')}</>, onClick: onTogglePinned }];
 
   return (
     <footer className={`relative shrink-0 h-[76px] px-6 lg:px-24 flex items-center text-mute transition-colors ${recording ? 'bg-accent-soft' : ''}`}>
-      {pinned && (
-        <div className="absolute right-6 lg:right-24 bottom-full mb-2 z-20 px-3.5 py-3 rounded-xl bg-page border border-line shadow-lift">
-          <ShortcutLegend dictation={dictation} />
-        </div>
-      )}
-
       <div className="flex-1 min-w-0 flex items-center gap-0.5 -ml-2">
         <Btn square size="sm" flat onClick={actions.onToggleSaveCurrent} title={isCurrentSaved ? t('transport.unsaveLine') : t('transport.saveLine')} className={isCurrentSaved ? '!text-accent' : ''}>
           <Bookmark size={17} fill={isCurrentSaved ? 'currentColor' : 'none'} />

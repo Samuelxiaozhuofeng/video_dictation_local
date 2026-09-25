@@ -37,8 +37,8 @@ export const tokenizeText = (text: string): Token[] => {
   // Regex to match words with Unicode letter support
   // \p{L} matches any Unicode letter (including ñ, ó, á, é, í, ú, ü, etc.)
   // \p{N} matches any Unicode number
-  // Supports apostrophes within words (e.g., don't, it's)
-  const pattern = /([\p{L}\p{N}]+(?:'[\p{L}]+)?)|([^\p{L}\p{N}\s])|(\s+)/gu;
+  // Supports apostrophes within words, straight or curly (don't, don’t, it's)
+  const pattern = /([\p{L}\p{N}]+(?:['’][\p{L}]+)?)|([^\p{L}\p{N}\s])|(\s+)/gu;
 
   let match;
   while ((match = pattern.exec(text)) !== null) {
@@ -79,8 +79,11 @@ export const getWordTokens = (tokens: Token[]): Token[] => {
 /**
  * Check if input matches target (case-insensitive)
  */
+// A keyboard types ' where subtitles often have ’; both count.
+const foldQuote = (s: string) => s.trim().replace(/’/g, "'");
+
 export const isInputCorrect = (input: string, target: string): boolean => {
-  return input.trim().toLowerCase() === target.trim().toLowerCase();
+  return foldQuote(input).toLowerCase() === foldQuote(target).toLowerCase();
 };
 
 /**
@@ -95,8 +98,8 @@ export const isInputCorrectFlexibleCase = (input: string, target: string, readin
     const typed = kanaFold(input);
     if (typed === kanaFold(target) || typed === kanaFold(reading)) return true;
   }
-  const trimmedInput = input.trim();
-  const trimmedTarget = target.trim();
+  const trimmedInput = foldQuote(input);
+  const trimmedTarget = foldQuote(target);
 
   if (trimmedInput.length !== trimmedTarget.length) {
     return false;

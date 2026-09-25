@@ -31,7 +31,7 @@ const BlurLine: React.FC<{ text: string; onLookup: (word: string) => void; onRev
 
   let wordIdx = 0;
   return (
-    <div className="font-serif text-[36px] leading-[1.5] text-center">
+    <div className="font-serif text-[36px] leading-[1.5] text-center" data-lookup-line>
       {tokens.map((tk, i) => {
         if (tk.type === TokenType.WORD) {
           const idx = wordIdx++;

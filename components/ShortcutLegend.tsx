@@ -2,7 +2,20 @@ import React from 'react';
 import { ACTIONS, formatCombo, useShortcuts } from '../utils/shortcuts';
 import { useT } from '../utils/i18n';
 
-// The key table, as the user has set it: in the "…" menu and pinned in the corner.
+const PIN_KEY = 'linguaclip_keys_pinned';
+const readPinned = () => { try { return localStorage.getItem(PIN_KEY) === '1'; } catch { return false; } };
+
+// Whether the table is pinned beside the practice line; remembered across sessions.
+export const usePinnedLegend = () => {
+  const [pinned, setPinned] = React.useState(readPinned);
+  const toggle = () => setPinned(p => {
+    try { localStorage.setItem(PIN_KEY, p ? '0' : '1'); } catch { /* localStorage unavailable */ }
+    return !p;
+  });
+  return [pinned, toggle] as const;
+};
+
+// The key table, as the user has set it: in the "…" menu and pinned beside the line.
 const ShortcutLegend: React.FC<{ dictation: boolean; className?: string }> = ({ dictation, className = '' }) => {
   const t = useT();
   const combos = useShortcuts();

@@ -113,4 +113,12 @@ assert.deepEqual(ja.rankJa([entry('個々', 'ここ', '名词'), entry('ここ',
 assert.deepEqual(ja.rankJa([entry('遣る', 'やる', '他动词')], '遣る').map(e => e.word), ['遣る']);
 assert.equal(ja.jaLemma('やって'), '遣る');
 
+// 5. A curly-apostrophe contraction is one box, and typing a straight ' counts.
+assert.deepEqual(words('I don’t know, it’s fine'), ['I', 'don’t', 'know', 'it’s', 'fine']);
+assert.deepEqual(words("I don't know"), ['I', "don't", 'know']);
+assert.ok(isInputCorrectFlexibleCase("don't", 'don’t'));
+assert.ok(isInputCorrectFlexibleCase('Don’t', 'don’t'));
+assert.ok(!isInputCorrectFlexibleCase('dont', 'don’t'));
+assert.deepEqual(words('the students’ books'), ['the', 'students', 'books'], 'a closing ’ stays punctuation');
+
 console.log('test-japanese: all checks passed');

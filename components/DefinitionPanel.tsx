@@ -5,8 +5,8 @@ import { DictEntry, Seg, Sense, senseToAnki } from '../utils/dictionary';
 import { Btn, Card, Stamp } from './ui';
 import { useT } from '../utils/i18n';
 
-// Single word-definition surface for both learning modes: a card floating top-right
-// over the video, closed by Esc, the X or a click outside. A dictionary entry is
+// Single word-definition surface for both learning modes: a small card beside the
+// clicked word (below it, or above when there's more room there), closed by Esc, the X or a click outside. A dictionary entry is
 // listed meaning by meaning; each has its own "+" that sends just that meaning
 // (and its first two examples) to Anki as an audio card. The AI can point at the
 // meaning this sentence uses (pick); an AI-only answer (data) gets one "+".
@@ -16,6 +16,7 @@ export type WordToAnki = (word: string, definition: string, example?: string) =>
 
 export interface DefinitionState {
   word: string | null;
+  anchor?: DOMRect; // the clicked word, where the card opens
   dict: DictEntry[] | null;
   context?: string; // the line the word was clicked in, for the AI pick
   data: AI.WordDefinition | null;
@@ -28,6 +29,18 @@ export interface DefinitionState {
 }
 
 export const emptyDefinition: DefinitionState = { word: null, dict: null, data: null, loading: false, failed: false };
+
+// Beside the word: centred on it, on the side with more room, kept inside the window.
+const placeBeside = (a: DOMRect | undefined): React.CSSProperties => {
+  const vw = window.innerWidth, vh = window.innerHeight, gap = 8, edge = 16;
+  const width = Math.min(340, vw - 2 * edge);
+  if (!a) return { width, right: edge, top: 64, maxHeight: vh - 140 };
+  const left = Math.min(Math.max(a.left + a.width / 2 - width / 2, edge), vw - width - edge);
+  const below = vh - a.bottom - gap - edge, above = a.top - gap - edge;
+  return below >= 280 || below >= above
+    ? { width, left, top: a.bottom + gap, maxHeight: below }
+    : { width, left, bottom: vh - a.top + gap, maxHeight: above };
+};
 
 const aiHtml = (d: AI.WordDefinition) => `<b>${d.word}</b> <i>(${d.partOfSpeech})</i><br/>${d.definition}`;
 
@@ -67,11 +80,11 @@ const SenseRow: React.FC<{ sense: Sense; picked: boolean; note?: string; action:
   useEffect(() => { if (picked) ref.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, [picked]);
   return (
     <li ref={ref} className={`flex gap-3 items-start rounded-lg -mx-2 px-2 py-1.5 ${picked ? 'bg-accent-soft ring-1 ring-accent/60' : ''}`}>
-      <div className="flex-1 min-w-0 text-[15px] leading-relaxed whitespace-pre-line">
+      <div className="flex-1 min-w-0 text-sm leading-relaxed whitespace-pre-line">
         {sense.pos && <span className="text-mute italic mr-2">{sense.pos}</span>}
         {sense.phrase && <span className="font-medium mr-2">{sense.phrase}</span>}
         <SegText line={sense.text} />
-        {sense.examples[0] && <div className="mt-1 text-sm text-mute"><SegText line={sense.examples[0]} /></div>}
+        {sense.examples[0] && <div className="mt-0.5 text-[13px] text-mute"><SegText line={sense.examples[0]} /></div>}
         {picked && note && <div className="mt-1.5 text-sm text-accent">AI：{note}</div>}
       </div>
       {action}
@@ -139,14 +152,14 @@ const DefinitionPanel: React.FC<{
 
   return (
   <div className="fixed inset-0 z-40 fade-in" onMouseDown={onClose}>
-  <Card className="absolute right-4 lg:right-24 top-16 w-[min(400px,calc(100vw-2rem))] max-h-[calc(100vh-140px)] !rounded-[18px] shadow-lift flex flex-col" role="dialog" aria-label={t('definition.ariaLabel')} onMouseDown={e => e.stopPropagation()}>
-    <Btn square size="sm" flat onClick={onClose} title={t('common.close')} className="!absolute right-3 top-3 z-10"><X size={16} /></Btn>
+  <Card className="absolute !rounded-2xl shadow-lift flex flex-col" style={placeBeside(def.anchor)} role="dialog" aria-label={t('definition.ariaLabel')} onMouseDown={e => e.stopPropagation()}>
+    <Btn square size="sm" flat onClick={onClose} title={t('common.close')} className="!absolute right-2 top-2 z-10"><X size={15} /></Btn>
 
-    <div className="flex-1 overflow-y-auto p-6 pr-12">
+    <div className="flex-1 overflow-y-auto p-4 pr-10">
       {def.loading ? (
         <div className="flex items-center gap-3 text-sm text-mute"><Loader2 size={18} className="animate-spin" /> {t('definition.asking')}</div>
       ) : def.dict ? (
-        <div className="space-y-5">
+        <div className="space-y-4">
           {onExplain && !def.pick && (
             def.aiLoading ? (
               <div className="flex items-center gap-3 text-sm text-mute"><Loader2 size={18} className="animate-spin" /> {t('definition.explaining')}</div>
@@ -163,7 +176,7 @@ const DefinitionPanel: React.FC<{
           {def.dict.map((e, ei) => (
             <div key={ei} className="space-y-3">
               <div className="flex items-baseline gap-3 flex-wrap">
-                <h4 className="font-serif text-3xl leading-none break-words">{e.word}</h4>
+                <h4 className="font-serif text-2xl leading-none break-words">{e.word}</h4>
                 {e.phonetic && <span className="text-sm text-mute font-mono">{e.phonetic}</span>}
                 {ei === 0 && <Stamp tone="shade">{t(`dict.${e.source}`)}</Stamp>}
               </div>
@@ -179,15 +192,15 @@ const DefinitionPanel: React.FC<{
       ) : def.data ? (
         <div className="flex gap-3 items-start">
           <div className="flex-1 min-w-0">
-            <h4 className="font-serif text-3xl leading-none break-words">{def.data.word}</h4>
+            <h4 className="font-serif text-2xl leading-none break-words">{def.data.word}</h4>
             <Stamp tone="shade" className="mt-2">{def.data.partOfSpeech}</Stamp>
-            <p className="text-[15px] leading-relaxed mt-3">{def.data.definition}</p>
+            <p className="text-sm leading-relaxed mt-2">{def.data.definition}</p>
           </div>
           {action('ai')}
         </div>
       ) : def.failed ? (
         <div className="space-y-3">
-          <h4 className="font-serif text-3xl leading-none break-words">{def.word}</h4>
+          <h4 className="font-serif text-2xl leading-none break-words">{def.word}</h4>
           <div className="text-sm text-mute leading-relaxed whitespace-pre-wrap break-words">{def.error}</div>
         </div>
       ) : (

@@ -9,6 +9,7 @@ import DictationLine, { LINE, slotEm } from './DictationLine';
 import { JaBanner } from './JaSetup';
 import BlurLine from './BlurLine';
 import Transport from './Transport';
+import ShortcutLegend, { usePinnedLegend } from './ShortcutLegend';
 import Timeline from './Timeline';
 import SavedDrawer from './SavedDrawer';
 import DefinitionPanel from './DefinitionPanel';
@@ -44,6 +45,7 @@ const Studio: React.FC = () => {
   const isBlur = learningMode === LearningMode.BLUR;
   const isStep = blurPlaybackMode === BlurPlaybackMode.SENTENCE_BY_SENTENCE;
   const hasClozeAi = canCloze();
+  const [keysPinned, toggleKeysPinned] = usePinnedLegend();
   const [clozeLevel, setClozeLevel] = useState<ClozeLevel>(() => Storage.getPracticeConfig().clozeLevel ?? 'full');
   const [rankedLines, setRankedLines] = useState<(number[] | null)[] | null>(null);
   const [clozeProgress, setClozeProgress] = useState<{ done: number; total: number } | null>(null);
@@ -311,7 +313,9 @@ const Studio: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 lg:px-24 py-5 flex flex-col">
+        {/* The pinned key table takes its own column, so it never covers the line however small the window. */}
+        <div className="flex-1 min-h-0 flex">
+        <div className="flex-1 min-w-0 overflow-y-auto px-6 lg:px-24 py-5 flex flex-col">
           <div className="mt-[5vh] w-full max-w-4xl mx-auto flex flex-col items-center gap-4 text-center">
               {isJa && <JaBanner />}
               {!currentSub ? (
@@ -373,8 +377,14 @@ const Studio: React.FC = () => {
               {(bdActive || isBlur) && offerBtn}
           </div>
         </div>
+        {keysPinned && (
+          <aside className="shrink-0 self-end mb-3 mr-6 lg:mr-24 px-3.5 py-3 rounded-xl bg-page border border-line">
+            <ShortcutLegend dictation={!isBlur} />
+          </aside>
+        )}
+        </div>
 
-        <Transport menuItems={menuItems} menuPanel={menuPanel} />
+        <Transport menuItems={menuItems} menuPanel={menuPanel} pinned={keysPinned} onTogglePinned={toggleKeysPinned} />
       </section>
 
       {showSectionComplete && (

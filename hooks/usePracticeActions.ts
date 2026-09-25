@@ -75,7 +75,11 @@ export function usePracticeActions(params: UsePracticeActionsParams) {
     videoPlayerHandleProgressSeek,
   } = params;
 
+  // Recording an Anki clip plays the video itself; moving it now would record the wrong audio.
+  const recording = ankiStatus === 'recording';
+
   const handleSkip = useCallback((direction: 'prev' | 'next') => {
+    if (recording) return;
     if (direction === 'prev' && currentSubtitleIndex > 0) {
       setCurrentSubtitleIndex(prev => (typeof prev === 'number' ? prev - 1 : currentSubtitleIndex - 1));
       setMode(PracticeMode.LISTENING);
@@ -85,9 +89,10 @@ export function usePracticeActions(params: UsePracticeActionsParams) {
       setMode(PracticeMode.LISTENING);
       setAnkiStatus('idle');
     }
-  }, [currentSubtitleIndex, subtitles.length, setCurrentSubtitleIndex, setMode, setAnkiStatus]);
+  }, [recording, currentSubtitleIndex, subtitles.length, setCurrentSubtitleIndex, setMode, setAnkiStatus]);
 
   const handleProgressSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (recording) return;
     videoPlayerHandleProgressSeek(e, sections, currentSectionIndex, (sectionIndex, subIndex) => {
       if (sectionIndex !== currentSectionIndex) {
         const newSection = sections[sectionIndex];
@@ -101,6 +106,7 @@ export function usePracticeActions(params: UsePracticeActionsParams) {
       setAnkiStatus('idle');
     });
   }, [
+    recording,
     videoPlayerHandleProgressSeek,
     sections,
     currentSectionIndex,
@@ -134,6 +140,7 @@ export function usePracticeActions(params: UsePracticeActionsParams) {
   }, [savedLinesDeleteSavedItem]);
 
   const jumpToSaved = useCallback((id: number) => {
+    if (recording) return;
     const sub = fullSubtitles.find(s => s.id === id);
     if (!sub) return;
 
@@ -154,6 +161,7 @@ export function usePracticeActions(params: UsePracticeActionsParams) {
     setAnkiStatus('idle');
     setShowSavedList(false);
   }, [
+    recording,
     fullSubtitles,
     sections,
     currentSectionIndex,

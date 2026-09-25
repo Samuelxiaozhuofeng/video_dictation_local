@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as AI from '../utils/ai';
 import { DefinitionState, emptyDefinition } from '../components/DefinitionPanel';
 import { useT, getLang } from '../utils/i18n';
@@ -13,28 +13,41 @@ export const useLookup = (dictLang: DictLang | null, context: string) => {
   const t = useT();
   const [def, setDef] = useState<DefinitionState>(emptyDefinition);
   const seqRef = useRef(0);
+  // Every lookup starts from a click on a word: remember where, so the card opens beside
+  // it — across from the word, but clear of the whole line above and below.
+  const lastPress = useRef<DOMRect | null>(null);
+  useEffect(() => {
+    const onDown = (e: PointerEvent) => {
+      const btn = (e.target as Element)?.closest?.('button');
+      const w = btn?.getBoundingClientRect(), l = btn?.closest('[data-lookup-line]')?.getBoundingClientRect() ?? w;
+      lastPress.current = w && l ? new DOMRect(w.left, l.top, w.width, l.height) : null;
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    return () => document.removeEventListener('pointerdown', onDown, true);
+  }, []);
 
   const lookup = async (word: string) => {
     const seq = ++seqRef.current;
     const mine = () => seq === seqRef.current;
     const ai = AI.aiReady();
-    setDef({ ...emptyDefinition, word, loading: true });
+    const anchor = lastPress.current ?? undefined;
+    setDef({ ...emptyDefinition, word, anchor, loading: true });
     let dict: DictEntry[] | null = null;
     let offline = false;
     if (dictLang && !(ai && getLang() === 'en')) {
       try { dict = dictLang === 'ja' ? await lookupJa(word) : await lookupWord(word, dictLang); } catch (e) { offline = true; console.error('Dictionary lookup failed:', e); }
     }
     if (!mine()) return;
-    if (dict) return setDef({ ...emptyDefinition, word, dict, context });
+    if (dict) return setDef({ ...emptyDefinition, word, anchor, dict, context });
     if (!ai) {
       const error = t(offline ? 'definition.dictOffline' : dictLang ? 'definition.notFound' : 'definition.noDictLang');
-      return setDef({ ...emptyDefinition, word, failed: true, error });
+      return setDef({ ...emptyDefinition, word, anchor, failed: true, error });
     }
     try {
       const data = await AI.getWordDefinition(word, context);
-      if (mine()) setDef({ ...emptyDefinition, word, data });
+      if (mine()) setDef({ ...emptyDefinition, word, anchor, data });
     } catch (e) {
-      if (mine()) setDef({ ...emptyDefinition, word, failed: true, error: (e as Error).message });
+      if (mine()) setDef({ ...emptyDefinition, word, anchor, failed: true, error: (e as Error).message });
     }
   };
 

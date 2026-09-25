@@ -194,8 +194,8 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
     if (w) onLookup(w);
   };
 
-  // The word to look up at group gi: a hyphenated word (well-being) or a curly-apostrophe
-  // contraction (don’t) splits into several words here; clicking any part looks up the
+  // The word to look up at group gi: a hyphenated word (well-being) or a word with two
+  // curly apostrophes (rock’n’roll) splits into several words here; clicking any part looks up the
   // whole, as before. Only parts with nothing between them join (a closing ’ before a
   // space does not).
   const joins = (g?: typeof groups[number], h?: typeof groups[number]) =>
@@ -216,7 +216,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
         {/* The answer, in the same place and size as the boxes were. A wrong word turns
             accent with what you typed struck out above it; a word left blank is only
             underlined (seeing the answer is not an error); click any word to look it up. */}
-        <p className={`${LINE} pt-4`}>
+        <p className={`${LINE} pt-4`} data-lookup-line>
           {groups.map((g, gi) => {
             if (!g.word) return <span key={g.key} className="text-mute">{g.punct}</span>;
             const r = isBlank(g.wi) ? wrong.get(g.word.index) : undefined;
