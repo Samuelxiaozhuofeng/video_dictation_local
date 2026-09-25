@@ -281,9 +281,9 @@ export default function App() {
   // the transport's replay button) plays the current step's clip instead.
   const stepReplayRef = useRef<(() => void) | null>(null);
   const setStepReplay = useCallback((play: (() => void) | null) => { stepReplayRef.current = play; }, []);
-  const replayCurrent = useCallback((autoAdvanceAfter?: boolean, fromRatio?: number) => {
+  const replayCurrent = useCallback((autoAdvanceAfter?: boolean, fromRatio?: number, toRatio?: number) => {
     if (stepReplayRef.current) stepReplayRef.current();
-    else handleReplayCurrent(autoAdvanceAfter, fromRatio);
+    else handleReplayCurrent(autoAdvanceAfter, fromRatio, toRatio);
   }, [handleReplayCurrent]);
   const togglePlayOrStep = useCallback(() => {
     if (stepReplayRef.current && !isPlaying) stepReplayRef.current();
@@ -337,8 +337,8 @@ export default function App() {
     { preventDefault: true, condition: (e: KeyboardEvent) => inPractice && matches(e, 'next'), handler: () => handleSkip('next') },
     { preventDefault: true, condition: (e: KeyboardEvent) => inPractice && matches(e, 'skipLine'), handler: () => handleSkip('next') },
     { condition: (e: KeyboardEvent) => inPractice && matches(e, 'anki'), handler: (e: KeyboardEvent) => handleAddToAnkiShortcut(e) },
-    // In a blank DictationLine handles it (from that word); anywhere else there's no current word, so replay the line.
-    { preventDefault: true, condition: (e: KeyboardEvent) => inPractice && matches(e, 'playFrom'), handler: () => replayCurrent() },
+    // In a blank DictationLine handles these (from / just that word); anywhere else there's no current word, so replay the line.
+    { preventDefault: true, condition: (e: KeyboardEvent) => inPractice && (matches(e, 'playFrom') || matches(e, 'playWord')), handler: () => replayCurrent() },
   ]), [inPractice, mode, blurStepPaused, replayCurrent, togglePlayOrStep, handleContinue, handleSkip, handleAddToAnkiShortcut]);
 
   useKeyboardShortcuts(keyboardShortcuts);

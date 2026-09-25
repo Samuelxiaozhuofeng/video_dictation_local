@@ -35,7 +35,7 @@ export interface UseVideoControllerReturn {
   setProgress: (value: number) => void;
   togglePlay: () => void;
   handleProgressSeek: (e: React.ChangeEvent<HTMLInputElement>, sections: VideoSection[], currentSectionIndex: number, onSectionChange: (sectionIndex: number, subIndex: number) => void) => void;
-  handleReplayCurrent: (autoAdvanceAfter?: boolean, fromRatio?: number) => void;
+  handleReplayCurrent: (autoAdvanceAfter?: boolean, fromRatio?: number, toRatio?: number) => void;
 }
 
 export function useVideoController(params: UseVideoControllerParams): UseVideoControllerReturn {

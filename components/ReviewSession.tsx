@@ -16,6 +16,7 @@ import { useT } from '../utils/i18n';
 import { countLine, usePracticeClock } from '../utils/today';
 import { hasKana, jaReady, useJaVersion } from '../utils/japanese';
 import { settleSplits } from '../utils/jaSegments';
+import { playSpan, useTimedWords } from '../utils/wordTimes';
 
 // A review round: one card at a time over the whole window (clip on top, a white
 // sheet below, like the practice page), graded by how the dictation went. Also opened on top of the practice page, so it owns its keys.
@@ -151,11 +152,15 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
     addWord({ videoId: card.videoId, videoName: card.videoName, videoPath, text: card.text, start: card.start, end: card.end }, word, definition, example).catch(console.error);
   };
 
-  const playCard = (then?: () => void, fromRatio?: number) => {
+  const playCard = (then?: () => void, fromRatio?: number, toRatio?: number) => {
     if (!card || !path) return;
     const [from, to] = clipOf(card);
-    clip.play(path, fromRatio === undefined ? from : card.start + fromRatio * (card.end - card.start), to, then);
+    if (fromRatio === undefined) return clip.play(path, from, to, then);
+    const [a, b] = playSpan(card.start, card.end, fromRatio, toRatio);
+    clip.play(path, a, toRatio === undefined ? to : b, then);
   };
+
+  const timedWords = useTimedWords(card?.videoId, card?.start ?? 0, card?.end ?? 0);
 
   const next = () => { clip.stop(); setMode(PracticeMode.INPUT); setIdx(i => i + 1); };
 
@@ -194,8 +199,8 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
     else setMode(PracticeMode.FEEDBACK);
   };
 
-  const replay = (auto?: boolean, fromRatio?: number) => {
-    if (!auto) return playCard(undefined, fromRatio);
+  const replay = (auto?: boolean, fromRatio?: number, toRatio?: number) => {
+    if (!auto) return playCard(undefined, fromRatio, toRatio);
     // All right: hear it once more, then the next line (a word card stops on its meaning).
     if (isWord) { setMode(PracticeMode.FEEDBACK); playCard(); }
     else playCard(next);
@@ -296,6 +301,7 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
                   nextLabel={isWord ? t('session.next') : undefined}
                   onComplete={complete}
                   onReplay={replay}
+                  timedWords={timedWords}
                   onLookup={lookup}
                   onResult={result}
                 />

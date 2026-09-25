@@ -396,6 +396,7 @@ export const en = {
   'keys.play': 'Play/pause',
   'keys.replay': 'Replay',
   'keys.playFrom': 'Play from this word',
+  'keys.playWord': 'Play just this word',
   'keys.prev': 'Previous line',
   'keys.next': 'Next line',
   'keys.skipLine': 'Skip this line',

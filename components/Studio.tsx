@@ -26,6 +26,7 @@ import { matches, formatCombo, useShortcuts } from '../utils/shortcuts';
 import { usePracticeClock } from '../utils/today';
 import { addLine, addWord, getAllCards, hasAudio, lineCardId, Reason, ReviewCard } from '../utils/review';
 import ReviewSession from './ReviewSession';
+import { useTimedWords } from '../utils/wordTimes';
 
 // The practice room: the video fills the top, a white sheet overlaps it from below with
 // the part's timeline, the line you work on (centred), and the remote (Transport).
@@ -108,6 +109,8 @@ const Studio: React.FC = () => {
   // Only while typing a dictation line: leaving INPUT (feedback, a seek, a new
   // line) drops any breakdown, so a late AI answer cannot start one elsewhere.
   const bd = useBreakdown(!isBlur && mode === PracticeMode.INPUT ? currentSub : undefined, videoId);
+
+  const timedWords = useTimedWords(videoId, currentSub?.startTime ?? 0, currentSub?.endTime ?? 0);
   const bdActive = bd.state.status === 'active' ? bd.state : null;
   const bdStep = bdActive ? bdActive.steps[bdActive.step] : null;
   const bdLast = !!bdActive && bdActive.step === bdActive.steps.length - 1;
@@ -363,6 +366,7 @@ const Studio: React.FC = () => {
                     splitVersion={splitVersion}
                     onComplete={correct => (correct && mode === PracticeMode.FEEDBACK ? actions.onContinue() : actions.onInputComplete(correct))}
                     onReplay={actions.onReplayCurrent}
+                    timedWords={timedWords}
                     onLookup={lookup}
                     extra={offerBtn}
                     onResult={o => { if (!o.correct) record('wrong'); else if (o.helped) record('peek'); }}
