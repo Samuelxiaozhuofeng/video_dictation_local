@@ -73,6 +73,7 @@ export default function App() {
   }, []);
 
   const [appState, setAppState] = useState<AppState>(AppState.UPLOAD);
+  const [homeEmpty, setHomeEmpty] = useState(false); // no videos yet: the top bar drops its add button
   const [addAsked, setAddAsked] = useState(false); // the top bar's "+": Home opens its add dialog
   const [videoFileName, setVideoFileName] = useState<string | null>(null);
   const [learningMode, setLearningMode] = useState<LearningMode>(LearningMode.DICTATION);
@@ -344,11 +345,11 @@ export default function App() {
   const currentSub = subtitles[currentSubtitleIndex];
 
   const page = appState !== AppState.PRACTICE ? (
-    <Shell active={appState} onNav={setAppState} onAdd={() => { setAppState(AppState.UPLOAD); setAddAsked(true); }}>
+    <Shell active={appState} onNav={setAppState} hideAdd={appState === AppState.UPLOAD && homeEmpty} onAdd={() => { setAppState(AppState.UPLOAD); setAddAsked(true); }}>
       {appState === AppState.SETTINGS ? <Settings /> :
        appState === AppState.LIBRARY ? <ReviewPage key="line" deck="line" /> :
        appState === AppState.CARDS ? <ReviewPage key="word" deck="word" /> :
-       <Home onResume={handleResume} addAsked={addAsked} onAddHandled={() => setAddAsked(false)} />}
+       <Home onResume={handleResume} onEmptyChange={setHomeEmpty} addAsked={addAsked} onAddHandled={() => setAddAsked(false)} />}
     </Shell>
   ) : (
     <PracticeProvider

@@ -245,9 +245,9 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
       {/* Same room as practice: the clip on top, a white sheet from below. */}
       <div className="relative min-h-0 flex items-center justify-center" style={{ flex: '60 1 0' }}>
         {clip.video(`block w-full h-full object-contain ${hidden ? 'invisible' : ''}`)}
-        <header className={`absolute inset-x-0 top-0 h-16 ${IS_WINDOWS ? 'pl-4' : 'pl-24'} pr-4 lg:pr-24 flex items-center justify-between gap-3 text-[13px]`} data-tauri-drag-region="deep">
-          <button type="button" onClick={onClose} className="press h-9 pl-3 pr-4 rounded-full bg-page text-ink flex items-center gap-1.5 shadow-card"><X size={15} /> {t('session.quit')}</button>
-          {!done && <span className="h-9 px-4 rounded-full bg-page text-ink flex items-center tabular-nums shadow-card">{t('session.progress', { current: idx + 1, total: queue.length })}</span>}
+        <header className={`absolute inset-x-0 top-0 h-16 ${IS_WINDOWS ? 'pl-4' : 'pl-24'} pr-4 lg:pr-6 flex items-center justify-between gap-3 text-[13px]`} data-tauri-drag-region="deep">
+          <button type="button" onClick={onClose} className="press h-[42px] pl-3.5 pr-4 rounded-full bg-page border border-line text-ink flex items-center gap-1.5"><X size={15} /> {t('session.quit')}</button>
+          {!done && <span className="h-[42px] px-4 rounded-full bg-page border border-line text-ink flex items-center tabular-nums">{t('session.progress', { current: idx + 1, total: queue.length })}</span>}
         </header>
       </div>
 

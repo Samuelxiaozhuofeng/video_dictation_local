@@ -279,20 +279,24 @@ const Studio: React.FC = () => {
             <span className="press rounded-full bg-accent text-white w-16 h-16 flex items-center justify-center"><Play size={26} fill="currentColor" className="ml-1" /></span>
           </button>
         )}
-        <header className={`absolute inset-x-0 top-0 h-16 ${IS_WINDOWS ? 'pl-4' : 'pl-24'} pr-4 flex items-center gap-2 text-[13px]`} data-tauri-drag-region="deep">
-          <div className="flex items-center h-9 rounded-full bg-page text-ink min-w-0 max-w-[60%] shadow-card">
+        <header className={`absolute inset-x-0 top-0 h-16 ${IS_WINDOWS ? 'pl-4' : 'pl-24'} pr-4 lg:pr-6 flex items-center justify-between gap-2 text-[13px]`} data-tauri-drag-region="deep">
+          {/* Same pill as the top bar on the other pages, on the same centre line as the traffic lights. */}
+          <div className="flex items-center gap-0.5 p-1 rounded-full bg-page border border-line text-ink min-w-0 max-w-[60%]">
             <button type="button" onClick={actions.onExit} title={t('studio.backToVideos')} aria-label={t('studio.backToVideos')}
-              className="h-9 pl-2.5 pr-3.5 flex items-center gap-1.5 min-w-0 rounded-full hover:bg-shade">
+              className="h-8 pl-2.5 pr-3.5 flex items-center gap-1.5 min-w-0 rounded-full hover:bg-shade">
               <ArrowLeft size={16} className="shrink-0" /><span className="truncate" title={videoName}>{videoName}</span>
             </button>
             {sections.length > 1 && (
-              <div className="inline-flex items-center shrink-0 pr-1 border-l border-line text-mute">
+              <div className="inline-flex items-center shrink-0 border-l border-line text-mute">
                 <Btn square size="sm" flat onClick={() => actions.onSwitchSection(currentSectionIndex - 1)} disabled={currentSectionIndex === 0} title={t('studio.previousSection')}><ChevronLeft size={15} /></Btn>
                 <span>{t('studio.part', { current: currentSectionIndex + 1, total: sections.length })}</span>
                 <Btn square size="sm" flat onClick={() => actions.onSwitchSection(currentSectionIndex + 1)} disabled={currentSectionIndex === sections.length - 1} title={t('studio.nextSection')}><ChevronRight size={15} /></Btn>
               </div>
             )}
           </div>
+          <span className="shrink-0 h-[42px] px-4 rounded-full bg-page border border-line text-ink flex items-center tabular-nums">
+            {t('studio.lineCount', { current: lineNo, total: practisedN })}
+          </span>
         </header>
       </div>
 
@@ -302,8 +306,7 @@ const Studio: React.FC = () => {
         <div className="px-6 lg:px-24 pt-6">
           <Timeline lines={subtitles} current={currentSubtitleIndex} watch={watch} onPick={id => (id === currentSub?.id ? actions.onReplayCurrent() : actions.onJumpToSaved(id))}
             title={i => t('studio.lineCount', { current: i + 1, total: subtitles.length })} />
-          <div className="mt-1.5 flex justify-between text-xs text-mute tabular-nums">
-            <span>{t('studio.lineCount', { current: lineNo, total: practisedN })}</span>
+          <div className="mt-1.5 flex justify-end text-xs text-mute tabular-nums">
             <span>{timeLabel}</span>
           </div>
         </div>

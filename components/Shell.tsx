@@ -6,8 +6,8 @@ import { IS_WINDOWS } from '../utils/platform';
 import { deckCounts, getAllCards, subscribeCards } from '../utils/review';
 
 // Page frame for the non-practice screens: wordmark, a centred pill of tabs (the two
-// libraries carry how many cards are due), the one "add video" button, scrolling body.
-const Shell: React.FC<{ active: AppState; onNav: (s: AppState) => void; onAdd: () => void; children: React.ReactNode }> = ({ active, onNav, onAdd, children }) => {
+// libraries carry how many cards are due), the quiet "add video" button, scrolling body.
+const Shell: React.FC<{ active: AppState; onNav: (s: AppState) => void; onAdd: () => void; hideAdd?: boolean; children: React.ReactNode }> = ({ active, onNav, onAdd, hideAdd, children }) => {
   const t = useT();
   const [due, setDue] = useState({ line: 0, word: 0 });
   useEffect(() => {
@@ -24,9 +24,9 @@ const Shell: React.FC<{ active: AppState; onNav: (s: AppState) => void; onAdd: (
   return (
   <div className="h-full flex flex-col">
     {/* The Mac's traffic lights sit top-left, so the wordmark starts after them. */}
-    <header className={`shrink-0 relative h-[70px] ${IS_WINDOWS ? 'pl-6' : 'pl-24'} pr-6 lg:pr-10 flex items-center justify-between`} data-tauri-drag-region="deep">
+    <header className={`shrink-0 relative h-16 ${IS_WINDOWS ? 'pl-6' : 'pl-24'} pr-6 lg:pr-10 flex items-center justify-between`} data-tauri-drag-region="deep">
       <span className="text-[15px] font-semibold select-none">LinguaClip</span>
-      <nav className="absolute left-1/2 top-3.5 -translate-x-1/2 flex gap-0.5 p-1 bg-page border border-line rounded-full">
+      <nav className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-0.5 p-1 bg-page border border-line rounded-full">
         {NAV.map(({ state, label, badge }) => {
           const on = active === state;
           return (
@@ -43,10 +43,13 @@ const Shell: React.FC<{ active: AppState; onNav: (s: AppState) => void; onAdd: (
           );
         })}
       </nav>
-      <button onClick={onAdd} title={t('home.addVideo')} aria-label={t('home.addVideo')}
-        className="press w-[42px] h-[42px] rounded-full bg-accent text-white flex items-center justify-center">
-        <Plus size={19} strokeWidth={2.25} />
-      </button>
+      {/* Home's empty state carries its own big add button; one is enough. */}
+      {!hideAdd && (
+        <button onClick={onAdd}
+          className="press h-[42px] pl-3.5 pr-4 rounded-full bg-page border border-line flex items-center gap-1.5 text-[13px] hover:border-ink/20">
+          <Plus size={16} strokeWidth={2.25} className="text-accent" />{t('home.addVideo')}
+        </button>
+      )}
     </header>
     <main className="flex-1 overflow-y-auto">
       <div className="max-w-[1280px] mx-auto px-6 md:px-12 lg:px-24 pt-4 pb-12">{children}</div>

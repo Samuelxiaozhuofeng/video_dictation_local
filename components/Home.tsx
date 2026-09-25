@@ -27,6 +27,7 @@ import { getToday } from '../utils/today';
 
 interface HomeProps {
   onResume: (record: VideoRecord, mode: LearningMode) => void | Promise<void>;
+  onEmptyChange?: (empty: boolean) => void;
   addAsked?: boolean; // the top bar's "+" was pressed
   onAddHandled?: () => void;
 }
@@ -41,10 +42,11 @@ const Line: React.FC<{ pct: number; className?: string }> = ({ pct, className = 
   </div>
 );
 
-const Home: React.FC<HomeProps> = ({ onResume, addAsked, onAddHandled }) => {
+const Home: React.FC<HomeProps> = ({ onResume, onEmptyChange, addAsked, onAddHandled }) => {
   const t = useT();
   const lang = useLang();
   const [videos, setVideos] = useState<VideoRecord[] | null>(null);
+  useEffect(() => { onEmptyChange?.(videos?.length === 0); }, [videos, onEmptyChange]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [adding, setAdding] = useState<{ path: string | null; srt?: string | null } | null>(null);
