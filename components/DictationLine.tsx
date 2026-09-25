@@ -194,13 +194,17 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
     if (w) onLookup(w);
   };
 
-  // The word to look up at group gi: a curly-apostrophe contraction (don’t) splits into
-  // two words here (no space between), so either half looks up the whole; a closing ’ before a space does not join.
+  // The word to look up at group gi: a hyphenated word (well-being) or a curly-apostrophe
+  // contraction (don’t) splits into several words here; clicking any part looks up the
+  // whole, as before. Only parts with nothing between them join (a closing ’ before a
+  // space does not).
+  const joins = (g?: typeof groups[number], h?: typeof groups[number]) =>
+    !!g?.word && !!h?.word && (g.punct === '-' || g.punct === '\u2019') && h.word.index === g.word.index + 2;
   const wordAt = (gi: number) => {
-    const g = groups[gi], prev = groups[gi - 1], next = groups[gi + 1];
-    if (g.punct === '\u2019' && next?.word && next.word.index === g.word!.index + 2) return `${g.word!.value}\u2019${next.word.value}`;
-    if (prev?.word && prev.punct === '\u2019' && g.word!.index === prev.word.index + 2) return `${prev.word.value}\u2019${g.word!.value}`;
-    return g.word!.value;
+    let from = gi, to = gi;
+    while (joins(groups[from - 1], groups[from])) from--;
+    while (joins(groups[to], groups[to + 1])) to++;
+    return groups.slice(from, to + 1).map((g, k, all) => g.word!.value + (k < all.length - 1 ? g.punct : '')).join('');
   };
 
   if (mode === PracticeMode.FEEDBACK) {
