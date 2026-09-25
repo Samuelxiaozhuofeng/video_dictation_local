@@ -194,3 +194,19 @@
 - [x] 浏览器实测（真 Anki）
 - [x] codex-review（修：Anki 里已有且改过字段名的 LinguaClip 卡，一键创建后提示手动补「句子」「音频」）
 - [x] npm run release
+
+# 定制练习：按时间 + 水平挑句子（2026-09-25 用户拍板）
+
+每次「开始练习」先弹面板：按段从头练 / 定制（时长、A1–C2、其余句子照常播放 or 跳过）；定制接着上次往后挑，挑够时长为止。AI 给每句打一次等级存 levels.json，挑句在本机。
+
+- [x] 产品门 pm + 用户拍板（做成可选、每次弹面板、接着上次往后挑）
+- [x] 设计门 reviewer（levels.json / 删除级联 / custom_pos / 不碰首页进度）
+- [x] utils/customPick.ts 纯函数（挑句、本机杂句规则、时长估算）+ test-custom.mjs
+- [x] utils/levelPrep.ts：AI 分级后台任务 + 缓存 + cancel；cache.rs / desktop.ts 加 levels；删视频级联
+- [x] 开始练习面板（App handleResume 前弹）+ practice_config.custom
+- [x] 练习页：定制会话（跳过 / 照常播放只看句）、句数、完成弹窗、custom_pos
+- [x] 中英文案；docs 更新
+- [x] tsc + test-*.mjs + cargo test
+- [x] 浏览器实测（真 AI 分级一个视频 + 两种其余句子 + 听写 / 遮字）
+- [x] codex-review 三路 + 错题本（修：面板回车 / 失败状态 / 等分级卡住 / 下一组沿用只按时间挑、播放方式 / 一句组连播卡死 / 快速连点串台）
+- [x] npm run release + 验收路径

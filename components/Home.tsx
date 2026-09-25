@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, MoreHorizontal, Loader2, LayoutGrid, List } from 'lucide-react';
 import { LearningMode, VideoRecord } from '../types';
 import * as VideoStorage from '../utils/videoStorage';
-import { getPracticeConfig } from '../utils/storage';
+import { forgetCustomPos, getPracticeConfig } from '../utils/storage';
 import { parseSRT } from '../utils/srtParser';
 import { buildSections } from '../utils/sections';
 import { fileNameFromPath, listenDragDrop, trashFile, relatedFilePaths, cacheFilePaths } from '../utils/desktop';
@@ -14,6 +14,7 @@ import { useT, useLang } from '../utils/i18n';
 import AddVideo from './AddVideo';
 import { canCloze } from '../utils/aiDrills';
 import { cancelPrep, getPrepJob, prepStatus, prepareBreakdowns, subscribePrep } from '../utils/breakdownPrep';
+import { cancelLevels } from '../utils/levelPrep';
 import { cancelCloze, clozeStatus, getClozeJob, linesOf, prepareCloze, subscribeCloze } from '../utils/clozePrep';
 import { cancelSegments, getSegJob, subscribeSeg } from '../utils/jaSegments';
 import { countForVideo, deckCounts, deleteVideoCards, getAllCards, subscribeCards } from '../utils/review';
@@ -88,13 +89,13 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
     return byId;
   }, [videos, sectionLength]);
 
-  useEffect(() => {
-    const load = () => {
-      VideoStorage.getAllVideoRecords().then(setVideos).catch(() => setVideos([]));
-    };
-    load();
-    return subscribeImportJobs(load);
+  const loadVideos = useCallback(() => {
+    VideoStorage.getAllVideoRecords().then(setVideos).catch(() => setVideos([]));
   }, []);
+  useEffect(() => {
+    loadVideos();
+    return subscribeImportJobs(loadVideos);
+  }, [loadVideos]);
 
   // The whole window takes a dropped video and/or .srt; it opens the add dialog
   // with them filled in, keeping whichever half is already there.
@@ -158,7 +159,8 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
       .catch(() => {});
   }, [videos, lang, hasAi, prepTick]);
 
-  const closeAdd = useCallback(() => setAdding(null), []);
+  // A record made in the dialog shows on the shelf even if the start panel is then cancelled.
+  const closeAdd = useCallback(() => { setAdding(null); loadVideos(); }, [loadVideos]);
 
   const handleYouTubeLogin = async () => {
     try {
@@ -194,10 +196,11 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
     );
     if (trash === null) return; // dismissed the file question: nothing is deleted
     setDeletingId(v.id);
-    await Promise.all([cancelPrep(v.id), cancelCloze(v.id), cancelSegments(v.id)]);
+    await Promise.all([cancelPrep(v.id), cancelCloze(v.id), cancelSegments(v.id), cancelLevels(v.id)]);
     try {
       await VideoStorage.deleteVideoRecord(v.id);
       setVideos(prev => (prev ? prev.filter(x => x.id !== v.id) : prev));
+      forgetCustomPos(v.id);
     } catch {
       dialog.alert(t('home.deleteFailTitle'), t('home.deleteFailBody'));
       setDeletingId(null);

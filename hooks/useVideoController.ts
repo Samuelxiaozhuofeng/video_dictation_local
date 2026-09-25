@@ -9,6 +9,8 @@ export interface UseVideoControllerParams {
   shouldAutoAdvance: boolean;
   learningMode?: LearningMode;
   blurPlaybackMode?: BlurPlaybackMode;
+  watch?: Set<number> | null;
+  jumpGaps?: boolean;
   onModeChange?: (mode: PracticeMode) => void;
   onAutoAdvance?: () => void;
   onShouldAutoAdvanceChange?: (value: boolean) => void;
@@ -44,6 +46,8 @@ export function useVideoController(params: UseVideoControllerParams): UseVideoCo
     shouldAutoAdvance,
     learningMode,
     blurPlaybackMode,
+    watch,
+    jumpGaps,
     onModeChange,
     onAutoAdvance,
     onShouldAutoAdvanceChange
@@ -76,6 +80,8 @@ export function useVideoController(params: UseVideoControllerParams): UseVideoCo
     shouldAutoAdvance,
     learningMode,
     blurPlaybackMode,
+    watch,
+    jumpGaps,
     onModeChange,
     onAutoAdvance,
     onShouldAutoAdvanceChange

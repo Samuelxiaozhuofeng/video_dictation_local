@@ -14,6 +14,7 @@ export interface PracticeContextPractice {
   learningMode: LearningMode;
   blurPlaybackMode: BlurPlaybackMode;
   videoName: string;
+  watch: Set<number> | null; // custom set: ids of lines only watched; null = section by section
 }
 
 export interface PracticeContextVideo {
@@ -40,6 +41,7 @@ export interface PracticeContextAnki {
 export interface PracticeContextActions {
   onExit: () => void;
   onRestart: () => void;
+  onNextSet: () => void;
   onSwitchSection: (index: number) => void;
   onToggleSavedList: (show: boolean) => void;
   onTogglePlay: () => void;

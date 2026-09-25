@@ -9,6 +9,10 @@ export interface UseVideoPlayerParams {
   shouldAutoAdvance: boolean;
   learningMode?: LearningMode;
   blurPlaybackMode?: BlurPlaybackMode;
+  // Custom practice: ids of lines only watched (play on, no stop, no input), and
+  // whether lines left out of the session are jumped over even while playing on.
+  watch?: Set<number> | null;
+  jumpGaps?: boolean;
   onSubtitleEnded?: () => void;
   onModeChange?: (mode: PracticeMode) => void;
   onAutoAdvance?: () => void;
@@ -40,6 +44,8 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
     shouldAutoAdvance,
     learningMode = LearningMode.DICTATION,
     blurPlaybackMode = BlurPlaybackMode.SENTENCE_BY_SENTENCE,
+    watch = null,
+    jumpGaps = false,
     onSubtitleEnded,
     onModeChange,
     onAutoAdvance,
@@ -53,12 +59,15 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
   const requestRef = useRef<number | undefined>(undefined);
   const blurAutoAdvanceRef = useRef(false);
   const userPausedRef = useRef(false); // Track if user manually paused in continuous mode
+  const flowRef = useRef(false); // the last line was only watched: play straight on into this one
 
+  // A new line list (next section, next custom set) counts as a new line even
+  // when the index stays 0, or a one-line set would never advance.
   useEffect(() => {
     blurAutoAdvanceRef.current = false;
     // Reset user pause state when subtitle changes
     userPausedRef.current = false;
-  }, [currentSubtitleIndex, learningMode, blurPlaybackMode]);
+  }, [currentSubtitleIndex, subtitles, learningMode, blurPlaybackMode]);
 
   // Checks whether the current line has ended; runs every frame and on `timeupdate`
   // (rAF is throttled in background tabs, timeupdate keeps firing).
@@ -71,12 +80,14 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
     if (!currentSub) return;
 
     const isBlurContinuous = learningMode === LearningMode.BLUR && blurPlaybackMode === BlurPlaybackMode.CONTINUOUS;
+    const watching = !!watch?.has(currentSub.id);
 
     if (isPlaying) {
       if (video.currentTime >= currentSub.endTime) {
-        if (isBlurContinuous) {
+        if (isBlurContinuous || watching) {
           if (!blurAutoAdvanceRef.current) {
             blurAutoAdvanceRef.current = true;
+            flowRef.current = watching;
             onAutoAdvance?.();
           }
         } else if (!video.paused) {
@@ -112,6 +123,7 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
     shouldAutoAdvance,
     learningMode,
     blurPlaybackMode,
+    watch,
     onModeChange,
     onAutoAdvance,
     onShouldAutoAdvanceChange,
@@ -148,10 +160,13 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
     if (!video || !currentSub || mode !== PracticeMode.LISTENING) return;
     const isBlurContinuous = learningMode === LearningMode.BLUR && blurPlaybackMode === BlurPlaybackMode.CONTINUOUS;
     const playing = isPlayingRef.current;
+    const flowing = flowRef.current;
+    flowRef.current = false;
 
     const tolerance = 0.5;
-    const shouldForceSeek = !(isBlurContinuous && playing);
-    if (shouldForceSeek && (video.currentTime < currentSub.startTime - tolerance || video.currentTime > currentSub.endTime)) {
+    const early = video.currentTime < currentSub.startTime - tolerance;
+    const shouldForceSeek = !((isBlurContinuous || flowing) && playing) || (jumpGaps && early);
+    if (shouldForceSeek && (early || video.currentTime > currentSub.endTime)) {
       video.currentTime = currentSub.startTime;
     }
 
@@ -160,7 +175,7 @@ export function useVideoPlayer(params: UseVideoPlayerParams): UseVideoPlayerRetu
     if (isBlurContinuous && userPausedRef.current) return;
     setIsPlaying(true);
     video.play().catch(e => { console.error("Autoplay blocked", e); setIsPlaying(false); });
-  }, [currentSubtitleIndex, subtitles, mode, videoRef, learningMode, blurPlaybackMode]);
+  }, [currentSubtitleIndex, subtitles, mode, videoRef, learningMode, blurPlaybackMode, jumpGaps]);
 
   // fromRatio: where in the line to start, 0 = its start. Used by "play from this
   // word", which only knows how far into the line's letters the word sits; start

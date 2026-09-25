@@ -30,12 +30,16 @@ import ReviewSession from './ReviewSession';
 const Studio: React.FC = () => {
   const t = useT();
   const { practice, video, saved, anki, actions } = usePracticeContext();
-  const { videoId, subtitles, fullSubtitles, sections, currentSectionIndex, currentSubtitleIndex, mode, showSectionComplete, showComplete, learningMode, blurPlaybackMode, videoName } = practice;
+  const { videoId, subtitles, fullSubtitles, sections, currentSectionIndex, currentSubtitleIndex, mode, showSectionComplete, showComplete, learningMode, blurPlaybackMode, videoName, watch } = practice;
   const { videoRef, videoSrc, isPlaying } = video;
   const { savedIds, showSavedList } = saved;
   const { ankiStatus } = anki;
 
   const currentSub = subtitles[currentSubtitleIndex];
+  // Custom set: watch-only lines play past untouched, and only practised lines are counted.
+  const watching = !!(watch && currentSub && watch.has(currentSub.id));
+  const practisedN = watch ? subtitles.filter(s => !watch.has(s.id)).length : subtitles.length;
+  const lineNo = watch ? Math.max(1, subtitles.slice(0, currentSubtitleIndex + 1).filter(s => !watch.has(s.id)).length) : currentSubtitleIndex + 1;
   const isBlur = learningMode === LearningMode.BLUR;
   const isStep = blurPlaybackMode === BlurPlaybackMode.SENTENCE_BY_SENTENCE;
   const hasClozeAi = canCloze();
@@ -294,7 +298,7 @@ const Studio: React.FC = () => {
           )}
         </div>
 
-        <section style={{ '--share': 100 - videoShare } as React.CSSProperties} className="min-w-0 lg:[flex:var(--share)_1_0] flex flex-col gap-5 lg:max-h-[calc(100vh-190px)] lg:overflow-y-auto" aria-label={t('studio.lineCount', { current: currentSubtitleIndex + 1, total: subtitles.length })}>
+        <section style={{ '--share': 100 - videoShare } as React.CSSProperties} className="min-w-0 lg:[flex:var(--share)_1_0] flex flex-col gap-5 lg:max-h-[calc(100vh-190px)] lg:overflow-y-auto" aria-label={t('studio.lineCount', { current: lineNo, total: practisedN })}>
           {isJa && <JaBanner />}
           {past.map((i, k) => (
             <p key={subtitles[i].id} className={`font-serif text-xl leading-[28px] ${k === past.length - 1 ? 'opacity-40' : 'opacity-20'}`}>{subtitles[i].text}</p>
@@ -304,6 +308,11 @@ const Studio: React.FC = () => {
             <div className="min-w-0">
               {!currentSub ? (
                 <span className="font-serif italic text-mute text-xl">{t('studio.endOfPart')}</span>
+              ) : watching ? (
+                <div className="flex flex-col items-start gap-3">
+                  <p className="font-serif text-xl leading-[28px] text-ink/60">{currentSub.text}</p>
+                  <span className="text-xs text-mute">{t('studio.watchOnly')}</span>
+                </div>
               ) : isBlur ? (
                 <div className="flex flex-col items-start gap-5">
                   <BlurLine text={currentSub.text} onLookup={lookup} onReveal={() => record('blur')} />
@@ -369,7 +378,17 @@ const Studio: React.FC = () => {
         </Overlay>
       )}
 
-      {showComplete && (
+      {showComplete && watch && (
+        <Overlay title={t('studio.customFinTitle')} body={t('studio.customFinBody')} stats={[
+          [String(practisedN), t('studio.statLines')],
+        ]}>
+          {retryBtn}
+          <Btn onClick={actions.onExit}>{t('studio.backToVideosBtn')}</Btn>
+          <Btn tone="accent" onClick={() => { setStuck(new Set()); actions.onNextSet(); }} autoFocus>{t('studio.nextSet')} <ArrowRight size={16} /></Btn>
+        </Overlay>
+      )}
+
+      {showComplete && !watch && (
         <Overlay title={t('studio.finTitle')} body={t('studio.finBody', { name: videoName })} stats={[
           [String(fullSubtitles.length), t('studio.statLines')],
           [String(savedIds.size), t('studio.statSaved')],
@@ -386,7 +405,7 @@ const Studio: React.FC = () => {
         </div>
       )}
 
-      <Transport lineLabel={t('studio.lineCount', { current: currentSubtitleIndex + 1, total: subtitles.length })} menuItems={menuItems} menuPanel={menuPanel} />
+      <Transport lineLabel={t('studio.lineCount', { current: lineNo, total: practisedN })} menuItems={menuItems} menuPanel={menuPanel} />
 
       {showSavedList && <SavedDrawer />}
       {defOpen && (

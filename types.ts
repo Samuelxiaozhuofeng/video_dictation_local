@@ -56,6 +56,7 @@ export interface PracticeConfig {
   clozeLevel?: ClozeLevel; // Dictation blank density; default 'full'
   autoAddReview?: boolean; // stuck lines go into the sentence deck on their own; default false
   videoShare?: number; // % of the practice page's width given to the video; default 60
+  custom?: import('./utils/customPick').CustomConfig; // the start-of-practice panel's last choice
 }
 
 export interface VideoSection {

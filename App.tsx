@@ -6,6 +6,7 @@ import Settings from './components/Settings';
 import Home from './components/Home';
 import Shell from './components/Shell';
 import Studio from './components/Studio';
+import CustomPanel, { PanelChoice, nextPick, paceOf } from './components/CustomPanel';
 import { DialogHost, dialog } from './components/Dialog';
 import { PracticeProvider } from './hooks/usePracticeContext';
 import { useVideoHistory } from './hooks/useVideoHistory';
@@ -17,11 +18,14 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { usePracticeActions } from './hooks/usePracticeActions';
 import * as VideoStorage from './utils/videoStorage';
 import { fileNameFromPath, pathExists, pickVideoPath, videoSrcFromPath } from './utils/desktop';
+import { parseSRT } from './utils/srtParser';
 import { t, useLang } from './utils/i18n';
 import { markInterruptedJobs, startImportListener } from './utils/importJob';
 import { matches } from './utils/shortcuts';
 import { countLine } from './utils/today';
 import { deleteCards, keepOrphans, orphanCards } from './utils/review';
+import { CustomConfig, CustomPick } from './utils/customPick';
+import { setCustomPos } from './utils/storage';
 
 let orphansAsked = false; // StrictMode runs effects twice in dev
 async function askAboutOrphans() {
@@ -74,6 +78,16 @@ export default function App() {
   const [learningMode, setLearningMode] = useState<LearningMode>(LearningMode.DICTATION);
   const [blurPlaybackMode, setBlurPlaybackModeState] = useState<BlurPlaybackMode>(BlurPlaybackMode.SENTENCE_BY_SENTENCE);
   const [showComplete, setShowComplete] = useState(false);
+  // The start-of-practice panel, and the custom set being practised (null = section by section).
+  const [panel, setPanel] = useState<{ record: VideoRecord; lm: LearningMode } | null>(null);
+  type CustomSession = { record: VideoRecord; lm: LearningMode; cfg: CustomConfig; watch: Set<number>; end: number };
+  const [custom, setCustom] = useState<CustomSession | null>(null);
+  const customRef = useRef<CustomSession | null>(null);
+  // Every write of the record's section progress goes through here, so a custom
+  // set can never move the shelf's "part 3 of 12" or where "continue" lands.
+  const saveProgress = useCallback((id: string, subIndex: number, sectionIndex: number, done?: number) => {
+    if (!customRef.current) VideoStorage.updateProgress(id, subIndex, sectionIndex, done);
+  }, []);
 
   const {
     currentVideoId, setCurrentVideoId, createVideoRecord,
@@ -95,8 +109,10 @@ export default function App() {
 
   const finishPractice = useCallback(() => {
     setShowComplete(true);
-    if (currentVideoId) VideoStorage.updateProgress(currentVideoId, fullSubtitles.length, currentSectionIndex);
-  }, [currentVideoId, fullSubtitles.length, currentSectionIndex]);
+    const c = customRef.current;
+    if (c) setCustomPos(c.record.id, c.end);
+    else if (currentVideoId) saveProgress(currentVideoId, fullSubtitles.length, currentSectionIndex);
+  }, [currentVideoId, fullSubtitles.length, currentSectionIndex, saveProgress]);
 
   const {
     videoRef, videoSrc, setVideoSrc, isPlaying, volume, playbackSpeed, progress,
@@ -104,10 +120,13 @@ export default function App() {
     handleProgressSeek: videoPlayerHandleProgressSeek, handleReplayCurrent,
   } = useVideoController({
     subtitles, currentSubtitleIndex, mode, shouldAutoAdvance, learningMode, blurPlaybackMode,
+    watch: custom?.watch.size ? custom.watch : null,
+    jumpGaps: !!custom && custom.cfg.others === 'skip',
     onModeChange: setMode,
     onAutoAdvance: () => {
-      // Continuous blur play rolls past lines on its own; those aren't practised.
-      if (!(learningMode === LearningMode.BLUR && blurPlaybackMode === BlurPlaybackMode.CONTINUOUS)) countLine();
+      // Continuous blur play and watch-only lines roll past on their own; those aren't practised.
+      const watched = !!custom?.watch.has(subtitles[currentSubtitleIndex]?.id);
+      if (!watched && !(learningMode === LearningMode.BLUR && blurPlaybackMode === BlurPlaybackMode.CONTINUOUS)) countLine();
       if (currentSubtitleIndex < subtitles.length - 1) {
         setCurrentSubtitleIndex(prev => prev + 1);
         setMode(PracticeMode.LISTENING);
@@ -131,19 +150,24 @@ export default function App() {
     if (appState !== AppState.SETTINGS) reloadAnkiConfig();
   }, [appState, reloadAnkiConfig]);
 
-  // Progress autosave (% is measured across the whole video, not just this section)
+  // Progress autosave (% is measured across the whole video, not just this section).
+  // A custom set only remembers the line it is on, so quitting resumes there.
   useEffect(() => {
-    if (currentVideoId && appState === AppState.PRACTICE && currentSubtitleIndex > 0 && !showComplete) {
+    if (!currentVideoId || appState !== AppState.PRACTICE || showComplete) return;
+    if (customRef.current) {
+      const sub = subtitles[currentSubtitleIndex];
+      if (sub) setCustomPos(customRef.current.record.id, sub.startTime);
+    } else if (currentSubtitleIndex > 0) {
       const before = sections.slice(0, currentSectionIndex).reduce((n, s) => n + s.subtitles.length, 0);
-      VideoStorage.updateProgress(currentVideoId, currentSubtitleIndex, currentSectionIndex, before + currentSubtitleIndex);
+      saveProgress(currentVideoId, currentSubtitleIndex, currentSectionIndex, before + currentSubtitleIndex);
     }
-  }, [currentSubtitleIndex, currentSectionIndex, currentVideoId, appState, showComplete, sections]);
+  }, [currentSubtitleIndex, currentSectionIndex, currentVideoId, appState, showComplete, sections, subtitles, saveProgress]);
 
   // --- Starting a session ---
 
   const startPractice = async (
     videoName: string, videoPath: string, sf: File, lm: LearningMode, bpm: BlurPlaybackMode,
-    startIndex?: number, startSectionIndex?: number, videoId?: string,
+    startIndex?: number, startSectionIndex?: number, videoId?: string, pick?: number[], stale?: () => boolean,
   ) => {
     let subText: string;
     try {
@@ -152,7 +176,8 @@ export default function App() {
       dialog.alert(t('app.subtitleReadFailTitle'), t('app.subtitleReadFailBody'));
       return;
     }
-    const result = initializePractice(subText, startIndex, startSectionIndex);
+    if (stale?.()) return;
+    const result = initializePractice(subText, startIndex, startSectionIndex, pick);
     if (!result) {
       dialog.alert(t('app.noSubtitlesTitle'), t('app.noSubtitlesBody', { name: sf.name }));
       return;
@@ -179,8 +204,17 @@ export default function App() {
     setAppState(AppState.PRACTICE);
   };
 
-  const handleResume = async (record: VideoRecord, lm: LearningMode) => {
-    if (record.importJob) return;
+  // Every way into practice lands here: ask how to practise first.
+  const handleResume = (record: VideoRecord, lm: LearningMode) => {
+    if (!record.importJob) setPanel({ record, lm });
+  };
+
+  // Only the latest start wins: two starts in quick succession must not mix one
+  // video's lines with the other's custom session.
+  const launchRef = useRef(0);
+  const openPractice = async (record: VideoRecord, lm: LearningMode, choice: PanelChoice) => {
+    const launch = ++launchRef.current;
+    const stale = () => launchRef.current !== launch;
     try {
       let videoPath = record.videoPath;
       if (!videoPath || !(await pathExists(videoPath))) {
@@ -193,11 +227,30 @@ export default function App() {
       }
 
       if (record.learningMode !== lm) await VideoStorage.patchVideoRecord(record.id, { learningMode: lm });
+      if (stale()) return;
+      const bpm = record.blurPlaybackMode ?? BlurPlaybackMode.SENTENCE_BY_SENTENCE;
+      if (choice.kind === 'custom') {
+        const { lines, practise } = choice.pick;
+        const keep = new Set(practise);
+        const subs = parseSRT(record.subtitleText);
+        const session: CustomSession = {
+          record: { ...record, videoPath }, lm, cfg: choice.cfg,
+          watch: new Set(lines.filter(i => !keep.has(i)).map(i => subs[i].id)),
+          end: subs[lines[lines.length - 1]].endTime,
+        };
+        customRef.current = session;
+        setCustom(session);
+        // The shelf's "last practised" moves; its section progress does not.
+        VideoStorage.patchVideoRecord(record.id, { lastPracticed: Date.now() }).catch(console.error);
+        await startPractice(record.videoFileName, videoPath, getSubtitleFileFromRecord(record), lm, bpm, 0, 0, record.id, lines, stale);
+        return;
+      }
+      customRef.current = null;
+      setCustom(null);
       const finished = record.completionRate >= 100;
       await startPractice(
-        record.videoFileName, videoPath, getSubtitleFileFromRecord(record), lm,
-        record.blurPlaybackMode ?? BlurPlaybackMode.SENTENCE_BY_SENTENCE,
-        finished ? 0 : record.currentSubtitleIndex, finished ? 0 : record.currentSectionIndex, record.id,
+        record.videoFileName, videoPath, getSubtitleFileFromRecord(record), lm, bpm,
+        finished ? 0 : record.currentSubtitleIndex, finished ? 0 : record.currentSectionIndex, record.id, undefined, stale,
       );
     } catch (error) {
       console.error('Failed to continue from library:', error);
@@ -236,7 +289,18 @@ export default function App() {
     else togglePlay();
   }, [togglePlay, isPlaying]);
 
-  const exitPractice = () => { setShowComplete(false); setAppState(AppState.UPLOAD); };
+  const exitPractice = () => { setShowComplete(false); setAppState(AppState.UPLOAD); customRef.current = null; setCustom(null); };
+
+  // "Next set" on the custom done overlay: same choices, from where this set ended.
+  const nextSet = async () => {
+    const c = customRef.current;
+    if (!c) return;
+    const pick = await nextPick(c.record, c.cfg, paceOf(c.lm, blurPlaybackMode));
+    if (customRef.current !== c) return; // left the page meanwhile
+    // The playback style may have changed mid-set (the record snapshot predates it).
+    if (pick) openPractice({ ...c.record, blurPlaybackMode }, c.lm, { kind: 'custom', cfg: c.cfg, pick });
+    else exitPractice();
+  };
 
   // "That's enough for today" from the section-done overlay. The autosave has
   // us parked on the last line of the finished section, so resuming there would
@@ -246,7 +310,7 @@ export default function App() {
     const next = Math.min(currentSectionIndex + 1, sections.length - 1);
     if (currentVideoId) {
       const done = sections.slice(0, next).reduce((n, s) => n + s.subtitles.length, 0);
-      VideoStorage.updateProgress(currentVideoId, 0, next, done);
+      saveProgress(currentVideoId, 0, next, done);
     }
     setShowSectionComplete(false);
     exitPractice();
@@ -254,7 +318,7 @@ export default function App() {
   const restartPractice = () => {
     setShowComplete(false);
     switchSection(0, videoRef, setIsPlaying);
-    if (currentVideoId) VideoStorage.updateProgress(currentVideoId, 0, 0);
+    if (currentVideoId) saveProgress(currentVideoId, 0, 0);
   };
 
   // --- Keyboard ---
@@ -293,6 +357,7 @@ export default function App() {
         subtitles, fullSubtitles, sections, currentSectionIndex, currentSubtitleIndex, mode,
         showSectionComplete, showComplete, learningMode, blurPlaybackMode,
         videoName: videoFileName || 'Video',
+        watch: custom ? custom.watch : null,
       }}
       video={{ videoRef, videoSrc, isPlaying, volume, playbackSpeed, progress }}
       saved={{ savedIds, showSavedList, savedItems, isCurrentSaved: savedLinesIsCurrentSaved(currentSub) }}
@@ -300,6 +365,7 @@ export default function App() {
       actions={{
         onExit: exitPractice,
         onRestart: restartPractice,
+        onNextSet: nextSet,
         onSwitchSection: (index: number) => switchSection(index, videoRef, setIsPlaying),
         onToggleSavedList: setShowSavedList,
         onTogglePlay: togglePlayOrStep,
@@ -329,6 +395,14 @@ export default function App() {
   return (
     <>
       {page}
+      {panel && (
+        <CustomPanel
+          record={panel.record}
+          pace={paceOf(panel.lm, panel.record.blurPlaybackMode)}
+          onCancel={() => setPanel(null)}
+          onStart={choice => { setPanel(null); openPractice(panel.record, panel.lm, choice); }}
+        />
+      )}
       <DialogHost />
     </>
   );

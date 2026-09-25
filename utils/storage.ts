@@ -1,4 +1,5 @@
 import { Subtitle, PracticeConfig, AudioPaddingConfig, ClozeLevel } from '../types';
+import { CustomConfig, parseCustomConfig } from './customPick';
 
 const STORAGE_KEY_PRACTICE = 'linguaclip_practice_config';
 const STORAGE_KEY_AUDIO_PADDING = 'linguaclip_audio_padding';
@@ -55,3 +56,39 @@ export const getAudioPaddingConfig = (): AudioPaddingConfig => {
 export const saveAudioPaddingConfig = (config: AudioPaddingConfig) => {
   localStorage.setItem(STORAGE_KEY_AUDIO_PADDING, JSON.stringify(config));
 };
+// --- Custom practice (utils/customPick.ts) ---
+
+export const getCustomConfig = (): CustomConfig => parseCustomConfig(getPracticeConfig().custom);
+
+export const saveCustomConfig = (custom: CustomConfig) => {
+  savePracticeConfig({ ...getPracticeConfig(), custom });
+};
+
+// Where each video's next custom session starts, in seconds. Kept apart from the
+// record's section progress, which custom practice never touches.
+const STORAGE_KEY_CUSTOM_POS = 'linguaclip_custom_pos';
+
+const readCustomPos = (): Record<string, number> => {
+  try {
+    const v = JSON.parse(localStorage.getItem(STORAGE_KEY_CUSTOM_POS) || '{}');
+    return v && typeof v === 'object' ? v : {};
+  } catch {
+    return {};
+  }
+};
+
+export const getCustomPos = (videoId: string): number => {
+  const n = readCustomPos()[videoId];
+  return typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : 0;
+};
+
+const writeCustomPos = (edit: (all: Record<string, number>) => void) => {
+  try {
+    const all = readCustomPos();
+    edit(all);
+    localStorage.setItem(STORAGE_KEY_CUSTOM_POS, JSON.stringify(all));
+  } catch { /* only costs where the next session starts */ }
+};
+
+export const setCustomPos = (videoId: string, sec: number) => writeCustomPos(all => { all[videoId] = sec; });
+export const forgetCustomPos = (videoId: string) => writeCustomPos(all => { delete all[videoId]; });
