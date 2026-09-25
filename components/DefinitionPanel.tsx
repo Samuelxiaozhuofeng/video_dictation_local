@@ -5,8 +5,8 @@ import { DictEntry, Seg, Sense, senseToAnki } from '../utils/dictionary';
 import { Btn, Card, Stamp } from './ui';
 import { useT } from '../utils/i18n';
 
-// Single word-definition surface for both learning modes: a centred popup over the
-// practice page, closed by Esc, the X or a click outside. A dictionary entry is
+// Single word-definition surface for both learning modes: a card floating top-right
+// over the video, closed by Esc, the X or a click outside. A dictionary entry is
 // listed meaning by meaning; each has its own "+" that sends just that meaning
 // (and its first two examples) to Anki as an audio card. The AI can point at the
 // meaning this sentence uses (pick); an AI-only answer (data) gets one "+".
@@ -35,7 +35,7 @@ const SegText: React.FC<{ line: Seg[] }> = ({ line }) => (
   <>
     {line.map((p, k) => (typeof p === 'string'
       ? <React.Fragment key={k}>{p}</React.Fragment>
-      : <img key={k} src={p.img} alt="" className="inline h-[1em] align-[-0.12em] invert mix-blend-screen" />))}
+      : <img key={k} src={p.img} alt="" className="inline h-[1em] align-[-0.12em] mix-blend-multiply" />))}
   </>
 );
 
@@ -138,14 +138,11 @@ const DefinitionPanel: React.FC<{
   const pickIndex = def.pick?.index ?? null;
 
   return (
-  <div className="fixed inset-0 z-40 bg-black/50 flex items-center justify-center p-4 fade-in" onMouseDown={onClose}>
-  <Card className="w-full max-w-md max-h-[80vh] shadow-lift flex flex-col" role="dialog" aria-label={t('definition.ariaLabel')} onMouseDown={e => e.stopPropagation()}>
-    <div className="h-14 px-5 flex items-center justify-between border-b border-line">
-      <span className="font-serif text-lg">{t('definition.heading')}</span>
-      <Btn square size="sm" flat onClick={onClose} title={t('common.close')}><X size={16} /></Btn>
-    </div>
+  <div className="fixed inset-0 z-40 fade-in" onMouseDown={onClose}>
+  <Card className="absolute right-4 lg:right-24 top-16 w-[min(400px,calc(100vw-2rem))] max-h-[calc(100vh-140px)] !rounded-[18px] shadow-lift flex flex-col" role="dialog" aria-label={t('definition.ariaLabel')} onMouseDown={e => e.stopPropagation()}>
+    <Btn square size="sm" flat onClick={onClose} title={t('common.close')} className="!absolute right-3 top-3 z-10"><X size={16} /></Btn>
 
-    <div className="flex-1 overflow-y-auto p-5">
+    <div className="flex-1 overflow-y-auto p-6 pr-12">
       {def.loading ? (
         <div className="flex items-center gap-3 text-sm text-mute"><Loader2 size={18} className="animate-spin" /> {t('definition.asking')}</div>
       ) : def.dict ? (
@@ -168,7 +165,7 @@ const DefinitionPanel: React.FC<{
               <div className="flex items-baseline gap-3 flex-wrap">
                 <h4 className="font-serif text-3xl leading-none break-words">{e.word}</h4>
                 {e.phonetic && <span className="text-sm text-mute font-mono">{e.phonetic}</span>}
-                {ei === 0 && <Stamp tone="shade" className="ml-auto">{t(`dict.${e.source}`)}</Stamp>}
+                {ei === 0 && <Stamp tone="shade">{t(`dict.${e.source}`)}</Stamp>}
               </div>
               <ul className="space-y-1">
                 {e.senses.map((s, si) => {

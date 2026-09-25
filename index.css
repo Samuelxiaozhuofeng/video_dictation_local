@@ -2,32 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
-/* LinguaClip — "night reading": deep ink-teal ground, cream type, one warm accent.
+/* LinguaClip — "cinema": light ground, white sheets, near-black type, one vermilion accent.
    Tailwind utilities come from the local build; this file holds what utilities can't:
    tokens, form-control skins, a few marks. Values mirror tailwind.config.js. */
 :root {
-  --paper: #12262B;
-  --page: #172E34;
-  --shade: #1B3237;
-  --line: #26414A;
-  --faint: #3E5A60;
-  --mute: #7F8F8E;
-  --ink: #EFE8DA;
-  --accent: #F2C94C;
-  color-scheme: dark;
+  --paper: #FAFAFA;
+  --page: #FFFFFF;
+  --shade: #F4F4F3;
+  --line: #E7E5E4;
+  --faint: #D6D3D1;
+  --mute: #78716C;
+  --ink: #1C1917;
+  --accent: #E8492B;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
 html, body { background: var(--paper); color: var(--ink); font-variant-numeric: tabular-nums; }
-::selection { background: rgba(242,201,76,.3); color: var(--ink); }
+::selection { background: rgba(232,73,43,.18); color: var(--ink); }
 
 /* A raised surface: dialogs, drawers, menus. No card-in-card: rows inside use hairlines. */
-.card { background: var(--page); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.35); }
-.flat { background-color: var(--shade); border: 1px solid var(--line); border-radius: 8px; }
+.card { background: var(--page); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 40px rgba(0,0,0,.12); }
+.flat { background-color: var(--page); border: 1px solid var(--line); border-radius: 10px; }
 
 /* Pressable: a touch lighter on hover. */
 .press { transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease; }
-.press:hover:not(:disabled) { filter: brightness(1.08); }
+.press:hover:not(:disabled) { filter: brightness(.96); }
 .press:disabled { opacity: 0.4; cursor: not-allowed; }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -36,9 +36,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 /* Word marks: a thin underline instead of highlighter bands. */
 .mark-accent { color: var(--accent); }
 .mark-ink { color: var(--mute); text-decoration: line-through; text-decoration-thickness: 1.5px; }
-.mark-yellow { background: rgba(242,201,76,.18); border-radius: 4px; }
+.mark-yellow { background: rgba(232,73,43,.10); border-radius: 4px; }
 
-/* Range sliders: hairline track, small cream thumb. */
+/* Range sliders: hairline track, small ink thumb. */
 input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 28px; background: transparent; cursor: pointer; }
 input[type="range"]::-webkit-slider-runnable-track { height: 2px; background: var(--line); }
 input[type="range"]::-moz-range-track { height: 2px; background: var(--line); }
@@ -48,7 +48,7 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius
 /* Native select, redrawn: same hairline chevron as the icons. */
 select {
   border-radius: 8px; -webkit-appearance: none; appearance: none; padding-right: 2rem;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237F8F8E' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 0.6rem center;
 }
 select option { background: var(--page); color: var(--ink); }

@@ -57,10 +57,10 @@ export const DialogHost: React.FC = () => {
   if (!p) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 fade-in" onClick={dismiss}>
+    <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-4 fade-in" onClick={dismiss}>
       <Card className="w-full max-w-md shadow-lift" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
         <div className="px-6 pt-6 pb-2">
-          <h3 className="font-serif text-xl leading-tight">{p.title}</h3>
+          <h3 className="text-xl font-semibold leading-tight">{p.title}</h3>
         </div>
         {p.body && <p className="px-6 pb-5 text-sm text-mute leading-relaxed whitespace-pre-line">{p.body}</p>}
         <div className="px-6 py-4 flex justify-end gap-3 border-t border-line">

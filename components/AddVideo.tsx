@@ -172,23 +172,23 @@ const AddVideo: React.FC<Props> = ({ initialPath, initialSrt, onClose, onPractic
   };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4 fade-in" onClick={onClose}>
       <Card className="w-full max-w-lg" role="dialog" aria-modal="true" aria-label={t('add.title')} onClick={e => e.stopPropagation()}>
         <div className="px-7 pt-7 pb-6 space-y-6">
           <div>
-            <h3 className="font-serif text-[30px] leading-tight">{t('add.title')}</h3>
+            <h3 className="text-2xl font-semibold tracking-[-0.01em] leading-tight">{t('add.title')}</h3>
             <p className="mt-1 text-sm text-mute">{t('home.dropHint')}</p>
           </div>
 
           <div className="flex items-center gap-3 min-w-0">
             <Btn onClick={browse} className="shrink-0"><FileVideo size={16} /> {path ? t('add.change') : t('add.pickLocal')}</Btn>
-            <span className={`min-w-0 truncate text-sm ${path ? 'text-ink' : 'text-faint'}`}>{path ? fileNameFromPath(path) : t('add.dragHint')}</span>
+            <span className={`min-w-0 truncate text-sm ${path ? 'text-ink' : 'text-mute'}`}>{path ? fileNameFromPath(path) : t('add.dragHint')}</span>
           </div>
 
           {!trimmed && (
             <div className="flex items-center gap-3 min-w-0">
               <Btn onClick={browseSrt} className="shrink-0"><FileText size={16} /> {srt ? t('add.change') : t('add.pickSubtitle')}</Btn>
-              <span className={`min-w-0 truncate text-sm ${srt ? 'text-ink' : 'text-faint'}`}>{srt ? fileNameFromPath(srt) : t('add.subtitleHint')}</span>
+              <span className={`min-w-0 truncate text-sm ${srt ? 'text-ink' : 'text-mute'}`}>{srt ? fileNameFromPath(srt) : t('add.subtitleHint')}</span>
               {srt && <button type="button" onClick={() => setSrt(null)} className="shrink-0 text-sm text-mute hover:text-ink">{t('add.clearSubtitle')}</button>}
             </div>
           )}

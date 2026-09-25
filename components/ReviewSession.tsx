@@ -5,7 +5,9 @@ import { getVideoRecord, patchVideoRecord } from '../utils/videoStorage';
 import { getAudioPaddingConfig } from '../utils/storage';
 import { videoSrcFromPath, pathExists, pickVideoPath } from '../utils/desktop';
 import { tokenizeText, getWordTokens } from '../utils/textTokenizer';
-import { Btn, Card } from './ui';
+import { Play, RotateCcw, X } from 'lucide-react';
+import { Btn } from './ui';
+import { IS_WINDOWS } from '../utils/platform';
 import DictationLine from './DictationLine';
 import DefinitionPanel from './DefinitionPanel';
 import { useLookup } from '../hooks/useLookup';
@@ -15,8 +17,8 @@ import { countLine, usePracticeClock } from '../utils/today';
 import { hasKana, jaReady, useJaVersion } from '../utils/japanese';
 import { settleSplits } from '../utils/jaSegments';
 
-// A review round: one card at a time over the whole window, graded by how the
-// dictation went. Also opened on top of the practice page, so it owns its keys.
+// A review round: one card at a time over the whole window (clip on top, a white
+// sheet below, like the practice page), graded by how the dictation went. Also opened on top of the practice page, so it owns its keys.
 
 // The video's current path (the record's wins over the card's snapshot), or null if the file is gone.
 export const findVideo = async (c: ReviewCard): Promise<string | null> => {
@@ -236,65 +238,89 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
     return () => window.removeEventListener('keydown', onKey, true);
   }, []);
 
+  const hidden = done || path === null;
+
   return (
-    <div ref={rootRef} onKeyDown={e => e.stopPropagation()} className="fixed inset-0 z-50 bg-paper flex flex-col fade-in">
-      <header className="shrink-0 h-14 px-6 flex items-center justify-between text-sm text-mute" data-tauri-drag-region="deep">
-        <span>{!done && t('session.progress', { current: idx + 1, total: queue.length })}</span>
-        <Btn size="sm" flat onClick={onClose}>{t('session.quit')}</Btn>
-      </header>
-
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 lg:px-11 pb-10">
-        <div className="max-w-3xl mx-auto flex flex-col gap-8">
-          <div className={done || path === null ? 'hidden' : ''}>
-            {clip.video('block w-full h-auto max-h-[45vh] object-contain')}
-          </div>
-
-          {done ? (
-            <Card className="w-full max-w-md mx-auto mt-16 fade-in">
-              <div className="px-7 pt-7 pb-5 space-y-3">
-                <h2 className="font-serif text-[30px] leading-tight">{t('session.doneTitle')}</h2>
-                <p className="text-sm text-mute leading-relaxed">{t('session.doneBody', { n: queue.length })}</p>
-              </div>
-              <div className="px-7 py-4 border-t border-line flex justify-end gap-2">
-                {!!more?.length && <Btn onClick={again}>{t('session.doneMore', { n: more.length })}</Btn>}
-                <Btn tone="accent" onClick={onClose} autoFocus>{t('session.back')}</Btn>
-              </div>
-            </Card>
-          ) : path === null ? (
-            <div className="mt-16 max-w-md mx-auto space-y-3">
-              <h2 className="font-serif text-[30px] leading-tight">{t('session.missingTitle')}</h2>
-              <p className="text-sm text-mute leading-relaxed">{t('session.missingBody', { name: card!.videoName })}</p>
-              <div className="pt-3 flex gap-2">
-                <Btn tone="accent" onClick={() => { relink().catch(console.error); }}>{t('session.relink')}</Btn>
-                <Btn onClick={next}>{t('session.skip')}</Btn>
-              </div>
-            </div>
-          ) : path && card && splitsReady ? (
-            <div className="flex flex-col gap-8">
-              <DictationLine
-                key={`${round}-${card.id}`}
-                targetText={card.text}
-                mode={mode}
-                blanks={blanks}
-                splitVersion={splitVersion}
-                nextLabel={isWord ? t('session.next') : undefined}
-                onComplete={complete}
-                onReplay={replay}
-                onLookup={lookup}
-                onResult={result}
-              />
-              {isWord && mode === PracticeMode.FEEDBACK && (
-                <section className="border-t border-line pt-5 space-y-3 fade-in">
-                  <h3 className="text-xs text-mute">{t('session.meaning')}</h3>
-                  <p className="font-serif text-2xl">{card.word}</p>
-                  <Html html={card.definition} className="text-[15px] leading-relaxed text-ink/90" />
-                  <Html html={card.example} className="text-[15px] leading-relaxed text-mute" />
-                </section>
-              )}
-            </div>
-          ) : null}
-        </div>
+    <div ref={rootRef} onKeyDown={e => e.stopPropagation()} className="fixed inset-0 z-50 bg-black flex flex-col fade-in">
+      {/* Same room as practice: the clip on top, a white sheet from below. */}
+      <div className="relative min-h-0 flex items-center justify-center" style={{ flex: '60 1 0' }}>
+        {clip.video(`block w-full h-full object-contain ${hidden ? 'invisible' : ''}`)}
+        <header className={`absolute inset-x-0 top-0 h-16 ${IS_WINDOWS ? 'pl-4' : 'pl-24'} pr-4 lg:pr-24 flex items-center justify-between gap-3 text-[13px]`} data-tauri-drag-region="deep">
+          <button type="button" onClick={onClose} className="press h-9 pl-3 pr-4 rounded-full bg-page text-ink flex items-center gap-1.5 shadow-card"><X size={15} /> {t('session.quit')}</button>
+          {!done && <span className="h-9 px-4 rounded-full bg-page text-ink flex items-center tabular-nums shadow-card">{t('session.progress', { current: idx + 1, total: queue.length })}</span>}
+        </header>
       </div>
+
+      <section className="relative -mt-6 min-h-[340px] bg-page rounded-t-3xl flex flex-col" style={{ flex: '40 1 0' }}>
+        {!done && (
+          <div className="px-6 lg:px-24 pt-6">
+            {queue.length <= 60 ? (
+              <div className="flex gap-[5px]">
+                {queue.map((c, i) => <span key={c.id} className={`flex-1 h-1 rounded-full ${i < idx ? 'bg-ink' : i === idx ? 'bg-accent' : 'bg-line'}`} />)}
+              </div>
+            ) : (
+              <div className="h-1 rounded-full bg-line"><div className="h-full rounded-full bg-ink" style={{ width: `${(idx / queue.length) * 100}%` }} /></div>
+            )}
+            {card && <p className="mt-1.5 text-xs text-mute truncate">{card.videoName}</p>}
+          </div>
+        )}
+
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 lg:px-24 py-5 flex flex-col">
+          <div className="my-auto w-full max-w-4xl mx-auto flex flex-col items-center gap-6 text-center">
+            {done ? (
+              <div className="flex flex-col items-center gap-3 fade-in">
+                <h2 className="text-[34px] font-semibold tracking-[-0.02em] leading-tight">{t('session.doneTitle')}</h2>
+                <p className="text-sm text-mute leading-relaxed max-w-md">{t('session.doneBody', { n: queue.length })}</p>
+                <div className="pt-4 flex gap-2.5">
+                  {!!more?.length && <Btn onClick={again}>{t('session.doneMore', { n: more.length })}</Btn>}
+                  <Btn tone="accent" onClick={onClose} autoFocus>{t('session.back')}</Btn>
+                </div>
+              </div>
+            ) : path === null ? (
+              <div className="max-w-md flex flex-col items-center gap-3">
+                <h2 className="text-2xl font-semibold leading-tight">{t('session.missingTitle')}</h2>
+                <p className="text-sm text-mute leading-relaxed">{t('session.missingBody', { name: card!.videoName })}</p>
+                <div className="pt-3 flex gap-2">
+                  <Btn tone="accent" onClick={() => { relink().catch(console.error); }}>{t('session.relink')}</Btn>
+                  <Btn onClick={next}>{t('session.skip')}</Btn>
+                </div>
+              </div>
+            ) : path && card && splitsReady ? (
+              <>
+                <DictationLine
+                  key={`${round}-${card.id}`}
+                  targetText={card.text}
+                  mode={mode}
+                  blanks={blanks}
+                  splitVersion={splitVersion}
+                  nextLabel={isWord ? t('session.next') : undefined}
+                  onComplete={complete}
+                  onReplay={replay}
+                  onLookup={lookup}
+                  onResult={result}
+                />
+                {isWord && mode === PracticeMode.FEEDBACK && (
+                  <section className="w-full max-w-2xl px-5 py-4 rounded-2xl bg-shade text-left space-y-2 fade-in">
+                    <h3 className="text-xs text-mute">{t('session.meaning')}</h3>
+                    <p className="font-serif text-2xl">{card.word}</p>
+                    <Html html={card.definition} className="text-[15px] leading-relaxed" />
+                    <Html html={card.example} className="text-[15px] leading-relaxed text-mute" />
+                  </section>
+                )}
+              </>
+            ) : null}
+          </div>
+        </div>
+
+        {!hidden && path && (
+          <footer className="shrink-0 h-[76px] flex items-center justify-center gap-2 text-ink">
+            <Btn square flat onClick={() => playCard()} title={t('transport.replayLine')} aria-label={t('transport.replayLine')} className="!text-ink"><RotateCcw size={18} /></Btn>
+            <button type="button" onClick={e => { e.currentTarget.blur(); playCard(); }} aria-label={t('transport.playSpace')}
+              className="press w-12 h-12 rounded-full bg-accent text-white flex items-center justify-center"><Play size={19} fill="currentColor" className="ml-0.5" /></button>
+            <Btn size="sm" flat onClick={next}>{t('session.skip')}</Btn>
+          </footer>
+        )}
+      </section>
       {defOpen && <DefinitionPanel key={def.word} def={def} onClose={closeDef} onExplain={explain} onKeepWord={keepWord} />}
     </div>
   );

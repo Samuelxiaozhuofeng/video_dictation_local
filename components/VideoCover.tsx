@@ -61,7 +61,7 @@ function coverOf(path: string): Promise<string | null> {
   return hit;
 }
 
-const VideoCover: React.FC<{ path?: string; children?: React.ReactNode }> = ({ path, children }) => {
+const VideoCover: React.FC<{ path?: string; className?: string; children?: React.ReactNode }> = ({ path, className = 'aspect-video rounded-xl', children }) => {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
@@ -70,8 +70,8 @@ const VideoCover: React.FC<{ path?: string; children?: React.ReactNode }> = ({ p
     return () => { live = false; };
   }, [path]);
   return (
-    <div className="relative aspect-video rounded-lg overflow-hidden bg-shade flex items-center justify-center">
-      {src ? <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" /> : <Film size={22} className="text-faint" />}
+    <div className={`relative overflow-hidden bg-line flex items-center justify-center ${className}`}>
+      {src ? <img src={src} alt="" className="absolute inset-0 w-full h-full object-cover" /> : <Film size={22} className="text-mute" />}
       {children}
     </div>
   );

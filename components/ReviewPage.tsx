@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { ReviewCard, Deck, getAllCards, subscribeCards, deckCounts, dueQueue, hasAudio } from '../utils/review';
-import { Btn, Card, H } from './ui';
+import { Play } from 'lucide-react';
+import { Btn } from './ui';
+import CardsPage from './CardsPage';
 import ReviewSession from './ReviewSession';
 import { useT, getLang } from '../utils/i18n';
 
-// The review page: the week ahead, then the two decks (due now, start). The cards themselves live on the Cards page.
+// A library page (sentences, or words): start reviewing what is due, the week ahead, every card below.
 
 export const DAY = 86_400_000;
 export const startOfDay = (ms: number) => new Date(ms).setHours(0, 0, 0, 0);
@@ -23,59 +25,53 @@ export const useCards = () => {
   return cards;
 };
 
-const ReviewPage: React.FC = () => {
+// One library per deck: start the due ones, the week ahead, then every card (CardsPage).
+const ReviewPage: React.FC<{ deck: Deck }> = ({ deck }) => {
   const t = useT();
   const cards = useCards();
   const [session, setSession] = useState<ReviewCard[] | null>(null);
 
   const all = cards ?? [];
-  const counts = deckCounts(all);
+  const n = deckCounts(all)[deck];
   const now = Date.now();
+  const isLine = deck === 'line';
 
-  // Cards (both decks, with audio) coming up on each of the next 7 days; today includes overdue.
+  // This deck's cards (with audio) coming up on each of the next 7 days; today includes overdue.
   const week = Array.from({ length: 7 }, (_, i) => {
     const day = dayStart(now, i), end = dayStart(now, i + 1);
-    const n = all.filter(c => hasAudio(c) && (i === 0 ? c.fsrs.due < end : c.fsrs.due >= day && c.fsrs.due < end)).length;
-    return { label: i === 0 ? t('review.today') : i === 1 ? t('review.dueTomorrow') : fmt(day, { weekday: 'short' }), n };
+    const count = all.filter(c => c.deck === deck && hasAudio(c) && (i === 0 ? c.fsrs.due < end : c.fsrs.due >= day && c.fsrs.due < end)).length;
+    return { label: i === 0 ? t('review.today') : fmt(day, { weekday: 'short' }), n: count };
   });
-
-  const deckCard = (d: Deck, title: string, hint: string) => {
-    const n = counts[d];
-    return (
-      <Card flat className="p-5 flex flex-col gap-3">
-        <div>
-          <h3 className="font-serif text-2xl">{title}</h3>
-          <p className="mt-1 text-sm text-mute">{hint}</p>
-        </div>
-        <div className="flex items-baseline gap-3">
-          <span className={`font-serif text-[30px] leading-none ${n.due ? 'text-accent' : 'text-mute'}`}>{t('review.due', { n: n.due })}</span>
-          <span className="text-xs text-mute">{t('review.total', { n: n.total })}</span>
-        </div>
-        <Btn tone="accent" className="self-start" disabled={n.due === 0} onClick={() => setSession(dueQueue(all, d))}>
-          {n.due === 0 ? t('review.nothingDue') : t('review.start')}
-        </Btn>
-      </Card>
-    );
-  };
+  const peak = Math.max(1, ...week.map(d => d.n));
 
   return (
     <div>
-      <H>{t('review.title')}</H>
-      <div className="mb-6">
-        <h3 className="text-xs text-mute mb-2">{t('review.week')}</h3>
-        <div className="grid grid-cols-7 gap-2">
-          {week.map((d, i) => (
-            <div key={i} className="rounded-lg bg-shade/40 py-2 text-center">
-              <div className="text-xs text-mute">{d.label}</div>
-              <div className={`font-serif text-xl leading-tight ${d.n ? 'text-accent' : 'text-mute'}`}>{d.n}</div>
-            </div>
-          ))}
+      <section className="pt-4 pb-7 border-b border-line grid grid-cols-1 md:grid-cols-[1fr_300px] gap-8 md:gap-12 items-end">
+        <div>
+          <h1 className="text-[34px] font-semibold tracking-[-0.02em] leading-tight">{isLine ? t('nav.saved') : t('nav.cards')}</h1>
+          <p className="mt-2 text-sm text-mute">{isLine ? t('review.deckLineHint') : t('review.deckWordHint')}</p>
+          <div className="mt-5 flex items-center gap-4">
+            <Btn tone="accent" size="lg" disabled={n.due === 0} onClick={() => setSession(dueQueue(all, deck))}>
+              {n.due === 0 ? t('review.nothingDue') : <><Play size={15} fill="currentColor" /> {t('review.start')} · {n.due}</>}
+            </Btn>
+            <span className="text-sm text-mute">{t('review.total', { n: n.total })}</span>
+          </div>
         </div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {deckCard('line', t('review.deckLine'), t('review.deckLineHint'))}
-        {deckCard('word', t('review.deckWord'), t('review.deckWordHint'))}
-      </div>
+        <div>
+          <h3 className="text-xs text-mute mb-2.5">{t('review.week')}</h3>
+          <div className="flex items-end gap-2.5 h-[84px]">
+            {week.map((d, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-1.5" title={String(d.n)}>
+                <span className="text-[11px] text-mute tabular-nums">{d.n || ''}</span>
+                <span className={`w-full rounded ${i === 0 && d.n ? 'bg-accent' : 'bg-faint'}`} style={{ height: Math.max(3, (d.n / peak) * 44) }} />
+                <span className="text-[11px] text-mute whitespace-nowrap">{d.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <CardsPage deck={deck} cards={cards} />
 
       {session && <ReviewSession cards={session} onClose={() => setSession(null)} />}
     </div>

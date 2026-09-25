@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { AppState, PracticeMode, VideoRecord, LearningMode, BlurPlaybackMode } from './types';
 import ReviewPage from './components/ReviewPage';
-import CardsPage from './components/CardsPage';
 import Settings from './components/Settings';
 import Home from './components/Home';
 import Shell from './components/Shell';
@@ -74,6 +73,7 @@ export default function App() {
   }, []);
 
   const [appState, setAppState] = useState<AppState>(AppState.UPLOAD);
+  const [addAsked, setAddAsked] = useState(false); // the top bar's "+": Home opens its add dialog
   const [videoFileName, setVideoFileName] = useState<string | null>(null);
   const [learningMode, setLearningMode] = useState<LearningMode>(LearningMode.DICTATION);
   const [blurPlaybackMode, setBlurPlaybackModeState] = useState<BlurPlaybackMode>(BlurPlaybackMode.SENTENCE_BY_SENTENCE);
@@ -344,11 +344,11 @@ export default function App() {
   const currentSub = subtitles[currentSubtitleIndex];
 
   const page = appState !== AppState.PRACTICE ? (
-    <Shell active={appState} onNav={setAppState}>
+    <Shell active={appState} onNav={setAppState} onAdd={() => { setAppState(AppState.UPLOAD); setAddAsked(true); }}>
       {appState === AppState.SETTINGS ? <Settings /> :
-       appState === AppState.LIBRARY ? <ReviewPage /> :
-       appState === AppState.CARDS ? <CardsPage /> :
-       <Home onResume={handleResume} onOpenReview={() => setAppState(AppState.LIBRARY)} />}
+       appState === AppState.LIBRARY ? <ReviewPage key="line" deck="line" /> :
+       appState === AppState.CARDS ? <ReviewPage key="word" deck="word" /> :
+       <Home onResume={handleResume} addAsked={addAsked} onAddHandled={() => setAddAsked(false)} />}
     </Shell>
   ) : (
     <PracticeProvider

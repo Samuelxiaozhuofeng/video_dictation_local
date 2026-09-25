@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, MoreHorizontal, Loader2, LayoutGrid, List } from 'lucide-react';
+import { Plus, MoreHorizontal, Loader2, Play } from 'lucide-react';
 import { LearningMode, VideoRecord } from '../types';
 import * as VideoStorage from '../utils/videoStorage';
 import { forgetCustomPos, getPracticeConfig } from '../utils/storage';
@@ -7,7 +7,7 @@ import { parseSRT } from '../utils/srtParser';
 import { buildSections } from '../utils/sections';
 import { fileNameFromPath, listenDragDrop, trashFile, relatedFilePaths, cacheFilePaths } from '../utils/desktop';
 import { formatImportError, isCookieError, openYouTubeLogin, retryImport, subscribeImportJobs } from '../utils/importJob';
-import { Btn, Menu, MenuItem, Seg } from './ui';
+import { Btn, Menu, MenuItem } from './ui';
 import VideoCover from './VideoCover';
 import { dialog } from './Dialog';
 import { useT, useLang } from '../utils/i18n';
@@ -20,19 +20,18 @@ import { cancelSegments, getSegJob, subscribeSeg } from '../utils/jaSegments';
 import { countForVideo, deckCounts, deleteVideoCards, getAllCards, subscribeCards } from '../utils/review';
 import { getToday } from '../utils/today';
 
-// Home does two things: pick up the video you were on, and add a new one.
-// As a list the most recent video leads and the rest are quiet rows; as cards
-// every video gets a cover frame. Everything else (mode switch, AI prep,
-// delete) waits behind hover or the "…" menu.
+// Home does two things: pick up the video you were on, and add a new one (the top
+// bar's "+", or a drop). The most recent video leads as a big frame with its play
+// strip; the rest are covers. Everything else (mode switch, AI prep, delete)
+// waits behind hover or the "…" menu.
 
 interface HomeProps {
   onResume: (record: VideoRecord, mode: LearningMode) => void | Promise<void>;
-  onOpenReview?: () => void;
+  addAsked?: boolean; // the top bar's "+" was pressed
+  onAddHandled?: () => void;
 }
 
 const VIDEO_EXT = /\.(mp4|mov|m4v)$/i;
-const VIEW_KEY = 'linguaclip_home_view';
-type View = 'list' | 'cards';
 type PrepInfo = { eligible: number; missing: number };
 const SRT_EXT = /\.srt$/i;
 
@@ -42,7 +41,7 @@ const Line: React.FC<{ pct: number; className?: string }> = ({ pct, className = 
   </div>
 );
 
-const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
+const Home: React.FC<HomeProps> = ({ onResume, addAsked, onAddHandled }) => {
   const t = useT();
   const lang = useLang();
   const [videos, setVideos] = useState<VideoRecord[] | null>(null);
@@ -56,13 +55,11 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
   const [prep, setPrep] = useState<Map<string, PrepInfo>>(new Map());
   const [cloze, setCloze] = useState<Map<string, PrepInfo>>(new Map());
   const [prepTick, setPrepTick] = useState(0);
-  const [view, setViewState] = useState<View>(() => {
-    try { return localStorage.getItem(VIEW_KEY) === 'cards' ? 'cards' : 'list'; } catch { return 'list'; }
-  });
-  const setView = (v: View) => {
-    setViewState(v);
-    try { localStorage.setItem(VIEW_KEY, v); } catch { /* per-device convenience only */ }
-  };
+  useEffect(() => {
+    if (!addAsked) return;
+    setAdding(prev => prev ?? { path: null });
+    onAddHandled?.();
+  }, [addAsked, onAddHandled]);
   const hasAi = canCloze();
 
   // Where each record sits in sections rather than in percent: "part 3 of 12"
@@ -121,19 +118,13 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
     };
   }, []);
 
-  // "3 lines · 2 words due": a quiet link to the review page, only when something is due.
-  const [reviewDue, setReviewDue] = useState<string | null>(null);
+  // How many lines stick; what is due shows on the top bar's tabs instead.
   const [remembered, setRemembered] = useState(0);
   useEffect(() => {
-    const load = () => getAllCards().then(cards => {
-      const { line, word } = deckCounts(cards);
-      const what = [line.due && t('home.reviewLine', { n: line.due }), word.due && t('home.reviewWord', { n: word.due })].filter(Boolean).join(' · ');
-      setReviewDue(what ? t('home.reviewDue', { what }) : null);
-      setRemembered(line.remembered);
-    }).catch(() => setReviewDue(null));
+    const load = () => getAllCards().then(cards => setRemembered(deckCounts(cards).line.remembered)).catch(() => {});
     load();
     return subscribeCards(load);
-  }, [lang]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const bump = () => setPrepTick(n => n + 1);
@@ -294,7 +285,7 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
 
   const more = (v: VideoRecord, size: 'sm' | 'lg' = 'sm') => (
     <Menu items={menuFor(v)} trigger={(open, toggle) => (
-      <Btn square size={size} flat onClick={toggle} title={t('home.more')} aria-label={t('home.more')} className={open ? '!bg-shade !text-ink' : ''}>
+      <Btn square size={size === 'lg' ? 'md' : size} flat onClick={toggle} title={t('home.more')} aria-label={t('home.more')} className={open ? '!bg-shade !text-ink' : ''}>
         {deletingId === v.id ? <Loader2 size={16} className="animate-spin" /> : <MoreHorizontal size={16} />}
       </Btn>
     )} />
@@ -305,10 +296,10 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
     const job = v.importJob!;
     if (!job.error) return null;
     return (
-      <p className="mt-1 text-sm text-mute">
+      <p className="mt-1 text-xs text-mute">
         {formatImportError(job.error)}
-        {isCookieError(job.error) && <><span className="mx-2 text-faint">·</span><button type="button" onClick={handleYouTubeLogin} className="text-ink hover:underline underline-offset-4">{t('home.ytLogin')}</button></>}
-        <span className="mx-2 text-faint">·</span><button type="button" onClick={() => handleRetry(v)} disabled={retryingId === v.id} className="text-ink hover:underline underline-offset-4 disabled:opacity-40">{t('home.retry')}</button>
+        {isCookieError(job.error) && <><span className="mx-2 text-mute">·</span><button type="button" onClick={handleYouTubeLogin} className="text-ink hover:underline underline-offset-4">{t('home.ytLogin')}</button></>}
+        <span className="mx-2 text-mute">·</span><button type="button" onClick={() => handleRetry(v)} disabled={retryingId === v.id} className="text-ink hover:underline underline-offset-4 disabled:opacity-40">{t('home.retry')}</button>
       </p>
     );
   };
@@ -316,15 +307,28 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
   // "Today: 12 min · 18 lines · 34 lines remembered" — each part only once it's above zero.
   const today = getToday();
   const todayWhat = [today.sec >= 60 && t('home.todayMin', { n: Math.floor(today.sec / 60) }), today.lines && t('home.reviewLine', { n: today.lines })].filter(Boolean).join(' · ');
-  const addBtn = <Btn size="sm" flat className="-mr-3" onClick={() => setAdding({ path: null })}><Plus size={15} /> {t('home.addVideo')}</Btn>;
+  const stats = [todayWhat && t('home.today', { what: todayWhat }), remembered > 0 && t('home.remembered', { n: remembered })].filter(Boolean).join(' · ');
   const lead = videos?.find(v => !v.importJob);
   const rest = (videos ?? []).filter(v => v !== lead);
 
+  // Where you are in this part: one tick per line when they fit, else a bar.
+  const ticks = (v: VideoRecord) => {
+    const pos = shelfPosition.get(v.id);
+    if (!pos || pos.lines > 32) return <Line pct={where(v).pct} className="w-[160px]" />;
+    return (
+      <span className="flex gap-[3px]">
+        {Array.from({ length: pos.lines }, (_, i) => (
+          <span key={i} className={`w-[18px] h-1 rounded-sm ${i < pos.line ? 'bg-ink' : i === pos.line ? 'bg-accent' : 'bg-line'}`} />
+        ))}
+      </span>
+    );
+  };
+
   return (
-    <div className={`${view === 'cards' ? 'max-w-5xl' : 'max-w-3xl'} mx-auto`}>
+    <div>
       {dragOver && (
         <div className="fixed inset-3 z-[70] rounded-2xl border-2 border-dashed border-accent bg-paper/90 flex items-center justify-center pointer-events-none fade-in">
-          <p className="font-serif text-3xl text-ink">{t('home.dropRelease')}</p>
+          <p className="text-3xl font-semibold text-ink">{t('home.dropRelease')}</p>
         </div>
       )}
       {adding && <AddVideo initialPath={adding.path} initialSrt={adding.srt ?? null} onClose={closeAdd} onPractice={rec => onResume(rec, LearningMode.DICTATION)} />}
@@ -333,120 +337,75 @@ const Home: React.FC<HomeProps> = ({ onResume, onOpenReview }) => {
         <div className="pt-24 flex justify-center text-mute"><Loader2 className="animate-spin" size={20} /></div>
       ) : videos.length === 0 ? (
         <div className="pt-28 flex flex-col items-center text-center">
-          <p className="font-serif text-[40px] leading-tight">{t('home.nothingHereYet')}</p>
+          <p className="text-[40px] font-semibold tracking-[-0.02em] leading-tight">{t('home.nothingHereYet')}</p>
           <p className="mt-3 text-sm text-mute max-w-sm leading-relaxed">{t('home.nothingHereHint')}</p>
           <Btn tone="accent" size="lg" className="mt-8" onClick={() => setAdding({ path: null })}><Plus size={18} /> {t('home.addVideo')}</Btn>
         </div>
       ) : (
         <>
-          <div className="pt-4 flex items-center justify-end gap-3">
-            <div className="mr-auto flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm text-mute">
-              {todayWhat && <span>{t('home.today', { what: todayWhat })}</span>}
-              {remembered > 0 && <span title={t('home.rememberedTitle')}>{t('home.remembered', { n: remembered })}</span>}
-              {reviewDue && onOpenReview && (
-                <button type="button" onClick={onOpenReview} className="hover:text-ink underline-offset-4 hover:underline">{reviewDue}</button>
-              )}
-            </div>
-            <Seg<View> size="sm" value={view} onChange={setView} options={[
-              { value: 'list', label: <List size={14} />, title: t('home.viewList') },
-              { value: 'cards', label: <LayoutGrid size={14} />, title: t('home.viewCards') },
-            ]} />
-            {addBtn}
-          </div>
-
-          {view === 'cards' ? (
-            <ul className="pt-6 pb-12 grid grid-cols-2 md:grid-cols-3 gap-x-5 gap-y-8">
-              {videos.map(v => {
-                const w = v.importJob ? null : where(v);
-                return (
-                  <li key={v.id} className="group relative min-w-0 focus-within:z-10 hover:z-10">
-                    <button type="button" disabled={!!v.importJob} onClick={() => onResume(v, lastMode(v))} className="block w-full text-left disabled:cursor-default">
-                      <VideoCover path={v.videoPath}>
-                        {v.importJob && !v.importJob.error && (
-                          <span className="absolute inset-x-0 bottom-0 px-3 py-2 text-xs text-ink bg-black/60">{jobLabel(v.importJob)}</span>
-                        )}
-                      </VideoCover>
-                      <p className={`mt-3 font-serif text-lg leading-snug line-clamp-2 break-words transition-colors ${v.importJob ? 'text-ink/70' : 'group-hover:text-white'}`}>{v.displayName}</p>
-                    </button>
-                    {v.importJob ? (
-                      jobStatus(v) ?? <Line pct={v.importJob.percent ?? 0} className="mt-2" />
-                    ) : (
-                      <>
-                        <p className="mt-1 text-sm text-mute truncate">{w!.text}{prepLine(v)}</p>
-                        <Line pct={w!.pct} className="mt-2" />
-                      </>
-                    )}
-                    <div className="absolute top-2 right-2 rounded-lg bg-page/80 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                      {more(v)}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (<>
           {lead && (() => {
             const w = where(lead);
             return (
-              <section className="pt-2 pb-12">
-                <button type="button" onClick={() => onResume(lead, lastMode(lead))} className="block text-left font-serif text-[40px] leading-[1.15] hover:text-white transition-colors break-words">
-                  {lead.displayName}
+              <section className="relative">
+                <button type="button" onClick={() => onResume(lead, lastMode(lead))} className="block w-full" aria-label={t('home.continueMode', { mode: modeName(lastMode(lead)) })}>
+                  <VideoCover path={lead.videoPath} className="h-[min(52vh,440px)] rounded-[20px]" />
                 </button>
-                <div className="mt-4 flex items-center gap-4 text-sm text-mute">
-                  <span>{w.text}{prepLine(lead)}</span>
-                  <Line pct={w.pct} className="w-[120px]" />
-                </div>
-                <div className="mt-8 flex items-center gap-2">
-                  <Btn tone="accent" size="lg" onClick={() => onResume(lead, lastMode(lead))}>
-                    {t('home.continueMode', { mode: modeName(lastMode(lead)) })}
-                  </Btn>
+                <div className="absolute left-6 right-6 bottom-6 flex items-center gap-5 p-4 pl-5 bg-page rounded-2xl shadow-card">
+                  <button type="button" onClick={() => onResume(lead, lastMode(lead))} title={t('home.continueMode', { mode: modeName(lastMode(lead)) })} aria-label={t('home.continueMode', { mode: modeName(lastMode(lead)) })}
+                    className="press shrink-0 w-[52px] h-[52px] rounded-full bg-accent text-white flex items-center justify-center">
+                    <Play size={20} fill="currentColor" className="ml-1" />
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xl font-semibold leading-snug truncate" title={lead.displayName}>{lead.displayName}</p>
+                    <div className="mt-2 flex items-center gap-3 text-[13px] text-mute min-w-0">
+                      {ticks(lead)}
+                      <span className="truncate">{w.text} · {t('home.continueMode', { mode: modeName(lastMode(lead)) })}{prepLine(lead)}</span>
+                    </div>
+                  </div>
                   {more(lead, 'lg')}
                 </div>
               </section>
             );
           })()}
 
-          <section className="border-t border-line">
-            {rest.length === 0 ? (
-              <p className="py-6 text-sm text-faint">{t('home.onlyOne')}</p>
-            ) : (
-              <ul>
-                {rest.map(v => {
-                  const w = v.importJob ? null : where(v);
-                  return (
-                    <li key={v.id} className="group relative flex items-center gap-6 py-3.5 border-t border-line first:border-t-0 focus-within:z-10 hover:z-10">
-                      <div className="min-w-0 flex-1">
-                        {v.importJob ? (
-                          <p className="font-serif text-lg leading-snug text-ink/70 truncate">{v.displayName}</p>
-                        ) : (
-                          <button type="button" onClick={() => onResume(v, lastMode(v))} className="block max-w-full text-left font-serif text-lg leading-snug hover:text-white transition-colors truncate">
-                            {v.displayName}
-                          </button>
+          <div className="mt-7 mb-3.5 flex items-baseline justify-between gap-4 text-[13px] text-mute">
+            <span className="font-medium text-ink">{lead ? t('home.others') : t('nav.videos')}</span>
+            {stats && <span title={t('home.rememberedTitle')}>{stats}</span>}
+          </div>
+          {rest.length === 0 ? (
+            <p className="py-2 text-sm text-mute">{t('home.onlyOne')}</p>
+          ) : (
+            <ul className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-7">
+              {rest.map(v => {
+                const w = v.importJob ? null : where(v);
+                return (
+                  <li key={v.id} className="group relative min-w-0 focus-within:z-10 hover:z-10">
+                    <button type="button" disabled={!!v.importJob} onClick={() => onResume(v, lastMode(v))} className="block w-full text-left disabled:cursor-default">
+                      <VideoCover path={v.videoPath}>
+                        {v.importJob && !v.importJob.error && (
+                          <span className="absolute inset-x-0 bottom-0 px-3 py-2 text-xs text-white bg-black/60">{jobLabel(v.importJob)}</span>
                         )}
-                        {v.importJob && jobStatus(v)}
-                      </div>
-                      {/* Where you are, at the right edge; on hover the "…" takes its place. */}
-                      <div className="relative shrink-0 w-[230px] h-8 flex items-center justify-end">
-                        <div className="flex items-center justify-end gap-4 text-sm text-mute group-hover:opacity-0 group-focus-within:opacity-0 transition-opacity">
-                          {v.importJob ? (
-                            !v.importJob.error && <><span>{jobLabel(v.importJob)}</span><Line pct={v.importJob.percent ?? 0} className="w-[120px] shrink-0" /></>
-                          ) : (
-                            <>
-                              <span className="truncate">{w!.text}{prepLine(v)}</span>
-                              <Line pct={w!.pct} className="w-[120px] shrink-0" />
-                            </>
-                          )}
-                        </div>
-                        <div className="absolute right-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                          {more(v)}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-          </>)}
+                        {w && (
+                          <span className="absolute left-2.5 right-2.5 bottom-2 h-[3px] rounded-full bg-white/50">
+                            <span className="block h-full rounded-full bg-accent" style={{ width: `${Math.min(100, Math.max(0, w.pct))}%` }} />
+                          </span>
+                        )}
+                      </VideoCover>
+                      <p className={`mt-2.5 text-[13px] font-medium leading-snug truncate ${v.importJob ? 'text-mute' : ''}`} title={v.displayName}>{v.displayName}</p>
+                    </button>
+                    {v.importJob ? (
+                      jobStatus(v) ?? <Line pct={v.importJob.percent ?? 0} className="mt-2" />
+                    ) : (
+                      <p className="mt-0.5 text-xs text-mute truncate">{w!.text} · {modeName(lastMode(v))}{prepLine(v)}</p>
+                    )}
+                    <div className="absolute top-2 right-2 rounded-lg bg-page opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                      {more(v)}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </>
       )}
     </div>

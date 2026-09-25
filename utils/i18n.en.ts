@@ -59,8 +59,8 @@ export const en = {
 
   // --- Shell.tsx / Studio.tsx nav labels ---
   'nav.videos': 'Videos',
-  'nav.saved': 'Review',
-  'nav.cards': 'Cards',
+  'nav.saved': 'Sentences',
+  'nav.cards': 'Words',
   'nav.settings': 'Settings',
 
   // --- Home.tsx ---
@@ -344,6 +344,7 @@ export const en = {
   'dictation.youTyped': 'You typed',
   'dictation.expected': 'Expected: {word}',
   'dictation.hearAgain': 'Hear again',
+  'dictation.score': '{right} of {total} words right · click any word to look it up',
   'dictation.nextStep': 'Next step',
 
   // --- SavedDrawer.tsx ---
@@ -369,6 +370,7 @@ export const en = {
   'home.more': 'More',
   'home.dropRelease': 'Drop to add this video',
   'home.onlyOne': 'That is your only video so far.',
+  'home.others': 'Other videos',
   'home.practiceAs': 'Practise with {mode}',
   'add.title': 'Add a video',
   'add.pickLocal': 'Choose a video on this Mac',

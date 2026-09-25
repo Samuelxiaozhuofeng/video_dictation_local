@@ -159,7 +159,7 @@ const SettingsAnki: React.FC<SettingsAnkiProps> = ({
 
       {status === 'success' && (
         <div>
-          <h3 className="font-serif text-lg mb-4">{t('settingsAnki.card')}</h3>
+          <h3 className="text-lg font-semibold mb-4">{t('settingsAnki.card')}</h3>
           <Card flat tone="shade" className="px-4 py-3 mb-4 flex flex-col md:flex-row gap-3 md:items-center">
             <p className="flex-1 text-sm">{t('settingsAnki.createHint')}</p>
             <Btn type="button" tone="accent" onClick={create} disabled={creating === 'busy'}>

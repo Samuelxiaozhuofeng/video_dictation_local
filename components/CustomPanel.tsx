@@ -121,10 +121,10 @@ const CustomPanel: React.FC<{
   }
 
   return (
-    <div className="fixed inset-0 z-[90] bg-black/60 flex items-center justify-center p-4 fade-in" onClick={onCancel}>
+    <div className="fixed inset-0 z-[90] bg-black/40 flex items-center justify-center p-4 fade-in" onClick={onCancel}>
       <Card className="w-full max-w-lg shadow-lift" role="dialog" aria-modal="true" aria-label={t('custom.title')} onClick={e => e.stopPropagation()}>
         <div className="px-6 pt-6 pb-1">
-          <h3 className="font-serif text-xl leading-tight">{t('custom.title')}</h3>
+          <h3 className="text-xl font-semibold leading-tight">{t('custom.title')}</h3>
           <p className="mt-1 text-sm text-mute truncate" title={record.displayName}>{record.displayName}</p>
         </div>
         <div className="px-6 py-4 flex flex-col gap-4">
@@ -170,7 +170,7 @@ const Row: React.FC<{ label: string; hint?: string; children: React.ReactNode }>
   <div className="flex flex-col gap-1.5">
     <span className="text-xs text-mute">{label}</span>
     <div>{children}</div>
-    {hint && <span className="text-xs text-faint leading-snug">{hint}</span>}
+    {hint && <span className="text-xs text-mute leading-snug">{hint}</span>}
   </div>
 );
 

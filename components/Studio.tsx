@@ -9,6 +9,7 @@ import DictationLine, { LINE, slotEm } from './DictationLine';
 import { JaBanner } from './JaSetup';
 import BlurLine from './BlurLine';
 import Transport from './Transport';
+import Timeline from './Timeline';
 import SavedDrawer from './SavedDrawer';
 import DefinitionPanel from './DefinitionPanel';
 import { useLookup } from '../hooks/useLookup';
@@ -25,8 +26,8 @@ import { usePracticeClock } from '../utils/today';
 import { addLine, addWord, getAllCards, hasAudio, lineCardId, Reason, ReviewCard } from '../utils/review';
 import ReviewSession from './ReviewSession';
 
-// The practice room: video on the left, a transcript column on the right (two faded
-// past lines over the line you work on), the remote (Transport) along the bottom.
+// The practice room: the video fills the top, a white sheet overlaps it from below with
+// the part's timeline, the line you work on (centred), and the remote (Transport).
 const Studio: React.FC = () => {
   const t = useT();
   const { practice, video, saved, anki, actions } = usePracticeContext();
@@ -192,7 +193,7 @@ const Studio: React.FC = () => {
     return () => window.clearTimeout(id);
   }, [bdHint]);
 
-  // Video : practice-column split, as a share of the row (the gap comes off both).
+  // Video : sheet split, as a share of the window's height.
   const [videoShare, setVideoShareState] = useState(() => Storage.getPracticeConfig().videoShare ?? 60);
   const setVideoShare = (share: number) => {
     setVideoShareState(share);
@@ -224,9 +225,6 @@ const Studio: React.FC = () => {
 
   const defOpen = def.word !== null;
   const showCenterPlay = !isPlaying && mode === PracticeMode.LISTENING && ankiStatus !== 'recording' && !showSectionComplete && !showComplete;
-
-  // The two lines just before this one, fading back like a transcript.
-  const past = [currentSubtitleIndex - 2, currentSubtitleIndex - 1].filter(i => i >= 0 && subtitles[i]);
 
   const menuItems: MenuItem[] = [
     { label: <><Bookmark size={15} /> {t('studio.savedLinesFromVideo')}{savedIds.size > 0 && <span className="ml-auto text-mute">{savedIds.size}</span>}</>, onClick: () => actions.onToggleSavedList(true) },
@@ -264,64 +262,71 @@ const Studio: React.FC = () => {
   );
   const menuPanel = <>{modeRow}{ratioRow}</>;
 
+  const timeLabel = videoRef.current && Number.isFinite(videoRef.current.duration)
+    ? `${Storage.formatTimeCode(videoRef.current.currentTime)} / ${Storage.formatTimeCode(videoRef.current.duration)}` : '';
+
   return (
-    <div className="relative h-full flex flex-col bg-paper">
-      {/* --- Top strip --- */}
-      <header className={`shrink-0 h-14 ${IS_WINDOWS ? 'pl-4' : 'pl-[80px]'} pr-4 flex items-center justify-between gap-3 text-sm text-mute`} data-tauri-drag-region="deep">
-        <div className="flex items-center gap-2 min-w-0">
-          <Btn square size="sm" flat onClick={actions.onExit} title={t('studio.backToVideos')} aria-label={t('studio.backToVideos')}><ArrowLeft size={16} /></Btn>
-          <span className="truncate min-w-0" title={videoName}>{videoName}</span>
-          {sections.length > 1 && (
-            <div className="inline-flex items-center shrink-0">
-              <span className="text-faint mx-1">/</span>
-              <Btn square size="sm" flat onClick={() => actions.onSwitchSection(currentSectionIndex - 1)} disabled={currentSectionIndex === 0} title={t('studio.previousSection')}><ChevronLeft size={15} /></Btn>
-              <span>{t('studio.part', { current: currentSectionIndex + 1, total: sections.length })}</span>
-              <Btn square size="sm" flat onClick={() => actions.onSwitchSection(currentSectionIndex + 1)} disabled={currentSectionIndex === sections.length - 1} title={t('studio.nextSection')}><ChevronRight size={15} /></Btn>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* --- Video left, transcript right: tops aligned, the pair centred in the window --- */}
-      <div className="relative flex-1 min-h-0 flex flex-col justify-center px-6 lg:px-11 pb-8">
-       <div className="min-h-0 flex flex-col lg:flex-row lg:items-start gap-8 lg:gap-12">
-        <div className="relative min-w-0 flex-1 lg:[flex:var(--share)_1_0]" style={{ '--share': videoShare } as React.CSSProperties}>
-          {videoSrc ? (
-            <video ref={videoRef} crossOrigin="anonymous" src={videoSrc} onLoadedMetadata={() => actions.onReplayCurrent()} className="block w-full h-auto max-h-[calc(100vh-190px)] object-contain object-left-top" />
-          ) : (
-            <p className="text-mute text-sm">{t('studio.noVideoLoaded')}</p>
-          )}
-          {showCenterPlay && (
-            <button onClick={actions.onTogglePlay} className="absolute inset-0 flex items-center justify-center" aria-label={t('studio.playAriaLabel')}>
-              <span className="press rounded-full bg-accent text-paper w-16 h-16 flex items-center justify-center"><Play size={26} fill="currentColor" className="ml-1" /></span>
+    <div className="relative h-full flex flex-col bg-black">
+      {/* --- The video fills the top; the back pill floats on it (clear of the Mac's traffic lights) --- */}
+      <div className="relative min-h-0 flex items-center justify-center" style={{ flex: `${videoShare} 1 0` }}>
+        {videoSrc ? (
+          <video ref={videoRef} crossOrigin="anonymous" src={videoSrc} onLoadedMetadata={() => actions.onReplayCurrent()} className="block w-full h-full object-contain" />
+        ) : (
+          <p className="text-white/70 text-sm">{t('studio.noVideoLoaded')}</p>
+        )}
+        {showCenterPlay && (
+          <button onClick={actions.onTogglePlay} className="absolute inset-0 flex items-center justify-center" aria-label={t('studio.playAriaLabel')}>
+            <span className="press rounded-full bg-accent text-white w-16 h-16 flex items-center justify-center"><Play size={26} fill="currentColor" className="ml-1" /></span>
+          </button>
+        )}
+        <header className={`absolute inset-x-0 top-0 h-16 ${IS_WINDOWS ? 'pl-4' : 'pl-24'} pr-4 flex items-center gap-2 text-[13px]`} data-tauri-drag-region="deep">
+          <div className="flex items-center h-9 rounded-full bg-page text-ink min-w-0 max-w-[60%] shadow-card">
+            <button type="button" onClick={actions.onExit} title={t('studio.backToVideos')} aria-label={t('studio.backToVideos')}
+              className="h-9 pl-2.5 pr-3.5 flex items-center gap-1.5 min-w-0 rounded-full hover:bg-shade">
+              <ArrowLeft size={16} className="shrink-0" /><span className="truncate" title={videoName}>{videoName}</span>
             </button>
-          )}
+            {sections.length > 1 && (
+              <div className="inline-flex items-center shrink-0 pr-1 border-l border-line text-mute">
+                <Btn square size="sm" flat onClick={() => actions.onSwitchSection(currentSectionIndex - 1)} disabled={currentSectionIndex === 0} title={t('studio.previousSection')}><ChevronLeft size={15} /></Btn>
+                <span>{t('studio.part', { current: currentSectionIndex + 1, total: sections.length })}</span>
+                <Btn square size="sm" flat onClick={() => actions.onSwitchSection(currentSectionIndex + 1)} disabled={currentSectionIndex === sections.length - 1} title={t('studio.nextSection')}><ChevronRight size={15} /></Btn>
+              </div>
+            )}
+          </div>
+        </header>
+      </div>
+
+      {/* --- The white sheet: where you are in the part, the line you work on, the remote --- */}
+      <section className="relative -mt-6 min-h-[340px] bg-page rounded-t-3xl flex flex-col" style={{ flex: `${100 - videoShare} 1 0` }}
+        aria-label={t('studio.lineCount', { current: lineNo, total: practisedN })}>
+        <div className="px-6 lg:px-24 pt-6">
+          <Timeline lines={subtitles} current={currentSubtitleIndex} watch={watch} onPick={actions.onJumpToSaved}
+            title={i => t('studio.lineCount', { current: i + 1, total: subtitles.length })} />
+          <div className="mt-1.5 flex justify-between text-xs text-mute tabular-nums">
+            <span>{t('studio.lineCount', { current: lineNo, total: practisedN })}</span>
+            <span>{timeLabel}</span>
+          </div>
         </div>
 
-        <section style={{ '--share': 100 - videoShare } as React.CSSProperties} className="min-w-0 lg:[flex:var(--share)_1_0] flex flex-col gap-5 lg:max-h-[calc(100vh-190px)] lg:overflow-y-auto" aria-label={t('studio.lineCount', { current: lineNo, total: practisedN })}>
-          {isJa && <JaBanner />}
-          {past.map((i, k) => (
-            <p key={subtitles[i].id} className={`font-serif text-xl leading-[28px] ${k === past.length - 1 ? 'opacity-40' : 'opacity-20'}`}>{subtitles[i].text}</p>
-          ))}
-
-          <div className="mt-1">
-            <div className="min-w-0">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 lg:px-24 py-5 flex flex-col">
+          <div className="my-auto w-full max-w-4xl mx-auto flex flex-col items-center gap-4 text-center">
+              {isJa && <JaBanner />}
               {!currentSub ? (
                 <span className="font-serif italic text-mute text-xl">{t('studio.endOfPart')}</span>
               ) : watching ? (
-                <div className="flex flex-col items-start gap-3">
-                  <p className="font-serif text-xl leading-[28px] text-ink/60">{currentSub.text}</p>
+                <div className="flex flex-col items-center gap-3">
+                  <p className="font-serif text-[28px] leading-snug text-ink/60">{currentSub.text}</p>
                   <span className="text-xs text-mute">{t('studio.watchOnly')}</span>
                 </div>
               ) : isBlur ? (
-                <div className="flex flex-col items-start gap-5">
+                <div className="flex flex-col items-center gap-5">
                   <BlurLine text={currentSub.text} onLookup={lookup} onReveal={() => record('blur')} />
                   {isStep && !isPlaying && (
                     <Btn tone="accent" onClick={actions.onContinue}>{t('common.nextLine')} <ChevronRight size={16} /></Btn>
                   )}
                 </div>
               ) : bdActive && bdStep ? (
-                <div className="flex flex-col items-start gap-4">
+                <div className="w-full flex flex-col items-center gap-4">
                   <div className="flex items-center gap-3 text-xs text-mute">
                     <span className="inline-flex items-center gap-1.5"><Scissors size={12} /> {t('studio.breakdownStep', { current: bdActive.step + 1, total: bdActive.steps.length })}</span>
                     <span>{bdLast ? t('studio.breakdownOriginal') : t('studio.breakdownClean')}</span>
@@ -337,7 +342,7 @@ const Studio: React.FC = () => {
                     nextLabel={bdLast ? undefined : t('dictation.nextStep')}
                   />
                   {bdActive.reviewing && (bdLast ? bdActive.steps.slice(0, -1) : [bdStep]).map(s => (
-                    <p key={s.text} className="text-[15px] leading-relaxed text-ink/80 fade-in">{s.note}</p>
+                    <p key={s.text} className="max-w-2xl px-4 py-3 rounded-xl bg-shade text-left text-[15px] leading-relaxed fade-in">{s.note}</p>
                   ))}
                 </div>
               ) : mode === PracticeMode.LISTENING ? (
@@ -356,18 +361,18 @@ const Studio: React.FC = () => {
                     onResult={o => { if (!o.correct) record('wrong'); else if (o.helped) record('peek'); }}
                   />
                   {mode === PracticeMode.INPUT && (bd.state.status === 'failed' || (clozeProgress && effectiveLevel !== 'full')) && (
-                    <p className="mt-3 text-xs text-mute">
+                    <p className="text-xs text-mute">
                       {bd.state.status === 'failed' ? t('studio.breakdownFailed') : t('studio.clozePreparing', clozeProgress!)}
                     </p>
                   )}
                 </>
               )}
               {(bdActive || isBlur) && offerBtn}
-            </div>
           </div>
-        </section>
-       </div>
-      </div>
+        </div>
+
+        <Transport menuItems={menuItems} menuPanel={menuPanel} />
+      </section>
 
       {showSectionComplete && (
         <Overlay title={t('studio.sectionDoneTitle', { n: currentSectionIndex + 1 })} body={t('studio.sectionDoneBody')}>
@@ -400,12 +405,11 @@ const Studio: React.FC = () => {
       )}
 
       {bdHint && (
-        <div className="absolute left-1/2 -translate-x-1/2 bottom-20 z-30">
+        <div className="absolute left-1/2 -translate-x-1/2 bottom-24 z-30">
           <Stamp tone="accent-soft" className="shadow-card">{bdHint}</Stamp>
         </div>
       )}
 
-      <Transport lineLabel={t('studio.lineCount', { current: lineNo, total: practisedN })} menuItems={menuItems} menuPanel={menuPanel} />
 
       {showSavedList && <SavedDrawer />}
       {defOpen && (
@@ -417,10 +421,10 @@ const Studio: React.FC = () => {
 };
 
 const MenuRow: React.FC<{ label: string; hint?: string; children: React.ReactNode }> = ({ label, hint, children }) => (
-  <div className="px-3.5 py-2 flex flex-col gap-2">
+  <div className="px-2.5 py-2 flex flex-col gap-2">
     <span className="text-xs text-mute">{label}</span>
     {children}
-    {hint && <span className="text-xs text-faint leading-snug max-w-[14rem]">{hint}</span>}
+    {hint && <span className="text-xs text-mute leading-snug max-w-[14rem]">{hint}</span>}
   </div>
 );
 
@@ -431,32 +435,32 @@ const ListeningGhost: React.FC<{ text: string; blanks: number[]; splitVersion: n
   return (
     <div className={LINE}>
       {words.map((w, i) => set.has(i) ? (
-        <span key={i} className="inline-block relative top-2 h-[30px] border-b-[1.5px] border-ink/25" style={{ width: `${slotEm(w.value)}em` }} />
+        <span key={i} className="inline-block relative top-2.5 h-[38px] border-b-2 border-line" style={{ width: `${slotEm(w.value)}em` }} />
       ) : (
-        <span key={i} className="text-ink/50">{w.value}</span>
+        <span key={i} className="text-ink/40">{w.value}</span>
       ))}
     </div>
   );
 };
 
 const Overlay: React.FC<{ title: string; body: string; stats?: [string, string][]; children: React.ReactNode }> = ({ title, body, stats, children }) => (
-  <div className="absolute inset-0 z-20 bg-black/60 flex items-center justify-center p-4">
-    <Card className="w-full max-w-md fade-in">
-      <div className="px-7 pt-7 pb-5 space-y-3">
-        <h2 className="font-serif text-[30px] leading-tight">{title}</h2>
+  <div className="absolute inset-0 z-20 bg-black/40 flex items-end">
+    <Card className="w-full !rounded-b-none !rounded-t-3xl !border-0 px-6 lg:px-24 pt-8 pb-8 flex flex-col md:flex-row md:items-end gap-8 fade-in">
+      <div className="flex-1 space-y-3">
+        <h2 className="text-[34px] font-semibold tracking-[-0.02em] leading-tight">{title}</h2>
         <p className="text-sm text-mute leading-relaxed">{body}</p>
         {stats && (
           <div className="flex gap-10 pt-3">
             {stats.map(([n, label]) => (
               <div key={label}>
-                <div className="font-serif text-[30px] leading-none">{n}</div>
+                <div className="text-[28px] font-semibold leading-none tabular-nums">{n}</div>
                 <div className="text-xs text-mute mt-1.5">{label}</div>
               </div>
             ))}
           </div>
         )}
       </div>
-      <div className="px-7 py-4 border-t border-line flex justify-end gap-2">{children}</div>
+      <div className="flex flex-wrap md:flex-col-reverse md:w-60 gap-2.5 [&>button]:justify-center">{children}</div>
     </Card>
   </div>
 );

@@ -60,8 +60,8 @@ export const zh: Record<keyof typeof en, string> = {
 
   // --- Shell.tsx / Studio.tsx nav labels ---
   'nav.videos': '视频',
-  'nav.saved': '复习',
-  'nav.cards': '卡片',
+  'nav.saved': '句子',
+  'nav.cards': '单词',
   'nav.settings': '设置',
 
   // --- Home.tsx ---
@@ -345,6 +345,7 @@ export const zh: Record<keyof typeof en, string> = {
   'dictation.youTyped': '你打的',
   'dictation.expected': '应为：{word}',
   'dictation.hearAgain': '再听一遍',
+  'dictation.score': '{total} 个词对了 {right} 个 · 点任意词查词',
   'dictation.nextStep': '下一步',
 
   // --- SavedDrawer.tsx ---
@@ -370,6 +371,7 @@ export const zh: Record<keyof typeof en, string> = {
   'home.more': '更多',
   'home.dropRelease': '松开，添加这个视频',
   'home.onlyOne': '只有上面这一个视频。',
+  'home.others': '其他视频',
   'home.practiceAs': '换成{mode}练',
   'add.title': '添加视频',
   'add.pickLocal': '选择本机视频',

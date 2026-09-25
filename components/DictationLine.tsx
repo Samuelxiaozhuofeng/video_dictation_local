@@ -4,6 +4,7 @@ import {
   tokenizeText, getWordTokens, Token, TokenType, compareWords,
   isInputCorrectFlexibleCase, areAllWordsCorrectFlexibleCase,
 } from '../utils/textTokenizer';
+import { RotateCcw, ArrowRight } from 'lucide-react';
 import { Btn } from './ui';
 import { useT } from '../utils/i18n';
 import { matches } from '../utils/shortcuts';
@@ -42,7 +43,7 @@ export const slotEm = (word: string) =>
   Math.max(0.92, [...word].reduce((n, ch) => n + (/[\u3000-\u9fff\uf900-\ufaff\uff00-\uffef]/.test(ch) ? 1 : 0.46), 0));
 
 // Typing and the answer share one setting, so submitting changes colours, not positions.
-export const LINE = 'flex flex-wrap items-baseline gap-x-[0.25em] font-serif text-[30px] leading-[42px]';
+export const LINE = 'flex flex-wrap justify-center items-baseline gap-x-[0.3em] font-serif text-[38px] leading-[54px]';
 
 const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay, onLookup, blanks, nextLabel, onResult, extra, splitVersion }) => {
   const t = useT();
@@ -195,42 +196,40 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
 
   if (mode === PracticeMode.FEEDBACK) {
     const results = compareWords(tokens, inputs);
+    const wrong = new Map(results.filter(r => !r.isCorrect).map(r => [r.tokenIndex, r]));
+    const typed = wordTokens.filter((_, i) => isBlank(i)).length;
     return (
-      <div className="w-full flex flex-col items-start gap-5">
-        {/* The answer: click any word to look it up */}
-        <p className={LINE}>
-          {(wordTokens.some(w => w.reading !== undefined) ? groups.map(g => (g.word?.value ?? '') + g.punct) : targetText.split(/\s+/)).filter(Boolean).map((part, i) => (
-            <button key={i} type="button" onClick={e => { e.currentTarget.blur(); lookup(part); }} className="rounded hover:mark-yellow" title={t('common.lookup')}>{part}</button>
-          ))}
-        </p>
-
-        {/* Yours, word by word */}
-        {/* Yours underneath, dimmer; only a wrong word steps forward. */}
-        <div className="w-full flex flex-wrap items-baseline gap-x-[0.3em] gap-y-1 font-serif text-xl" aria-label={t('dictation.youTyped')}>
+      <div className="w-full flex flex-col items-center gap-5">
+        {/* The answer, in the same place and size as the boxes were. A wrong word turns
+            accent with what you typed struck out above it; click any word to look it up. */}
+        <p className={`${LINE} pt-4`}>
           {groups.map(g => {
-            if (g.wi < 0) return <span key={g.key} className="text-mute">{g.punct}</span>;
-            if (!isBlank(g.wi)) return null;
-            const r = results.find(x => x.tokenIndex === g.word!.index);
-            if (!r) return null;
+            if (!g.word) return <span key={g.key} className="text-mute">{g.punct}</span>;
+            const r = isBlank(g.wi) ? wrong.get(g.word.index) : undefined;
             return (
-              <span key={g.key}>
-                {r.inputWord ? (
-                  <span title={r.isCorrect ? '' : t('dictation.expected', { word: r.targetWord })} className={r.isCorrect ? 'text-mute' : 'text-ink underline decoration-accent decoration-[1.5px] underline-offset-[6px]'}>
-                    {r.inputWord}
+              <span key={g.key} className="relative inline-flex items-baseline">
+                {r && (
+                  <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-sans text-sm leading-none text-mute line-through whitespace-nowrap" title={t('dictation.youTyped')}>
+                    {r.inputWord || '—'}
                   </span>
-                ) : (
-                  // Left blank: the same empty slot you saw while typing.
-                  <span title={t('dictation.expected', { word: r.targetWord })} className="inline-block relative top-1 border-b-[1.5px] border-ink/25" style={{ width: `${slotEm(r.targetWord)}em`, height: '1em' }} />
                 )}
+                <button type="button" onClick={e => { e.currentTarget.blur(); lookup(g.word!.value); }} title={r ? t('dictation.expected', { word: r.targetWord }) : t('common.lookup')}
+                  className={`rounded-md -mx-1 px-1 hover:bg-accent-soft ${r ? 'text-accent underline decoration-2 underline-offset-[8px]' : ''}`}>
+                  {g.word.value}
+                </button>
                 <span className="text-mute">{g.punct}</span>
               </span>
             );
           })}
-        </div>
+        </p>
 
-        <div className="flex gap-2">
-          <Btn tone="accent" onClick={() => onComplete(true)}>{nextLabel ?? t('common.nextLine')}</Btn>
-          {extra}
+        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
+          <span className="text-[13px] text-mute">{t('dictation.score', { right: typed - wrong.size, total: typed })}</span>
+          <div className="flex gap-2.5">
+            <Btn onClick={() => onReplay(false)}><RotateCcw size={15} /> {t('dictation.hearAgain')}</Btn>
+            <Btn tone="accent" onClick={() => onComplete(true)}>{nextLabel ?? t('common.nextLine')} <ArrowRight size={15} /></Btn>
+            {extra}
+          </div>
         </div>
       </div>
     );
@@ -246,7 +245,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
           const i = g.wi;
           const tk = g.word!;
           if (!isBlank(i)) {
-            return <span key={g.key} className="text-ink/50 select-none">{tk.value}{punct}</span>;
+            return <span key={g.key} className="text-ink/40 select-none">{tk.value}{punct}</span>;
           }
           const ok = !!inputs[i] && isInputCorrectFlexibleCase(inputs[i], tk.value, tk.reading);
           return (
@@ -262,15 +261,15 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
                   onCompositionEnd={e => settle(i, Object.assign([...inputs], { [i]: e.currentTarget.value }))}
                   onKeyDown={e => keyDown(i, e)}
                   onPaste={paste}
-                  // A 34px box keeps the underline just under the letters (not under the descenders), so a comma or full stop sits on it.
-                  className={`col-start-1 row-start-1 w-full min-w-0 h-[34px] p-0 bg-transparent border-0 border-b-[1.5px] rounded-none font-serif text-ink caret-accent outline-none focus:outline-none focus-visible:outline-none ${ok ? 'border-transparent' : 'border-ink/25 focus:border-accent'}`}
+                  // A 44px box keeps the underline just under the letters (not under the descenders), so a comma or full stop sits on it.
+                  className={`col-start-1 row-start-1 w-full min-w-0 h-[44px] p-0 bg-transparent border-0 border-b-2 rounded-none font-serif text-ink caret-accent outline-none focus:outline-none focus-visible:outline-none ${ok ? 'border-transparent' : 'border-faint focus:border-accent'}`}
                   autoComplete="off" autoCorrect="off" spellCheck={false}
                 />
                 <span className="invisible h-0 overflow-hidden whitespace-pre col-start-1 row-start-1">{inputs[i] || ''}</span>
               </span>
               {punct}
               {peek === i && (
-                <span className="absolute -top-12 left-1/2 -translate-x-1/2 rounded-md bg-accent text-paper px-3 py-1 font-serif text-xl leading-7 whitespace-nowrap pointer-events-none z-10 fade-in">
+                <span className="absolute -top-12 left-1/2 -translate-x-1/2 rounded-md bg-ink text-white px-3 py-1 font-serif text-xl leading-7 whitespace-nowrap pointer-events-none z-10 fade-in">
                   {tk.value}
                 </span>
               )}

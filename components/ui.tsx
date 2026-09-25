@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-// Shared primitives for the "night reading" look: deep ground, cream type, one warm accent.
+// Shared primitives for the "cinema" look: light ground, white sheets, one vermilion accent.
 // Btn (pressable), Card (a raised surface), Stamp (small label), Seg (segmented switch),
 // Menu (the "…" popover).
 
@@ -10,9 +10,9 @@ export const toneBg: Record<Tone, string> = {
   white: 'bg-page text-ink',
   paper: 'bg-paper text-ink',
   shade: 'bg-shade text-ink',
-  accent: 'bg-accent text-paper',
+  accent: 'bg-accent text-white',
   'accent-soft': 'bg-accent-soft text-accent',
-  ink: 'bg-ink text-paper',
+  ink: 'bg-ink text-white',
 };
 
 type BtnProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -29,21 +29,21 @@ const btnSize = {
 };
 const sqSize = { sm: 'h-8 w-8', md: 'h-10 w-10', lg: 'h-12 w-12' };
 
-// Three weights: solid (accent / ink), outline (tone="white"), ghost (flat).
+// Three weights: solid (accent / ink), soft fill (tone="white"), ghost (flat). Pills; icon buttons are rounded squares.
 export const Btn: React.FC<BtnProps> = ({
   tone = 'white', size = 'md', flat = false, square = false, className = '', children, onClick, ...rest
 }) => {
   const skin = flat
     ? 'bg-transparent text-mute hover:text-ink hover:bg-shade border border-transparent'
     : tone === 'white'
-      ? 'bg-transparent text-ink border border-line hover:bg-shade'
-      : `${toneBg[tone]} border border-transparent disabled:!bg-ink/10 disabled:!text-ink/40 disabled:!opacity-100`;
+      ? 'bg-shade text-ink border border-transparent hover:bg-line'
+      : `${toneBg[tone]} border border-transparent disabled:!bg-shade disabled:!text-mute disabled:!opacity-100`;
   return (
     <button
       {...rest}
       // Drop focus after a mouse click so Space/Enter shortcuts don't re-fire this button.
       onClick={e => { onClick?.(e); e.currentTarget.blur(); }}
-      className={`press rounded-lg ${skin} ${square ? sqSize[size] : btnSize[size]}
+      className={`press ${square ? 'rounded-lg' : 'rounded-full'} ${skin} ${square ? sqSize[size] : btnSize[size]}
         inline-flex items-center justify-center gap-2 font-medium whitespace-nowrap select-none
         disabled:cursor-not-allowed ${className}`}
     >
@@ -81,7 +81,7 @@ export function Seg<T extends string | number>({
   className?: string;
 }) {
   return (
-    <div className={`inline-flex p-0.5 gap-0.5 bg-shade rounded-lg ${className}`} role="radiogroup">
+    <div className={`inline-flex p-[3px] gap-0.5 bg-shade rounded-[10px] ${className}`} role="radiogroup">
       {options.map(o => (
         <button
           key={String(o.value)}
@@ -90,8 +90,8 @@ export function Seg<T extends string | number>({
           aria-checked={o.value === value}
           title={o.title}
           onClick={e => { onChange(o.value); e.currentTarget.blur(); }}
-          className={`${size === 'sm' ? 'h-7 px-2.5 text-xs' : 'h-9 px-3.5 text-sm'} rounded-md font-medium transition-colors
-            ${o.value === value ? 'bg-line text-ink' : 'text-mute hover:text-ink'}`}
+          className={`${size === 'sm' ? 'h-7 px-2.5 text-xs' : 'h-9 px-3.5 text-sm'} rounded-[7px] font-medium transition-colors
+            ${o.value === value ? 'bg-page text-ink shadow-card' : 'text-mute hover:text-ink'}`}
         >
           {o.label}
         </button>
@@ -103,7 +103,7 @@ export function Seg<T extends string | number>({
 // Section heading used across settings / library pages.
 export const H: React.FC<{ children: React.ReactNode; sub?: React.ReactNode; badge?: React.ReactNode; className?: string }> = ({ children, sub, badge, className = '' }) => (
   <div className={`mb-5 ${className}`}>
-    <h2 className="font-serif text-[30px] font-normal leading-tight flex items-center gap-3">{children}{badge}</h2>
+    <h2 className="text-[30px] font-semibold tracking-[-0.02em] leading-tight flex items-center gap-3">{children}{badge}</h2>
     {sub && <p className="mt-1 text-sm text-mute">{sub}</p>}
   </div>
 );
@@ -126,7 +126,7 @@ export const Field: React.FC<{ label: React.ReactNode; hint?: React.ReactNode; r
   </label>
 );
 
-export const inputCls = 'flat w-full h-10 px-3 text-sm text-ink placeholder:text-faint focus:border-accent';
+export const inputCls = 'flat w-full h-10 px-3 text-sm text-ink placeholder:text-mute focus:border-accent';
 
 // "…" popover. Items close it on click; Esc and a click outside close it too.
 export type MenuItem = { label: React.ReactNode; onClick: () => void; disabled?: boolean; title?: string } | 'divider';
@@ -138,7 +138,8 @@ export const Menu: React.FC<{
   up?: boolean;
   children?: React.ReactNode; // extra panel content above the items (e.g. a Seg)
   footer?: React.ReactNode; // quiet content below the items (e.g. a key legend)
-}> = ({ items, trigger, align = 'right', up = false, children, footer }) => {
+  className?: string; // the panel's width etc.
+}> = ({ items, trigger, align = 'right', up = false, children, footer, className = '' }) => {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -153,10 +154,10 @@ export const Menu: React.FC<{
     <div ref={box} className="relative">
       {trigger(open, () => setOpen(o => !o))}
       {open && (
-        <div className={`absolute z-30 ${up ? 'bottom-full mb-2' : 'top-full mt-2'} ${align === 'right' ? 'right-0' : 'left-0'} card min-w-[200px] py-1.5 fade-in`} role="menu">
+        <div className={`absolute z-30 ${up ? 'bottom-full mb-2' : 'top-full mt-2'} ${align === 'right' ? 'right-0' : 'left-0'} card min-w-[220px] p-1.5 fade-in ${className}`} role="menu">
           {children}
           {items.map((it, i) => it === 'divider' ? (
-            <div key={i} className="my-1.5 border-t border-line" />
+            <div key={i} className="my-1.5 mx-1 border-t border-line" />
           ) : (
             <button
               key={i}
@@ -165,7 +166,7 @@ export const Menu: React.FC<{
               disabled={it.disabled}
               title={it.title}
               onClick={e => { e.currentTarget.blur(); setOpen(false); it.onClick(); }}
-              className="w-full h-9 px-3.5 flex items-center gap-2.5 text-sm text-ink text-left hover:bg-shade disabled:text-faint disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="w-full h-9 px-2.5 rounded-lg flex items-center gap-2.5 text-sm text-ink text-left hover:bg-shade disabled:text-mute disabled:hover:bg-transparent disabled:cursor-not-allowed"
             >
               {it.label}
             </button>
