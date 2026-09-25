@@ -14,8 +14,8 @@
 - [x] 中英文案；docs 更新
 - [x] tsc + test-*.mjs + 新 test-japanese.mjs + cargo test
 - [x] 浏览器实测
-- [ ] codex-review + 错题本
-- [ ] npm run release + 验收路径
+- [x] codex-review + 错题本（Gemini 3 条、6-sol 1 条新的，已修；6-sol 另 2 条按设计接受：开 AI 校对后改了切法的句子重挖一次、同句跨视频借用切点）
+- [x] npm run release + 验收路径
 
 # 转录标签页 + 云端转录（Groq）+ 本机标准/轻量
 
