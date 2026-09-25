@@ -198,3 +198,7 @@ export function jaLemma(text: string): string {
   if (head.length === 0) return text;
   return head.slice(0, -1).map(m => m.s).join('') + head[head.length - 1].base;
 }
+
+// The word in hiragana (皆さん → みなさん), for when Youdao misreads a kanji
+// query as another language.
+export const jaKana = (text: string) => kanaFold((jaMorphs(text) ?? []).map(m => m.reading ?? m.s).join('')) || text;

@@ -301,8 +301,10 @@ export const parseEudic = (html: string): DictEntry | null => {
   return { word, phonetic: clean(head?.querySelector('.Phonitic')?.textContent), senses, source: 'eudic' };
 };
 
+// Origin '' drops the tauri://localhost Origin the http plugin adds by
+// default (needs its unsafe-headers feature): Youdao answers that with 400.
 const get = async (url: string): Promise<Response> => {
-  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(15_000) });
+  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', Origin: '' }, signal: AbortSignal.timeout(15_000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res;
 };

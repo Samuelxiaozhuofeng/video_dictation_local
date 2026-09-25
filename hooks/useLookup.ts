@@ -3,19 +3,25 @@ import * as AI from '../utils/ai';
 import { DefinitionState, emptyDefinition } from '../components/DefinitionPanel';
 import { useT, getLang } from '../utils/i18n';
 import { DictLang, lookupWord, senseList, DictEntry } from '../utils/dictionary';
-import { jaLemma } from '../utils/japanese';
+import { jaLemma, jaKana } from '../utils/japanese';
 
 // Word lookup behind the definition popup, shared by the practice page and review.
 // Dictionary first. AI answers instead when the dictionary has nothing (or no
 // dictionary covers the language), and first when the UI is English, since
 // the dictionaries only give Chinese.
 // Japanese: the word in dictionary form (食べました → 食べる), led by an entry
-// for the clicked phrase itself when Youdao has one (すみません, 見ている).
+// for the clicked phrase itself when Youdao has one (すみません, 見ている);
+// found by its kana when Youdao takes the kanji for another language (皆さん).
 const lookupJa = async (word: string): Promise<DictEntry[] | null> => {
   const lemma = jaLemma(word);
   const [whole, base] = await Promise.all([lemma !== word ? lookupWord(word, 'ja') : null, lookupWord(lemma, 'ja')]);
   const found = [...(whole ?? []).filter(e => e.word === word), ...(base ?? [])];
-  return found.length ? found : null;
+  if (found.length) return found;
+  const kana = jaKana(lemma);
+  if (kana === lemma) return null;
+  // A kana query lists every homophone (こうきゅう → 高級, 呼吸); keep only this word.
+  const same = (await lookupWord(kana, 'ja'))?.filter(e => e.word === lemma || e.word === word) ?? [];
+  return same.length ? same : null;
 };
 
 export const useLookup = (dictLang: DictLang | null, context: string) => {

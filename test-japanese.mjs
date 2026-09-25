@@ -90,4 +90,7 @@ for (const [group, lemma] of [['食べました', '食べる'], ['お茶を', '�
   assert.equal(ja.jaLemma(group), lemma, group);
 }
 
+assert.equal(ja.jaKana('皆さん'), 'みなさん');
+assert.equal(ja.jaKana('食べる'), 'たべる');
+
 console.log('test-japanese: all checks passed');
