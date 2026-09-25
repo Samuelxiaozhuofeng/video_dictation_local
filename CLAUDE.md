@@ -21,6 +21,7 @@ node test-sections.mjs    # 分段逻辑自检（同上）
 node test-cloze.mjs       # 挖空逻辑 + 缓存自检（同上）
 node test-dictionary.mjs  # 查词：认语言 + 有道解析 + 欧路挑词（同上）
 node test-anki.mjs        # Anki 旧配置合并成一种卡 + 单词加粗（同上）
+node test-japanese.mjs    # 日语切词组 + 假名判对 + AI 校对回答校验（读 node_modules/kuromoji/dict）
 ```
 
 前端没有测试框架，逻辑自检就是根目录那几个 `node` 脚本（`test-tokenizer.js` / `test-flexible-case.js` 是早期的复制逻辑版，参考价值有限）。
@@ -36,6 +37,7 @@ node test-anki.mjs        # Anki 旧配置合并成一种卡 + 单词加粗（�
 浏览器模式怎么运作（`dev/browserMock.ts` 冒充 Tauri 外壳，只在浏览器 dev 下加载，正式包和 `tauri dev` 里都没有）：
 
 - 本地文件经 vite `/@fs` 读真文件（允许 `~/Movies`、`~/Downloads`、项目目录；cookies / `.yt-login` 已屏蔽）。
+- 日语词典默认「没下载」；`window.__MOCK__.jaDict = true` 当已下载，文件从 `node_modules/kuromoji/dict` 读（刷新即忘）。
 - 文件对话框默认返回 `~/Movies/LinguaClip/Me at the zoo` 样片（视频或 .srt 看过滤器）；`window.__MOCK__.pick = '绝对路径'` 指定下一次返回值。
 - Rust 命令不执行，只记到 `window.__MOCK__.calls`；`write_cache` 存内存，刷新即清。
 - 导入进度手动发：`window.__MOCK__.emit('import-progress', { id, stage: 'done', videoPath, subtitleText })`，`id` 从 `__MOCK__.calls` 里的 `start_import` 取。

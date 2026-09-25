@@ -23,6 +23,9 @@ interface Props {
   // come out right, and was help used (peek, or playing from a word).
   onResult?: (o: { correct: boolean; helped: boolean }) => void;
   extra?: React.ReactNode; // shown beside the feedback's forward button
+  // Japanese: when the line may re-split (the practice page decides, so its blanks
+  // and these boxes always count the same split). Omitted: re-split until typed in.
+  splitVersion?: number;
 }
 
 // How far into the line word i starts, by letters: a rough stand-in for time when
@@ -41,21 +44,16 @@ export const slotEm = (word: string) =>
 // Typing and the answer share one setting, so submitting changes colours, not positions.
 export const LINE = 'flex flex-wrap items-baseline gap-x-[0.25em] font-serif text-[30px] leading-[42px]';
 
-const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay, onLookup, blanks, nextLabel, onResult, extra }) => {
+const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay, onLookup, blanks, nextLabel, onResult, extra, splitVersion }) => {
   const t = useT();
   // A Japanese line is re-split when its dictionary or AI cut points arrive, but
   // never under the user's fingers: once something is typed the split holds.
-  // (A new set of blanks resets the line anyway, so it re-splits then too.)
   const jaVersion = useJaVersion();
-  const [splitVersion, setSplitVersion] = useState(jaVersion);
+  const [ownVersion, setOwnVersion] = useState(jaVersion);
   const typedRef = useRef(false);
-  const lastBlanks = useRef(blanks);
-  useEffect(() => {
-    const reset = lastBlanks.current !== blanks;
-    lastBlanks.current = blanks;
-    if (reset || !typedRef.current) setSplitVersion(jaVersion);
-  }, [jaVersion, targetText, blanks]);
-  const tokens = useMemo(() => tokenizeText(targetText), [targetText, splitVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!typedRef.current) setOwnVersion(jaVersion); }, [jaVersion, targetText]);
+  const version = splitVersion ?? ownVersion;
+  const tokens = useMemo(() => tokenizeText(targetText), [targetText, version]); // eslint-disable-line react-hooks/exhaustive-deps
   const wordTokens = useMemo(() => getWordTokens(tokens), [tokens]);
   // Each word carries the punctuation right after it, so a comma sits on its word, not a gap away.
   const groups = useMemo(() => {
@@ -191,7 +189,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
   };
 
   const lookup = (raw: string) => {
-    const w = raw.replace(/[.,/#!$%^&*;:{}=\-_`~()?"']/g, '');
+    const w = raw.replace(/[.,/#!$%^&*;:{}=\-_`~()?"'\u3000-\u303f\uff01-\uff0f\uff1a-\uff20]/g, '');
     if (w) onLookup(w);
   };
 

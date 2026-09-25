@@ -3,6 +3,7 @@ import { getAIConfig, readJsonBody } from './aiConfig';
 import { clozeRouter, extractLines } from './aiDrills';
 import { withAiSlot } from './aiLimit';
 import { readCacheText, writeCacheText } from './desktop';
+import { getVideoRecord } from './videoStorage';
 import { hasKana, jaMorphs, loadJa, setJaCuts } from './japanese';
 
 // The AI check of Japanese phrase splits, one background job per video, saved
@@ -112,7 +113,9 @@ async function run(recordId: string, lineTexts: string[], job: SegJob): Promise<
     job.done++;
     notify();
   }, () => job.urgent)));
-  if (job.cancelled || !answered) return;
+  // Deleted meanwhile (even before this job could be cancelled): write nothing back.
+  if (!answered || !await getVideoRecord(recordId).catch(() => null)) return;
+  if (job.cancelled) return; // checked after the await: a delete may have come in during it
   job.saving = writeCacheText(recordId, 'segments', JSON.stringify({ v: 1, lines } satisfies SegFile)).catch(() => {});
   await job.saving;
   apply(lines);

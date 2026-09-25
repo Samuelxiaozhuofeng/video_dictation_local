@@ -17,7 +17,7 @@ const BlurLine: React.FC<{ text: string; onLookup: (word: string) => void; onRev
 
   const click = (e: React.MouseEvent<HTMLButtonElement>, wordIdx: number, raw: string) => {
     e.currentTarget.blur(); // keep Space/Enter shortcuts from re-firing this button
-    const word = raw.replace(/[.,/#!$%^&*;:{}=\-_`~()?"']/g, '');
+    const word = raw.replace(/[.,/#!$%^&*;:{}=\-_`~()?"'\u3000-\u303f\uff01-\uff0f\uff1a-\uff20]/g, '');
     if (!word) return;
     if (!revealed.has(wordIdx)) {
       if (revealed.size === 0) onReveal?.();

@@ -49,15 +49,25 @@ const Studio: React.FC = () => {
   usePracticeClock();
   const clozeKey = videoId ?? '';
   const lineIndex = currentSub ? fullSubtitles.findIndex(s => s.id === currentSub.id) : -1;
-  // Japanese lines re-split when the dictionary loads or the AI check lands.
+  // Japanese lines re-split when the dictionary loads, this video's saved AI
+  // splits are read, or blanks arrive — but a line on screen keeps its boxes
+  // while an AI check lands mid-line; the new split shows from the next line.
   const jaVersion = useJaVersion();
   const isJa = useMemo(() => lineTexts.some(hasKana), [lineTexts]);
   const jaOn = jaReady();
+  const [jaSettled, setJaSettled] = useState(0);
   useEffect(() => {
     if (!isJa) return;
-    settleSplits(videoId, lineTexts).then(ok => { if (ok && videoId && jaCheckOn()) prepareSegments(videoId, lineTexts, true).catch(() => {}); });
+    let live = true;
+    settleSplits(videoId, lineTexts).then(ok => {
+      if (!live) return;
+      setJaSettled(n => n + 1);
+      if (ok && videoId && jaCheckOn()) prepareSegments(videoId, lineTexts, true).catch(() => {});
+    });
+    return () => { live = false; };
   }, [isJa, videoId, lineTexts, jaOn]);
-  const wordN = useMemo(() => currentSub ? getWordTokens(tokenizeText(currentSub.text)).length : 0, [currentSub, jaVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+  const splitVersion = useMemo(() => jaVersion, [currentSub?.id, jaOn, jaSettled, rankedLines]); // eslint-disable-line react-hooks/exhaustive-deps
+  const wordN = useMemo(() => currentSub ? getWordTokens(tokenizeText(currentSub.text)).length : 0, [currentSub, splitVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const blanks = useMemo(
     () => pickBlanks(rankedLines?.[lineIndex] ?? null, wordN, effectiveLevel),
     [rankedLines, lineIndex, wordN, effectiveLevel],
@@ -65,7 +75,7 @@ const Studio: React.FC = () => {
   useEffect(() => {
     setRankedLines(null);
     setClozeProgress(null);
-  }, [clozeKey, jaVersion]);
+  }, [clozeKey, jaOn]);
 
   // Joins the video's shared job if the shelf already started one; progress is
   // read off that job, so a finished job clears "preparing" for good.
@@ -322,13 +332,14 @@ const Studio: React.FC = () => {
                   ))}
                 </div>
               ) : mode === PracticeMode.LISTENING ? (
-                <ListeningGhost text={currentSub.text} blanks={blanks} />
+                <ListeningGhost text={currentSub.text} blanks={blanks} splitVersion={splitVersion} />
               ) : (
                 <>
                   <DictationLine
                     targetText={currentSub.text}
                     mode={mode}
                     blanks={blanks}
+                    splitVersion={splitVersion}
                     onComplete={correct => (correct && mode === PracticeMode.FEEDBACK ? actions.onContinue() : actions.onInputComplete(correct))}
                     onReplay={actions.onReplayCurrent}
                     onLookup={lookup}
@@ -395,8 +406,8 @@ const MenuRow: React.FC<{ label: string; hint?: string; children: React.ReactNod
 );
 
 // One covered slot per word while the line plays: given words show as text, blanks as underlines.
-const ListeningGhost: React.FC<{ text: string; blanks: number[] }> = ({ text, blanks }) => {
-  const words = getWordTokens(tokenizeText(text));
+const ListeningGhost: React.FC<{ text: string; blanks: number[]; splitVersion: number }> = ({ text, blanks, splitVersion }) => {
+  const words = useMemo(() => getWordTokens(tokenizeText(text)), [text, splitVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = new Set(blanks);
   return (
     <div className={LINE}>
