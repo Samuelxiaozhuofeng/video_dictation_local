@@ -12,7 +12,7 @@ import { useLookup } from '../hooks/useLookup';
 import { detectLang } from '../utils/dictionary';
 import { useT } from '../utils/i18n';
 import { countLine, usePracticeClock } from '../utils/today';
-import { hasKana, useJaVersion } from '../utils/japanese';
+import { hasKana, jaReady, useJaVersion } from '../utils/japanese';
 import { settleSplits } from '../utils/jaSegments';
 
 // A review round: one card at a time over the whole window, graded by how the
@@ -115,15 +115,28 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
   const path = card && found?.id === card.id ? found.path : undefined; // undefined = still looking
   const isWord = card?.deck === 'word';
   // Japanese cards split as on the practice page: the dictionary plus each video's AI check.
+  // A card keeps the split it opened with. A Japanese queue shows no boxes until
+  // the dictionary and every video's saved splits are read, all at once, so no
+  // split lands under the user's fingers; a dictionary downloaded meanwhile
+  // (from the practice page underneath) re-reads them.
   const jaVersion = useJaVersion();
+  const jaOn = jaReady();
+  const hasJa = useMemo(() => queue.some(c => hasKana(c.text)), [queue]);
+  const [settled, setSettled] = useState<{ queue: ReviewCard[]; n: number } | null>(null);
   useEffect(() => {
+    if (!hasJa) return;
+    let live = true;
     const byVideo = new Map<string, string[]>();
     for (const c of queue) if (hasKana(c.text)) byVideo.set(c.videoId, [...byVideo.get(c.videoId) ?? [], c.text]);
-    byVideo.forEach((texts, id) => { settleSplits(id, texts).catch(() => {}); });
-  }, [queue]);
+    Promise.all([...byVideo].map(([id, texts]) => settleSplits(id, texts).catch(() => {})))
+      .then(() => { if (live) setSettled(s => ({ queue, n: (s?.n ?? 0) + 1 })); });
+    return () => { live = false; };
+  }, [queue, hasJa, jaOn]);
+  const splitsReady = !hasJa || settled?.queue === queue;
+  const splitVersion = useMemo(() => jaVersion, [card?.id, settled]); // eslint-disable-line react-hooks/exhaustive-deps
   const blanks = useMemo(
     () => card?.deck === 'word' ? wordBoxes(getWordTokens(tokenizeText(card.text)).map(w => w.value), card.word!) : undefined,
-    [card, jaVersion], // eslint-disable-line react-hooks/exhaustive-deps
+    [card, splitVersion], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   // Words in the answer can be looked up, and kept, as on the practice page (no Anki: that records off the practice video).
@@ -256,13 +269,14 @@ const ReviewSession: React.FC<{ cards: ReviewCard[]; onClose: () => void }> = ({
                 <Btn onClick={next}>{t('session.skip')}</Btn>
               </div>
             </div>
-          ) : path && card ? (
+          ) : path && card && splitsReady ? (
             <div className="flex flex-col gap-8">
               <DictationLine
                 key={`${round}-${card.id}`}
                 targetText={card.text}
                 mode={mode}
                 blanks={blanks}
+                splitVersion={splitVersion}
                 nextLabel={isWord ? t('session.next') : undefined}
                 onComplete={complete}
                 onReplay={replay}
