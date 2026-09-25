@@ -6,7 +6,7 @@
 - 打包：`npx tauri build` → `src-tauri/target/release/bundle/macos/LinguaClip.app`
 - 类型检查：`npx tsc --noEmit`
 - 前端：React 19 + Vite 6 + Tailwind 3（本地打包，见 `tailwind.config.js`），字体走 `@fontsource`，断网可用
-- 界面风格：深海夜读（深墨青底 + 奶油字，唯一主色暖黄；句子 Newsreader 衬线、界面 Instrument Sans），令牌在 `tailwind.config.js` / `index.css`，原语全在 `components/ui.tsx`（含「…」菜单 `Menu`）；快捷键提示用 ⌘ ⇧ 符号
+- 界面风格：影院浮层（浅灰底 #FAFAFA + 白面板，近黑字，唯一主色朱红 #E8492B；学习的外语句子 Source Serif 4 衬线、界面 Instrument Sans、中文苹方）。首页上方是继续练的大画面 + 白条，练习页和复习都是「视频在上、白面板从下盖上来」；顶栏居中胶囊「视频 / 句子 / 单词 / 设置」，句子 / 单词两个库页 = `ReviewPage`（deck）+ 下面的 `CardsPage` 列表，令牌在 `tailwind.config.js` / `index.css`，原语全在 `components/ui.tsx`（含「…」菜单 `Menu`）；快捷键提示用 ⌘ ⇧ 符号
 
 ## 目录
 
