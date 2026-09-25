@@ -216,7 +216,7 @@ const DictationLine: React.FC<Props> = ({ targetText, mode, onComplete, onReplay
         {/* The answer, in the same place and size as the boxes were. A wrong word turns
             accent with what you typed struck out above it; a word left blank is only
             underlined (seeing the answer is not an error); click any word to look it up. */}
-        <p className={`${LINE} pt-4`} data-lookup-line>
+        <p className={`${LINE} gap-y-5 pt-4`} data-lookup-line>
           {groups.map((g, gi) => {
             if (!g.word) return <span key={g.key} className="text-mute">{g.punct}</span>;
             const r = isBlank(g.wi) ? wrong.get(g.word.index) : undefined;
