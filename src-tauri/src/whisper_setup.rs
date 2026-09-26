@@ -12,6 +12,8 @@ use tauri_plugin_http::reqwest;
 
 pub struct Parts {
   pub whisper: PathBuf,
+  // The CPU whisper-cli to rerun with when the graphics-card one fails.
+  pub fallback: Option<PathBuf>,
   pub model: PathBuf,
   pub vad: PathBuf,
 }
@@ -55,6 +57,17 @@ const WHISPER_CLI: Asset = Asset {
 };
 #[cfg(windows)]
 const WHISPER_EXE: &str = "Release/whisper-cli.exe";
+// Settings → "Transcribe on the graphics card": the same whisper.cpp built with
+// Vulkan by .github/workflows/whisper-vulkan.yml, unpacked beside the CPU one.
+#[cfg(windows)]
+const WHISPER_VULKAN: Asset = Asset {
+  name: "whisper-vulkan-x64.zip",
+  size: 17_988_352,
+  sha256: "11b8f84c9202f83cb6510bba2e92c9520b9c79990d6b25db12ca0cd46caebeaa",
+  urls: &["https://github.com/Samuelxiaozhuofeng/video_dictation_local/releases/download/whisper-vulkan-1.8.4/whisper-vulkan-x64.zip"],
+};
+#[cfg(windows)]
+const WHISPER_VULKAN_EXE: &str = "vulkan/whisper-cli.exe";
 // q5_0 is a third of the full model's size with near-identical output, and the
 // DTW preset "large.v3.turbo" still gives word timings with it.
 const MODEL: Asset = Asset {
@@ -155,6 +168,28 @@ fn find_whisper() -> Option<PathBuf> {
     .or_else(|| crate::import::find_bin("whisper-cli").ok())
 }
 
+// Every Intel / AMD / NVIDIA driver installs the Vulkan loader. Without it the
+// Vulkan whisper-cli cannot even start (and Windows would pop a "DLL not found"
+// box), so such a machine just keeps the CPU one.
+#[cfg(windows)]
+fn wants_vulkan(gpu: bool) -> bool {
+  let root = std::env::var_os("SystemRoot").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
+  gpu && root.join(r"System32\vulkan-1.dll").is_file()
+}
+#[cfg(not(windows))]
+fn wants_vulkan(_gpu: bool) -> bool {
+  false
+}
+
+#[cfg(windows)]
+fn find_vulkan() -> Option<PathBuf> {
+  first_file(vec![parts_dir().join(WHISPER_VULKAN_EXE)])
+}
+#[cfg(not(windows))]
+fn find_vulkan() -> Option<PathBuf> {
+  None
+}
+
 fn find_model(tier: Tier) -> Option<PathBuf> {
   let cache = home().join(".cache/whisper.cpp");
   let [a, b] = tier.cached_names();
@@ -165,15 +200,23 @@ fn find_vad() -> Option<PathBuf> {
   first_file(vec![parts_dir().join(VAD.name), home().join(".cache/whisper.cpp").join(VAD.name)])
 }
 
-pub fn find(tier: Tier) -> Option<Parts> {
-  Some(Parts { whisper: find_whisper()?, model: find_model(tier)?, vad: find_vad()? })
+pub fn find(tier: Tier, gpu: bool) -> Option<Parts> {
+  let cpu = find_whisper()?;
+  let (whisper, fallback) = if wants_vulkan(gpu) { (find_vulkan()?, Some(cpu)) } else { (cpu, None) };
+  Some(Parts { whisper, fallback, model: find_model(tier)?, vad: find_vad()? })
 }
 
-fn missing(tier: Tier) -> Vec<&'static Asset> {
+fn missing(tier: Tier, gpu: bool) -> Vec<&'static Asset> {
   let mut out = Vec::new();
   if find_whisper().is_none() {
     out.push(&WHISPER_CLI);
   }
+  #[cfg(windows)]
+  if wants_vulkan(gpu) && find_vulkan().is_none() {
+    out.push(&WHISPER_VULKAN);
+  }
+  #[cfg(not(windows))]
+  let _ = gpu;
   if find_model(tier).is_none() {
     out.push(tier.asset());
   }
@@ -186,9 +229,9 @@ fn missing(tier: Tier) -> Vec<&'static Asset> {
 // Returns the parts, downloading any that are missing first. `on_pct` gets the
 // overall percent across everything still to fetch; it is not called at all
 // when nothing is missing.
-pub fn ensure(tier: Tier, mut on_pct: impl FnMut(u32)) -> Result<Parts, String> {
+pub fn ensure(tier: Tier, gpu: bool, mut on_pct: impl FnMut(u32)) -> Result<Parts, String> {
   let _guard = INSTALLING.lock().unwrap_or_else(|e| e.into_inner());
-  let todo = missing(tier);
+  let todo = missing(tier, gpu);
   if !todo.is_empty() {
     let dir = parts_dir();
     std::fs::create_dir_all(&dir).map_err(|e| format!("setup:{e}"))?;
@@ -206,7 +249,7 @@ pub fn ensure(tier: Tier, mut on_pct: impl FnMut(u32)) -> Result<Parts, String> 
       before += asset.size;
     }
   }
-  find(tier).ok_or_else(|| "setup:parts still missing after download".into())
+  find(tier, gpu).ok_or_else(|| "setup:parts still missing after download".into())
 }
 
 pub(crate) async fn fetch(asset: &Asset, dir: &Path, mut on_bytes: impl FnMut(u64)) -> Result<(), String> {
@@ -341,11 +384,12 @@ pub struct ImportTools {
 // first import will download the transcription parts (for the model picked in
 // Settings), and whether this Mac has the (hand-installed) YouTube downloader.
 #[tauri::command]
-pub fn import_tools(model: Option<String>) -> ImportTools {
+pub fn import_tools(model: Option<String>, gpu: Option<bool>) -> ImportTools {
   let tier = model.as_deref().and_then(|m| Tier::parse(m).ok()).unwrap_or(Tier::Standard);
+  let gpu = gpu.unwrap_or(false);
   // No YouTube on Windows: Chrome there encrypts cookies so yt-dlp cannot sign in.
   let youtube = !cfg!(windows) && crate::import::find_bin("yt-dlp").is_ok();
-  ImportTools { whisper: find(tier).is_some(), youtube }
+  ImportTools { whisper: find(tier, gpu).is_some(), youtube }
 }
 
 #[derive(serde::Serialize)]
@@ -413,6 +457,13 @@ mod tests {
     cmd.env_clear().env("PATH", "/usr/bin:/bin");
     let out = cmd.arg("--help").output().unwrap();
     assert!(String::from_utf8_lossy(&out.stderr).contains("usage") || String::from_utf8_lossy(&out.stdout).contains("usage"));
+    // The Vulkan build only downloads and unpacks here: the CI runner has no
+    // Vulkan driver to start it (whisper-vulkan.yml runs it on lavapipe).
+    #[cfg(windows)]
+    {
+      rt.block_on(fetch(&WHISPER_VULKAN, &dir, |_| {})).unwrap();
+      assert!(dir.join(WHISPER_VULKAN_EXE).is_file());
+    }
     std::fs::remove_dir_all(&dir).unwrap();
   }
 

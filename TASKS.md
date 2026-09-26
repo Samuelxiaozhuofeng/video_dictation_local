@@ -1,3 +1,12 @@
+# Windows 显卡加速（Vulkan，设置里的开关，默认关）
+
+- [x] 前端开关 + gpu 参数传到 start_import / import_tools（浏览器实测过）
+- [x] Rust：下载 vulkan 版、没 vulkan-1.dll 就用 CPU、显卡失败退回 CPU
+- [x] 写 .github/workflows/whisper-vulkan.yml（编译 + lavapipe 实测 + 发 Release）
+- [x] 审码（Gemini）结论核完：能合，无缺陷
+- [x] push → 跑 whisper-vulkan.yml（lavapipe 上真走 Vulkan0 通过）→ size / sha256 已填
+- [ ] 跑 windows.yml 出 Windows 测试包，交给提需求的用户在真显卡上试
+
 # 日语分词（按需下载 kuromoji 词典 + AI 校对）
 
 用户拍板：打假名读音也算对；设置里勾「AI 校对日语分词」后台整部校；助词粘前一个词（今日は 一格）；词典不进安装包，第一次遇到日语时提示下载。

@@ -201,7 +201,8 @@ export type ImportTools = { whisper: boolean; youtube: boolean };
 // machine (else the first local import downloads them). youtube: yt-dlp is
 // installed by hand, so the link box is worth showing.
 export async function importTools(): Promise<ImportTools> {
-  return invoke('import_tools', { model: getTranscribeConfig().localModel });
+  const { model, gpu } = engineArgs();
+  return invoke('import_tools', { model: model ?? getTranscribeConfig().localModel, gpu });
 }
 
 export async function probeImportSizes(url: string): Promise<QualitySizes> {

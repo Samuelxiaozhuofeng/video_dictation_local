@@ -1,4 +1,5 @@
 import { isBadKey } from './aiConfig';
+import { IS_WINDOWS } from './platform';
 
 // Settings → Transcription: how "make subtitles" runs. On this machine with one
 // of two model sizes, or on a cloud service with the user's own key: Groq
@@ -7,7 +8,8 @@ import { isBadKey } from './aiConfig';
 
 export type TranscribeMode = 'local' | 'cloud' | 'bailian';
 export type LocalModel = 'standard' | 'light';
-export type TranscribeConfig = { mode: TranscribeMode; localModel: LocalModel; groqKey: string; bailianKey: string };
+// gpu: Windows only — run whisper on the graphics card (Vulkan) instead of the CPU.
+export type TranscribeConfig = { mode: TranscribeMode; localModel: LocalModel; gpu: boolean; groqKey: string; bailianKey: string };
 export type CloudMode = Exclude<TranscribeMode, 'local'>;
 
 export const CLOUD = {
@@ -16,7 +18,7 @@ export const CLOUD = {
 } as const;
 
 const STORAGE_KEY = 'linguaclip_transcribe_config';
-const DEFAULTS: TranscribeConfig = { mode: 'local', localModel: 'standard', groqKey: '', bailianKey: '' };
+const DEFAULTS: TranscribeConfig = { mode: 'local', localModel: 'standard', gpu: false, groqKey: '', bailianKey: '' };
 
 export function getTranscribeConfig(): TranscribeConfig {
   try {
@@ -25,6 +27,7 @@ export function getTranscribeConfig(): TranscribeConfig {
     return {
       mode: stored.mode === 'cloud' || stored.mode === 'bailian' ? stored.mode : 'local',
       localModel: stored.localModel === 'light' ? 'light' : 'standard',
+      gpu: stored.gpu === true,
       groqKey: str(stored.groqKey),
       bailianKey: str(stored.bailianKey),
     };
@@ -50,6 +53,6 @@ export function cloudKeyMissing(config = getTranscribeConfig()): boolean {
 // What start_import needs to know about the engine (src-tauri/src/import.rs).
 export function engineArgs(config = getTranscribeConfig()) {
   return config.mode === 'local'
-    ? { engine: 'local', model: config.localModel, apiKey: null }
-    : { engine: CLOUD[config.mode].engine, model: null, apiKey: cloudKey(config) };
+    ? { engine: 'local', model: config.localModel, gpu: IS_WINDOWS && config.gpu, apiKey: null }
+    : { engine: CLOUD[config.mode].engine, model: null, gpu: false, apiKey: cloudKey(config) };
 }

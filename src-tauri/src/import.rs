@@ -609,7 +609,8 @@ pub(crate) fn read_words(json_path: &Path) -> Result<Vec<Word>, String> {
 
 // Settings → Transcription: this machine (with a model size) or a cloud service.
 pub(crate) enum Engine {
-  Local(crate::whisper_setup::Tier),
+  // The bool: Windows "Transcribe on the graphics card".
+  Local(crate::whisper_setup::Tier, bool),
   Cloud { provider: crate::cloud_asr::Provider, api_key: String },
 }
 
@@ -620,8 +621,8 @@ fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str, quality: u32,
   // First import on a new Mac: fetch the transcription parts before anything
   // else, so a failure here never leaves a half-downloaded video behind.
   let parts = match engine {
-    Engine::Local(tier) => Some((
-      crate::whisper_setup::ensure(*tier, |pct| {
+    Engine::Local(tier, gpu) => Some((
+      crate::whisper_setup::ensure(*tier, *gpu, |pct| {
         emit(app, ImportProgress::stage(id, "setup", Some(pct)));
       })?,
       *tier,
@@ -668,7 +669,17 @@ fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str, quality: u32,
     (Some((parts, tier)), _) => {
       emit(app, ImportProgress::stage(id, "transcribe", Some(0)));
       let on_pct = |pct| emit(app, ImportProgress::stage(id, "transcribe", Some(pct)));
-      transcribe(on_pct, &parts.whisper, &parts.model, &parts.vad, tier.dtw(), lang, &wav, &work).map(|()| None)
+      let run = |whisper: &Path| transcribe(on_pct, whisper, &parts.model, &parts.vad, tier.dtw(), lang, &wav, &work);
+      // A graphics card whose driver cannot run it: same job again on the CPU.
+      match (run(&parts.whisper), &parts.fallback) {
+        (Err(e), Some(cpu)) => {
+          log::error!("gpu transcribe failed, retrying on cpu: {e}");
+          emit(app, ImportProgress::stage(id, "transcribe", Some(0)));
+          run(cpu)
+        }
+        (r, _) => r,
+      }
+      .map(|()| None)
     }
     (None, Engine::Cloud { provider, api_key }) => {
       emit(app, ImportProgress::stage(id, "cloud", Some(0)));
@@ -676,7 +687,7 @@ fn run_import(app: &AppHandle, id: &str, source: &str, lang: &str, quality: u32,
       // Writes <work>.srt like whisper-cli; the words come back directly.
       crate::cloud_asr::transcribe(on_pct, *provider, api_key, lang, &wav, &work).map(Some)
     }
-    (None, Engine::Local(_)) => unreachable!("local engine always has parts"),
+    (None, Engine::Local(..)) => unreachable!("local engine always has parts"),
   }
   .and_then(|words| {
     std::fs::rename(work.with_extension("srt"), &srt).map_err(|e| format!("transcribe:{e}"))?;
@@ -738,6 +749,7 @@ pub fn start_import(
   quality: u32,
   engine: Option<String>,
   model: Option<String>,
+  gpu: Option<bool>,
   api_key: Option<String>,
 ) -> Result<(), String> {
   if id.trim().is_empty() || source.trim().is_empty() {
@@ -756,7 +768,7 @@ pub fn start_import(
   }
   // Older front ends send no engine: that is the local standard model.
   let engine = match engine.as_deref().unwrap_or("local") {
-    "local" => Engine::Local(crate::whisper_setup::Tier::parse(model.as_deref().unwrap_or("standard"))?),
+    "local" => Engine::Local(crate::whisper_setup::Tier::parse(model.as_deref().unwrap_or("standard"))?, gpu.unwrap_or(false)),
     cloud @ ("groq" | "bailian") => {
       let key = api_key.unwrap_or_default().trim().to_string();
       if key.is_empty() {

@@ -11,10 +11,11 @@ import {
   saveTranscribeConfig,
 } from '../utils/transcribeConfig';
 import { useT } from '../utils/i18n';
+import { IS_WINDOWS } from '../utils/platform';
 import { Btn, Field, Seg, inputCls } from './ui';
 
-// Settings → Transcription: this machine (standard / light model, where its
-// parts live) or a cloud service (link to get a key, the key itself).
+// Settings → Transcription: this machine (standard / light model, graphics card
+// on Windows, where its parts live) or a cloud service (link to get a key, the key itself).
 const SettingsTranscribe: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
   const t = useT();
   const [config, setConfig] = useState<TranscribeConfig>(getTranscribeConfig);
@@ -65,6 +66,15 @@ const SettingsTranscribe: React.FC<{ onSaved: () => void }> = ({ onSaved }) => {
               ]}
             />
           </Field>
+
+          {IS_WINDOWS && (
+            <Field label={t('transcribe.gpu')} hint={t('transcribe.gpuHint')}>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" checked={config.gpu} onChange={e => update({ gpu: e.target.checked })} className="w-4 h-4 accent-accent" />
+                {t('transcribe.gpuLabel')}
+              </label>
+            </Field>
+          )}
 
           {location && (
             <Field
