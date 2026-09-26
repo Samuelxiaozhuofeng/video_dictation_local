@@ -49,6 +49,9 @@ jobs:
           Add-Content $env:GITHUB_ENV "VK_ICD_FILENAMES=$icd"
           # lavapipe reports itself as a CPU device, which ggml skips unless named.
           Add-Content $env:GITHUB_ENV "GGML_VK_VISIBLE_DEVICES=0"
+          Get-ChildItem mesa\x64 -Filter *lvp*
+          $env:VK_DRIVER_FILES = "$icd"; $env:VK_ICD_FILENAMES = "$icd"
+          vulkaninfo --summary
 
       # The app's own flags (src-tauri/src/import.rs transcribe): VAD, DTW word
       # timings with flash attention off, srt + full json out.
