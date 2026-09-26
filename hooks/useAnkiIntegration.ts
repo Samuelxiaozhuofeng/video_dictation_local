@@ -43,7 +43,11 @@ function tapVideo(video: HTMLVideoElement): VideoAudioTap {
   return tap;
 }
 
+// AAC/m4a first: AnkiMobile (iPad/iPhone) can't play webm/opus; desktop and AnkiDroid play m4a too.
 function pickRecorderMime(): { mimeType: string; ext: string } {
+  if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/mp4;codecs=mp4a.40.2')) {
+    return { mimeType: 'audio/mp4;codecs=mp4a.40.2', ext: 'm4a' };
+  }
   if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm')) {
     return { mimeType: 'audio/webm', ext: 'webm' };
   }
