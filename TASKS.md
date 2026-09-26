@@ -5,7 +5,8 @@
 - [x] 写 .github/workflows/whisper-vulkan.yml（编译 + lavapipe 实测 + 发 Release）
 - [x] 审码（Gemini）结论核完：能合，无缺陷
 - [x] push → 跑 whisper-vulkan.yml（lavapipe 上真走 Vulkan0 通过）→ size / sha256 已填
-- [ ] 跑 windows.yml 出 Windows 测试包，交给提需求的用户在真显卡上试
+- [x] 跑 windows.yml 出 Windows 测试包（run 36220916594）
+- [ ] 提需求的用户在真显卡上试
 
 # 日语分词（按需下载 kuromoji 词典 + AI 校对）
 
