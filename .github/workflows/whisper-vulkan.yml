@@ -1,0 +1,82 @@
+# Builds the Vulkan whisper-cli that Windows users download when they turn on
+# Settings → Transcription → "Transcribe on the graphics card". The runner has
+# no GPU, so it is checked on Mesa's software Vulkan device (lavapipe) with the
+# same flags the app uses. Run by hand: `gh workflow run whisper-vulkan.yml`.
+# Publishes Release "whisper-vulkan-1.8.4"; then put the size and sha256 printed
+# by "Pack" into WHISPER_VULKAN in src-tauri/src/whisper_setup.rs.
+name: whisper Vulkan build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      WHISPER_VERSION: v1.8.4
+      VULKAN_VERSION: 1.4.313.2
+      MESA_VERSION: 26.2.1
+      TAG: whisper-vulkan-1.8.4
+    steps:
+      - name: Install Vulkan SDK
+        run: |
+          curl.exe -fsSL -o "$env:RUNNER_TEMP\vk.exe" "https://sdk.lunarg.com/sdk/download/$env:VULKAN_VERSION/windows/vulkansdk-windows-X64-$env:VULKAN_VERSION.exe"
+          & "$env:RUNNER_TEMP\vk.exe" --accept-licenses --default-answer --confirm-command install | Out-Null
+          Add-Content $env:GITHUB_ENV "VULKAN_SDK=C:\VulkanSDK\$env:VULKAN_VERSION"
+          Add-Content $env:GITHUB_PATH "C:\VulkanSDK\$env:VULKAN_VERSION\bin"
+
+      # Same as whisper.cpp's own Windows release (shared libs, MSVC), plus Vulkan.
+      # AVX2 instead of "native": the build machine's CPU is not the user's.
+      - name: Build
+        run: |
+          git clone -q --depth 1 --branch $env:WHISPER_VERSION https://github.com/ggml-org/whisper.cpp wcpp
+          cmake -S wcpp -B build -A x64 -DBUILD_SHARED_LIBS=ON -DGGML_VULKAN=ON `
+            -DGGML_NATIVE=OFF -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON `
+            -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF
+          cmake --build build --config Release -j --target whisper-cli
+          Rename-Item build\bin\Release vulkan
+          Get-ChildItem build\bin\vulkan
+
+      - name: Software Vulkan device (lavapipe)
+        run: |
+          curl.exe -fsSL -o mesa.7z "https://github.com/pal1000/mesa-dist-win/releases/download/$env:MESA_VERSION/mesa3d-$env:MESA_VERSION-release-msvc.7z"
+          7z x -omesa mesa.7z | Out-Null
+          $icd = Resolve-Path mesa\x64\lvp_icd.x86_64.json
+          Add-Content $env:GITHUB_ENV "VK_DRIVER_FILES=$icd"
+          Add-Content $env:GITHUB_ENV "VK_ICD_FILENAMES=$icd"
+          # lavapipe reports itself as a CPU device, which ggml skips unless named.
+          Add-Content $env:GITHUB_ENV "GGML_VK_VISIBLE_DEVICES=0"
+
+      # The app's own flags (src-tauri/src/import.rs transcribe): VAD, DTW word
+      # timings with flash attention off, srt + full json out.
+      - name: Transcribe on Vulkan
+        run: |
+          curl.exe -fsSL -o base.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+          curl.exe -fsSL -o vad.bin https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin
+          $log = & build\bin\vulkan\whisper-cli.exe -m base.bin -l en --vad --vad-model vad.bin -pp -nfa --dtw base.en `
+            -f wcpp\samples\jfk.wav -osrt -oj -ojf -of out 2>&1 | Out-String
+          $log
+          if ($LASTEXITCODE -ne 0) { throw "whisper-cli exit $LASTEXITCODE" }
+          if ($log -notmatch 'using Vulkan') { throw 'did not run on Vulkan' }
+          $srt = Get-Content out.srt -Raw
+          if ($srt -notmatch '(?i)ask not what your country') { throw "bad transcript: $srt" }
+          if ((Get-Content out.json -Raw) -notmatch 't_dtw') { throw 'no word timings' }
+
+      - name: Pack
+        run: |
+          Compress-Archive -Path build\bin\vulkan -DestinationPath whisper-vulkan-x64.zip
+          "size:   " + (Get-Item whisper-vulkan-x64.zip).Length
+          "sha256: " + (Get-FileHash whisper-vulkan-x64.zip -Algorithm SHA256).Hash.ToLower()
+
+      - name: Publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
+            gh release create "$TAG" -R "$GITHUB_REPOSITORY" --title "whisper-cli 1.8.4 (Windows, Vulkan)" \
+              --notes "whisper.cpp $WHISPER_VERSION built with Vulkan. Downloaded by LinguaClip on Windows when \"Transcribe on the graphics card\" is on."
+          gh release upload "$TAG" whisper-vulkan-x64.zip -R "$GITHUB_REPOSITORY" --clobber
