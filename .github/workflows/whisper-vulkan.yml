@@ -44,13 +44,14 @@ jobs:
         run: |
           curl.exe -fsSL -o mesa.7z "https://github.com/pal1000/mesa-dist-win/releases/download/$env:MESA_VERSION/mesa3d-$env:MESA_VERSION-release-msvc.7z"
           7z x -omesa mesa.7z | Out-Null
-          $icd = Resolve-Path mesa\x64\lvp_icd.x86_64.json
-          Add-Content $env:GITHUB_ENV "VK_DRIVER_FILES=$icd"
-          Add-Content $env:GITHUB_ENV "VK_ICD_FILENAMES=$icd"
+          # The runner is elevated, and an elevated Vulkan loader ignores
+          # VK_DRIVER_FILES: register the ICD the way a real driver does.
+          $icd = (Resolve-Path mesa\x64\lvp_icd.x86_64.json).Path
+          $key = "HKLM:\SOFTWARE\Khronos\Vulkan\Drivers"
+          if (!(Test-Path $key)) { New-Item -Path $key -Force | Out-Null }
+          New-ItemProperty -Force -Path $key -Name $icd -PropertyType DWord -Value 0 | Out-Null
           # lavapipe reports itself as a CPU device, which ggml skips unless named.
           Add-Content $env:GITHUB_ENV "GGML_VK_VISIBLE_DEVICES=0"
-          Get-ChildItem mesa\x64 -Filter *lvp*
-          $env:VK_DRIVER_FILES = "$icd"; $env:VK_ICD_FILENAMES = "$icd"
           vulkaninfo --summary
 
       # The app's own flags (src-tauri/src/import.rs transcribe): VAD, DTW word
