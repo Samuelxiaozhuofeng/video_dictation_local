@@ -165,7 +165,7 @@ impl WavWriter {
 mod tests {
   use super::*;
 
-  // tests/fixtures/tone.{mp4,mov}: 3 s of a 440 Hz tone, stereo AAC at 44.1 kHz
+  // tests/fixtures/tone*.{mp4,mov,m4v}: 3 s of a 440 Hz tone (tone.mp4/.mov: stereo AAC at 44.1 kHz)
   // (made with ffmpeg's sine source). Checks length, format and that it is not silent.
   fn check(name: &str) {
     let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures").join(name);
@@ -192,6 +192,15 @@ mod tests {
   #[test]
   fn decodes_mov() {
     check("tone.mov");
+  }
+
+  // Same tone with the other audio codecs mp4/mov carry: MP3, 16-bit PCM
+  // (camera .mov, mono 22.05 kHz), ALAC. Opus and AC-3 have no decoder here.
+  #[test]
+  fn decodes_other_codecs() {
+    for name in ["tone-mp3.mp4", "tone-pcm.mov", "tone-alac.m4v"] {
+      check(name);
+    }
   }
 
   #[test]
