@@ -131,6 +131,8 @@ export const zh: Record<keyof typeof en, string> = {
   'import.failedDownload': '下载失败：{detail}',
   'import.failedSetup': '转录组件没下载完：{detail}。点重试会接着下',
   'import.failedExtract': '提取音频失败：{detail}',
+  'import.extractCodec': '这个视频的声音格式暂不支持。请先把它转成普通 mp4（AAC 声音）再导入',
+  'import.extractNoAudio': '这个视频里没找到能识别的声音：可能本来没声音，或是杜比 AC-3 等暂不支持的格式。请先转成普通 mp4（AAC 声音）再导入',
   'import.failedTranscribe': '转录失败：{detail}',
   'import.stageCloud': '云端转录中 {pct}%',
   'import.cloudKey': '云端转录的密钥没填或不对。打开 设置 → 转录 重新填，再点重试',

@@ -79,6 +79,9 @@ export function formatImportError(raw: string): string {
   if (raw.startsWith('download:')) {
     return t('import.failedDownload', { detail: raw.slice('download:'.length) });
   }
+  // Codecs our Windows decoder lacks (Opus, AC-3…): the raw text is jargon.
+  if (/^extract:.*unsupported codec/.test(raw)) return t('import.extractCodec');
+  if (raw === 'extract:no audio track') return t('import.extractNoAudio');
   if (raw.startsWith('extract:')) {
     return t('import.failedExtract', { detail: raw.slice('extract:'.length) });
   }

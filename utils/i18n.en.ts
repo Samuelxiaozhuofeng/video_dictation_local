@@ -130,6 +130,8 @@ export const en = {
   'import.failedDownload': 'Download failed: {detail}',
   'import.failedSetup': 'Transcription parts did not finish downloading: {detail}. Retry picks up where it stopped',
   'import.failedExtract': 'Audio extract failed: {detail}',
+  'import.extractCodec': "This video's audio format isn't supported. Convert it to a standard mp4 (AAC audio) and import again",
+  'import.extractNoAudio': 'No readable audio in this video: it may be silent, or use an unsupported format such as Dolby AC-3. Convert it to a standard mp4 (AAC audio) and import again',
   'import.failedTranscribe': 'Transcription failed: {detail}',
   'import.stageCloud': 'Transcribing in the cloud {pct}%',
   'import.cloudKey': 'The cloud transcription key is missing or wrong. Fix it in Settings → Transcription, then retry',
